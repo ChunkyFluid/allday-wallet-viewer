@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>NFL ALL DAY Wallet Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020617;
+        --bg-elevated: #020617;
+        --bg-elevated-soft: #020617;
+        --border-subtle: #1f2937;
+        --border-strong: #4b5563;
+        --text-main: #e5e7eb;
+        --text-muted: #9ca3af;
+        --accent: #22c55e;
+        --accent-soft: #022c16;
+        --danger: #ef4444;
+        --pill-bg: #020617;
+        --pill-border: #374151;
+        --pill-active-bg: #022c16;
+        --pill-active-border: #22c55e;
+        --table-header-bg: #020617;
+        --table-row-alt: #020617;
+        --table-row-hover: #020617;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: radial-gradient(circle at top, #020617 0, #020617 55%, #020617 90%);
+        color: var(--text-main);
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #020617;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+
+      header h1 {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      header .badge {
+        font-size: 0.7rem;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        color: var(--text-muted);
+      }
+
+      .main-layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 0;
+        padding: 0;
+      }
+
+      @media (max-width: 900px) {
+        .main-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      aside.sidebar {
+        border-right: 1px solid var(--border-subtle);
+        background: #020617;
+        padding: 0.75rem 0.75rem 1rem;
+        position: sticky;
+        top: 3rem;
+        align-self: flex-start;
+        max-height: calc(100vh - 3rem);
+        overflow-y: auto;
+      }
+
+      .sidebar h2 {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .sidebar-group {
+        border-radius: 0.75rem;
+        border: 1px solid var(--border-subtle);
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+        background: #020617;
+      }
+
+      .sidebar-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.35rem 0.6rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        color: var(--text-muted);
+        user-select: none;
+      }
+
+      .sidebar-group-header span.label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .sidebar-group-toggle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-right: 0.25rem;
+      }
+
+      .sidebar-group-body {
+        padding: 0.35rem 0.45rem 0.45rem;
+        border-top: 1px solid var(--border-subtle);
+      }
+
+      .sidebar-group.collapsed .sidebar-group-body {
+        display: none;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 999px;
+        border: 1px solid var(--pill-border);
+        padding: 0.05rem 0.45rem;
+        font-size: 0.7rem;
+        margin: 0.12rem;
+        color: var(--text-muted);
+        background: var(--pill-bg);
+        white-space: nowrap;
+      }
+
+      .pill strong {
+        color: var(--text-main);
+        margin-left: 0.25rem;
+      }
+
+      .pill:hover {
+        border-color: var(--accent);
+      }
+
+      .link-pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        padding: 0.1rem 0.6rem;
+        font-size: 0.7rem;
+        margin: 0.1rem;
+        cursor: pointer;
+        color: var(--text-muted);
+        background: #020617;
+      }
+
+      .link-pill:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .sidebar-footer {
+        margin-top: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .sidebar-footer button {
+        width: 100%;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+        cursor: pointer;
+      }
+
+      .sidebar-footer button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .content {
+        padding: 0.75rem 1.25rem 1.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .controls input[type="text"] {
+        flex: 1 1 260px;
+        min-width: 0;
+        padding: 0.45rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(15, 23, 42, 0.7);
+        color: var(--text-main);
+        font-size: 0.85rem;
+      }
+
+      .controls input[type="text"]::placeholder {
+        color: #6b7280;
+      }
+
+      .controls button {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        padding: 0.35rem 0.9rem;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .controls button#submit-btn {
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 500;
+      }
+
+      .controls button#submit-btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      .controls button:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      #status {
+        min-height: 1.1rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.3rem;
+      }
+
+      #status.error {
+        color: var(--danger);
+      }
+
+      #recent {
+        display: none;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 0.35rem;
+      }
+
+      #recent-label {
+        margin-right: 0.35rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      #summary {
+        display: none;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.15rem;
+      }
+
+      #summary-wallet {
+        font-weight: 500;
+        color: var(--text-main);
+      }
+
+      #summary-count {
+        margin-left: 0.25rem;
+      }
+
+      #summary-stats {
+        display: none;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-bottom: 0.35rem;
+      }
+
+      #filters {
+        display: none;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-bottom: 0.4rem;
+        font-size: 0.8rem;
+      }
+
+      #filter-text {
+        flex: 1 1 200px;
+        min-width: 0;
+        padding: 0.35rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(15, 23, 42, 0.7);
+        color: var(--text-main);
+        font-size: 0.8rem;
+      }
+
+      #filter-tier {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+      }
+
+      #download-csv-btn {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        padding: 0.3rem 0.7rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+      }
+
+      #download-csv-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      #table-container {
+        display: none;
+        border-radius: 0.9rem;
+        border: 1px solid var(--border-subtle);
+        background: rgba(15, 23, 42, 0.7);
+        overflow: hidden;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.78rem;
+        table-layout: fixed;
+      }
+
+      thead {
+        background: var(--table-header-bg);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      th,
+      td {
+        padding: 0.45rem 0.4rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(31, 41, 55, 0.5);
+        white-space: nowrap;
+      }
+
+      th:first-child,
+      td:first-child {
+        padding-left: 0.75rem;
+      }
+
+      th:last-child,
+      td:last-child {
+        padding-right: 0.75rem;
+      }
+
+      th {
+        font-weight: 500;
+        font-size: 0.75rem;
+        color: #9ca3af;
+        cursor: pointer;
+        position: relative;
+      }
+
+      th span.label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      .sort-indicator {
+        font-size: 0.65rem;
+        opacity: 0.75;
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(15, 23, 42, 0.4);
+      }
+
+      tbody tr:hover {
+        background: rgba(34, 197, 94, 0.07);
+      }
+
+      td {
+        color: var(--text-main);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid var(--accent);
+        padding: 0.1rem 0.5rem;
+        font-size: 0.7rem;
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      #pagination {
+        display: none;
+        padding: 0.35rem 0.75rem;
+        background: rgba(15, 23, 42, 0.95);
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      #page-size {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        padding: 0.1rem 0.4rem;
+        font-size: 0.75rem;
+      }
+
+      #page-info {
+        font-variant-numeric: tabular-nums;
+      }
+
+      #pagination button {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: #020617;
+        color: var(--text-muted);
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        margin-left: 0.25rem;
+      }
+
+      #pagination button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      #pagination button:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* Stable column widths */
+      #table-container th,
+      #table-container td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* tweak numbers to taste */
+      #table-container th:nth-child(1),
+      #table-container td:nth-child(1) {
+        width: 180px;
+      } /* Player */
+
+      #table-container th:nth-child(2),
+      #table-container td:nth-child(2) {
+        width: 150px;
+      } /* Team */
+
+      #table-container th:nth-child(3),
+      #table-container td:nth-child(3) {
+        width: 30px;
+      } /* Pos */
+
+      #table-container th:nth-child(4),
+      #table-container td:nth-child(4) {
+        width: 95px;
+      } /* Tier */
+
+      #table-container th:nth-child(5),
+      #table-container td:nth-child(5) {
+        width: 220px;
+      } /* Set */
+
+      #table-container th:nth-child(6),
+      #table-container td:nth-child(6) {
+        width: 90px;
+      } /* Series */
+
+      #table-container th:nth-child(7),
+      #table-container td:nth-child(7) {
+        width: 60px;
+      } /* Serial */
+
+      #table-container th:nth-child(8),
+      #table-container td:nth-child(8) {
+        width: 60px;
+      } /* Max Mint */
+
+      #table-container th:nth-child(9),
+      #table-container td:nth-child(9) {
+        width: 60px;
+      } /* Low Ask */
+
+      #table-container th:nth-child(10),
+      #table-container td:nth-child(10) {
+        width: 60px;
+      } /* ASP (90d) */
+
+      #table-container th:nth-child(11),
+      #table-container td:nth-child(11) {
+        width: 150px;
+      } /* Last Event */
+
+      #table-container th:nth-child(12),
+      #table-container td:nth-child(12) {
+        width: 110px;
+      } /* NFT ID */
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>NFL ALL DAY – Wallet Viewer</h1>
+        <div class="badge">Alpha</div>
+      </header>
+
+      <div class="main-layout">
+        <aside class="sidebar">
+          <h2>Filters</h2>
+
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-toggle">▾</span>
+              <span class="label">Tiers</span>
+            </div>
+            <div class="sidebar-group-body" id="summary-tiers"></div>
+          </div>
+
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-toggle">▾</span>
+              <span class="label">Teams</span>
+            </div>
+            <div class="sidebar-group-body" id="summary-teams"></div>
+          </div>
+
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-toggle">▾</span>
+              <span class="label">Sets</span>
+            </div>
+            <div class="sidebar-group-body" id="summary-sets"></div>
+          </div>
+
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-toggle">▾</span>
+              <span class="label">Series</span>
+            </div>
+            <div class="sidebar-group-body" id="summary-series"></div>
+          </div>
+
+          <div class="sidebar-footer">
+            <button id="clear-filters-btn" type="button">Clear all filters</button>
+          </div>
+        </aside>
+
+        <section class="content">
+          <form id="wallet-form" class="controls">
+            <input id="wallet-input" type="text" placeholder="Flow / Dapper wallet (0x...)" autocomplete="off" />
+            <button id="submit-btn" type="submit">Load collection</button>
+            <button id="copy-link-btn" type="button">Copy link</button>
+          </form>
+
+          <div id="status"></div>
+
+          <div id="recent">
+            <span id="recent-label">Recent:</span>
+            <div id="recent-list"></div>
+          </div>
+
+          <div id="summary">
+            <span id="summary-wallet"></span>
+            <span id="summary-count"></span>
+          </div>
+          <div id="summary-stats"></div>
+
+          <div id="filters">
+            <input
+              id="filter-text"
+              type="text"
+              placeholder="Filter by player, team, set, series..."
+              autocomplete="off" />
+            <select id="filter-tier">
+              <option value="">All tiers</option>
+              <option value="COMMON">COMMON</option>
+              <option value="RARE">RARE</option>
+              <option value="LEGENDARY">LEGENDARY</option>
+              <option value="ICONIC">ICONIC</option>
+            </select>
+            <button id="download-csv-btn" type="button">Download CSV</button>
+          </div>
+
+          <div id="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th data-key="player">
+                    <span class="label">Player</span><span class="sort-indicator" data-key="player"></span>
+                  </th>
+                  <th data-key="team_name">
+                    <span class="label">Team</span><span class="sort-indicator" data-key="team_name"></span>
+                  </th>
+                  <th data-key="position">
+                    <span class="label">Pos</span><span class="sort-indicator" data-key="position"></span>
+                  </th>
+                  <th data-key="tier">
+                    <span class="label">Tier</span><span class="sort-indicator" data-key="tier"></span>
+                  </th>
+                  <th data-key="set_name">
+                    <span class="label">Set</span><span class="sort-indicator" data-key="set_name"></span>
+                  </th>
+                  <th data-key="series_name">
+                    <span class="label">Series</span><span class="sort-indicator" data-key="series_name"></span>
+                  </th>
+                  <th data-key="serial_number">
+                    <span class="label">Serial</span><span class="sort-indicator" data-key="serial_number"></span>
+                  </th>
+                  <th data-key="max_mint_size">
+                    <span class="label">Max Mint</span><span class="sort-indicator" data-key="max_mint_size"></span>
+                  </th>
+                  <th data-key="low_ask">
+                    <span class="label">Low Ask</span><span class="sort-indicator" data-key="low_ask"></span>
+                  </th>
+                  <th data-key="asp_90d">
+                    <span class="label">ASP (90d)</span><span class="sort-indicator" data-key="asp_90d"></span>
+                  </th>
+                  <th data-key="last_event_ts">
+                    <span class="label">Last Event</span><span class="sort-indicator" data-key="last_event_ts"></span>
+                  </th>
+                  <th data-key="nft_id">
+                    <span class="label">NFT ID</span><span class="sort-indicator" data-key="nft_id"></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+
+            <div id="pagination">
+              <div>
+                <span id="page-info"></span>
+              </div>
+              <div>
+                <label for="page-size">Rows / page:</label>
+                <select id="page-size">
+                  <option value="100">100</option>
+                  <option value="200" selected>200</option>
+                  <option value="500">500</option>
+                </select>
+                <button id="prev-page-btn" type="button">Prev</button>
+                <button id="next-page-btn" type="button">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById("wallet-form");
+      const input = document.getElementById("wallet-input");
+      const statusEl = document.getElementById("status");
+      const summaryEl = document.getElementById("summary");
+      const summaryWalletEl = document.getElementById("summary-wallet");
+      const summaryCountEl = document.getElementById("summary-count");
+      const summaryStatsEl = document.getElementById("summary-stats");
+      const summaryTiersEl = document.getElementById("summary-tiers");
+      const summaryTeamsEl = document.getElementById("summary-teams");
+      const summarySetsEl = document.getElementById("summary-sets");
+      const summarySeriesEl = document.getElementById("summary-series");
+      const filtersEl = document.getElementById("filters");
+      const filterTextEl = document.getElementById("filter-text");
+      const filterTierEl = document.getElementById("filter-tier");
+      const clearFiltersBtn = document.getElementById("clear-filters-btn");
+      const tableContainerEl = document.getElementById("table-container");
+      const tbody = document.getElementById("results-body");
+      const submitBtn = document.getElementById("submit-btn");
+      const copyLinkBtn = document.getElementById("copy-link-btn");
+      const recentEl = document.getElementById("recent");
+      const recentListEl = document.getElementById("recent-list");
+      const downloadCsvBtn = document.getElementById("download-csv-btn");
+
+      const paginationEl = document.getElementById("pagination");
+      const pageInfoEl = document.getElementById("page-info");
+      const pageSizeSelect = document.getElementById("page-size");
+      const prevPageBtn = document.getElementById("prev-page-btn");
+      const nextPageBtn = document.getElementById("next-page-btn");
+
+      let fullRows = [];
+      let filteredRows = [];
+      let currentRows = [];
+      let currentSortKey = "last_event_ts";
+      let currentSortDir = "desc";
+      let currentWallet = "";
+
+      let pageSize = parseInt(pageSizeSelect.value, 10) || 200;
+      let currentPage = 1;
+
+      // sticky sidebar filters
+      let activeTeamFilter = "";
+      let activeSetFilter = "";
+      let activeSeriesFilter = "";
+
+      const RECENT_KEY = "allday_recent_wallets";
+      const RECENT_LIMIT = 8;
+
+      function setStatus(msg, isError = false) {
+        statusEl.textContent = msg || "";
+        statusEl.classList.toggle("error", !!isError);
+      }
+
+      function isWallet(str) {
+        return /^0x[0-9a-fA-F]{4,64}$/.test((str || "").trim());
+      }
+
+      function formatDate(ts) {
+        if (!ts) return "";
+        try {
+          const d = new Date(ts);
+          if (Number.isNaN(d.getTime())) return "";
+          return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        } catch {
+          return "";
+        }
+      }
+
+      function formatCurrency(num) {
+        if (num == null || Number.isNaN(num)) return "";
+        const n = Number(num);
+        if (Number.isNaN(n)) return "";
+        return (
+          "$" +
+          n.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+          })
+        );
+      }
+
+      function computeSummary(rows, wallet) {
+        if (!rows || !rows.length) {
+          summaryEl.style.display = "none";
+          summaryStatsEl.style.display = "none";
+          filtersEl.style.display = "none";
+          tableContainerEl.style.display = "none";
+          return;
+        }
+
+        summaryWalletEl.textContent = "Wallet: " + wallet;
+        summaryCountEl.textContent = " · Total moments: " + rows.length.toString();
+
+        const tierCounts = {};
+        const teamCounts = {};
+        const setCounts = {};
+        const seriesCounts = {};
+        const playerSet = new Set();
+        const positionSet = new Set();
+
+        let totalLowAsk = 0;
+        let totalAsp = 0;
+        let countLow = 0;
+        let countAsp = 0;
+
+        for (const r of rows) {
+          const tier = (r.tier || "UNKNOWN").toUpperCase();
+          tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+
+          const team = r.team_name || "Unknown";
+          teamCounts[team] = (teamCounts[team] || 0) + 1;
+
+          const setName = r.set_name || "Unknown";
+          setCounts[setName] = (setCounts[setName] || 0) + 1;
+
+          const seriesName = r.series_name || "Unknown";
+          seriesCounts[seriesName] = (seriesCounts[seriesName] || 0) + 1;
+
+          const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
+          if (playerName) {
+            playerSet.add(playerName);
+          }
+          if (r.position) {
+            positionSet.add(r.position);
+          }
+
+          if (typeof r.low_ask === "number") {
+            totalLowAsk += r.low_ask;
+            countLow++;
+          }
+          if (typeof r.asp_90d === "number") {
+            totalAsp += r.asp_90d;
+            countAsp++;
+          }
+        }
+
+        // Tiers
+        summaryTiersEl.innerHTML = "";
+        Object.entries(tierCounts)
+          .sort((a, b) => b[1] - a[1])
+          .forEach(([tier, count]) => {
+            const div = document.createElement("div");
+            div.className = "pill";
+            div.textContent = tier + " · " + count;
+
+            const isActive = filterTierEl.value === tier;
+            if (isActive) {
+              div.style.borderColor = "#22c55e";
+              div.style.background = "#022c16";
+            }
+            div.style.cursor = "pointer";
+            div.title = "Click to toggle filter for this tier";
+
+            div.addEventListener("click", () => {
+              if (filterTierEl.value === tier) {
+                filterTierEl.value = "";
+              } else {
+                filterTierEl.value = tier;
+              }
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
+
+            summaryTiersEl.appendChild(div);
+          });
+
+        // Teams
+        summaryTeamsEl.innerHTML = "";
+        Object.entries(teamCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .forEach(([team, count]) => {
+            const div = document.createElement("div");
+            div.className = "pill";
+            div.textContent = team + " · " + count;
+
+            const isActive = activeTeamFilter === team;
+            if (isActive) {
+              div.style.borderColor = "#22c55e";
+              div.style.background = "#022c16";
+            }
+            div.style.cursor = "pointer";
+            div.title = "Click to toggle filter for this team";
+
+            div.addEventListener("click", () => {
+              if (activeTeamFilter === team) {
+                activeTeamFilter = "";
+              } else {
+                activeTeamFilter = team;
+              }
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
+
+            summaryTeamsEl.appendChild(div);
+          });
+
+        // Sets
+        summarySetsEl.innerHTML = "";
+        Object.entries(setCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 30)
+          .forEach(([setName, count]) => {
+            const div = document.createElement("div");
+            div.className = "pill";
+            div.textContent = setName + " · " + count;
+
+            const isActive = activeSetFilter === setName;
+            if (isActive) {
+              div.style.borderColor = "#22c55e";
+              div.style.background = "#022c16";
+            }
+            div.style.cursor = "pointer";
+            div.title = "Click to toggle filter for this set";
+
+            div.addEventListener("click", () => {
+              if (activeSetFilter === setName) {
+                activeSetFilter = "";
+              } else {
+                activeSetFilter = setName;
+              }
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
+
+            summarySetsEl.appendChild(div);
+          });
+
+        // Series
+        summarySeriesEl.innerHTML = "";
+        Object.entries(seriesCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .forEach(([seriesName, count]) => {
+            const div = document.createElement("div");
+            div.className = "pill";
+            div.textContent = seriesName + " · " + count;
+
+            const isActive = activeSeriesFilter === seriesName;
+            if (isActive) {
+              div.style.borderColor = "#22c55e";
+              div.style.background = "#022c16";
+            }
+            div.style.cursor = "pointer";
+            div.title = "Click to toggle filter for this series";
+
+            div.addEventListener("click", () => {
+              if (activeSeriesFilter === seriesName) {
+                activeSeriesFilter = "";
+              } else {
+                activeSeriesFilter = seriesName;
+              }
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
+
+            summarySeriesEl.appendChild(div);
+          });
+
+        const numTeams = Object.keys(teamCounts).length;
+        const numSets = Object.keys(setCounts).length;
+        const numSeries = Object.keys(seriesCounts).length;
+
+        const parts = [
+          `Players: ${playerSet.size}`,
+          `Teams: ${numTeams}`,
+          `Sets: ${numSets}`,
+          `Series: ${numSeries}`,
+          `Positions: ${positionSet.size}`
+        ];
+
+        if (countLow > 0) {
+          parts.push(`Est (Low Ask): ${formatCurrency(totalLowAsk)}`);
+        }
+        if (countAsp > 0) {
+          parts.push(`Est (ASP 90d): ${formatCurrency(totalAsp)}`);
+        }
+
+        summaryStatsEl.textContent = parts.join(" · ");
+        summaryStatsEl.style.display = "block";
+
+        summaryEl.style.display = "block";
+        filtersEl.style.display = "flex";
+        tableContainerEl.style.display = "block";
+      }
+
+      function sortFilteredRows() {
+        if (!currentSortKey) return;
+        const key = currentSortKey;
+        const dir = currentSortDir === "asc" ? 1 : -1;
+
+        filteredRows.sort((a, b) => {
+          let va, vb;
+
+          if (key === "player") {
+            va = (a.first_name || "") + " " + (a.last_name || "");
+            vb = (b.first_name || "") + " " + (b.last_name || "");
+          } else {
+            va = a[key];
+            vb = b[key];
+          }
+
+          if (key === "serial_number" || key === "max_mint_size" || key === "low_ask" || key === "asp_90d") {
+            const na = Number(va);
+            const nb = Number(vb);
+            if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+            if (Number.isNaN(na)) return -1 * dir;
+            if (Number.isNaN(nb)) return 1 * dir;
+            return (na - nb) * dir;
+          }
+
+          if (key === "last_event_ts") {
+            const da = new Date(a.last_event_ts || 0).getTime();
+            const db = new Date(b.last_event_ts || 0).getTime();
+            return (da - db) * dir;
+          }
+
+          const sa = va === null || va === undefined ? "" : String(va).toLowerCase();
+          const sb = vb === null || vb === undefined ? "" : String(vb).toLowerCase();
+          if (sa < sb) return -1 * dir;
+          if (sa > sb) return 1 * dir;
+          return 0;
+        });
+
+        document.querySelectorAll("th .sort-indicator").forEach((span) => {
+          const k = span.getAttribute("data-key");
+          if (k === currentSortKey) {
+            span.textContent = currentSortDir === "asc" ? "▲" : "▼";
+          } else {
+            span.textContent = "";
+          }
+        });
+      }
+
+      function updatePagination(total, totalPages) {
+        if (!total) {
+          paginationEl.style.display = "none";
+          pageInfoEl.textContent = "";
+          return;
+        }
+
+        const start = (currentPage - 1) * pageSize + 1;
+        const end = Math.min(start + pageSize - 1, total);
+        pageInfoEl.textContent = `Showing ${start}-${end} of ${total}`;
+
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+
+        paginationEl.style.display = "flex";
+      }
+
+      function applyFiltersAndRender() {
+        if (!fullRows.length) {
+          tbody.innerHTML = "";
+          summaryEl.style.display = "none";
+          summaryStatsEl.style.display = "none";
+          filtersEl.style.display = "none";
+          tableContainerEl.style.display = "none";
+          paginationEl.style.display = "none";
+          return;
+        }
+
+        const text = filterTextEl.value.trim().toLowerCase();
+        const tierFilter = filterTierEl.value;
+        const teamFilter = activeTeamFilter;
+        const setFilter = activeSetFilter;
+        const seriesFilter = activeSeriesFilter;
+
+        filteredRows = fullRows.filter((r) => {
+          const tier = (r.tier || "UNKNOWN").toUpperCase();
+          const teamName = r.team_name || "Unknown";
+          const setName = r.set_name || "Unknown";
+          const seriesName = r.series_name || "Unknown";
+
+          if (tierFilter && tier !== tierFilter) return false;
+          if (teamFilter && teamName !== teamFilter) return false;
+          if (setFilter && setName !== setFilter) return false;
+          if (seriesFilter && seriesName !== seriesFilter) return false;
+
+          if (text) {
+            const haystack = [r.first_name, r.last_name, r.team_name, r.set_name, r.series_name]
+              .map((x) => (x || "").toLowerCase())
+              .join(" ");
+            if (!haystack.includes(text)) return false;
+          }
+
+          return true;
+        });
+
+        if (!currentSortKey) {
+          currentSortKey = "last_event_ts";
+          currentSortDir = "desc";
+        }
+        sortFilteredRows();
+
+        const total = filteredRows.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        currentRows = filteredRows.slice(startIdx, endIdx);
+
+        renderTable();
+        updatePagination(total, totalPages);
+        computeSummary(fullRows, currentWallet);
+      }
+
+      function renderTable() {
+        tbody.innerHTML = "";
+
+        for (const r of currentRows) {
+          const tr = document.createElement("tr");
+          const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
+
+          const cols = [
+            playerName,
+            r.team_name || "",
+            r.position || "",
+            r.tier || "",
+            r.set_name || "",
+            r.series_name || "",
+            r.serial_number != null ? r.serial_number : "",
+            r.max_mint_size != null ? r.max_mint_size : "",
+            r.low_ask != null ? formatCurrency(r.low_ask) : "",
+            r.asp_90d != null ? formatCurrency(r.asp_90d) : "",
+            formatDate(r.last_event_ts),
+            r.nft_id
+          ];
+
+          cols.forEach((val, idx) => {
+            const td = document.createElement("td");
+            if (idx === 3 && r.tier) {
+              td.innerHTML = "";
+              const span = document.createElement("span");
+              span.className = "tag";
+              span.textContent = r.tier;
+              td.appendChild(span);
+            } else {
+              td.textContent = val;
+            }
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        }
+      }
+
+      function clearAllFilters() {
+        filterTextEl.value = "";
+        filterTierEl.value = "";
+        activeTeamFilter = "";
+        activeSetFilter = "";
+        activeSeriesFilter = "";
+        currentSortKey = "last_event_ts";
+        currentSortDir = "desc";
+        currentPage = 1;
+        applyFiltersAndRender();
+      }
+
+      function loadRecentWallets() {
+        try {
+          const raw = localStorage.getItem(RECENT_KEY);
+          if (!raw) return [];
+          const arr = JSON.parse(raw);
+          if (!Array.isArray(arr)) return [];
+          return arr.filter((w) => typeof w === "string" && isWallet(w));
+        } catch {
+          return [];
+        }
+      }
+
+      function saveRecentWallets(wallets) {
+        try {
+          localStorage.setItem(RECENT_KEY, JSON.stringify(wallets));
+        } catch {
+          // ignore
+        }
+      }
+
+      function addWalletToRecent(wallet) {
+        if (!isWallet(wallet)) return;
+        const lower = wallet.toLowerCase();
+        let wallets = loadRecentWallets().filter((w) => w.toLowerCase() !== lower);
+        wallets.unshift(wallet);
+        if (wallets.length > RECENT_LIMIT) {
+          wallets = wallets.slice(0, RECENT_LIMIT);
+        }
+        saveRecentWallets(wallets);
+        renderRecentWallets();
+      }
+
+      function renderRecentWallets() {
+        const wallets = loadRecentWallets();
+        recentListEl.innerHTML = "";
+
+        if (!wallets.length) {
+          recentEl.style.display = "none";
+          return;
+        }
+
+        wallets.forEach((w) => {
+          const div = document.createElement("div");
+          div.className = "link-pill";
+          div.textContent = w;
+          div.addEventListener("click", () => {
+            input.value = w;
+            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          });
+          recentListEl.appendChild(div);
+        });
+
+        recentEl.style.display = "flex";
+      }
+
+      function rowsToCsv(rows) {
+        const headers = [
+          "wallet_address",
+          "nft_id",
+          "edition_id",
+          "play_id",
+          "series_id",
+          "set_id",
+          "tier",
+          "serial_number",
+          "max_mint_size",
+          "first_name",
+          "last_name",
+          "team_name",
+          "position",
+          "jersey_number",
+          "series_name",
+          "set_name",
+          "last_event_ts",
+          "low_ask",
+          "asp_90d"
+        ];
+
+        const escapeCell = (val) => {
+          if (val === null || val === undefined) return "";
+          const s = String(val);
+          if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        };
+
+        const lines = [];
+        lines.push(headers.join(","));
+
+        for (const r of rows) {
+          const rowVals = [
+            r.wallet_address,
+            r.nft_id,
+            r.edition_id,
+            r.play_id,
+            r.series_id,
+            r.set_id,
+            r.tier,
+            r.serial_number,
+            r.max_mint_size,
+            r.first_name,
+            r.last_name,
+            r.team_name,
+            r.position,
+            r.jersey_number,
+            r.series_name,
+            r.set_name,
+            r.last_event_ts,
+            r.low_ask,
+            r.asp_90d
+          ].map(escapeCell);
+          lines.push(rowVals.join(","));
+        }
+
+        return lines.join("\n");
+      }
+
+      function downloadCsv() {
+        if (!filteredRows.length) {
+          alert("No rows to export.");
+          return;
+        }
+        const csv = rowsToCsv(filteredRows);
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const wallet = currentWallet || "wallet";
+        a.href = url;
+        a.download = `allday_${wallet}_moments.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      function updateUrlWithWallet(wallet) {
+        if (!isWallet(wallet)) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set("wallet", wallet);
+        window.history.replaceState({}, "", url.toString());
+      }
+
+      async function enrichRowsWithPrices(rows) {
+        const editions = [...new Set(rows.map((r) => r.edition_id).filter(Boolean))];
+        if (!editions.length) return;
+
+        try {
+          const resp = await fetch(`/api/prices?editions=${encodeURIComponent(editions.join(","))}`);
+          if (!resp.ok) {
+            console.warn("prices API failed", await resp.text());
+            return;
+          }
+
+          const data = await resp.json();
+          console.log("prices response", data);
+
+          if (!data.ok) {
+            console.warn("prices API error", data.error);
+            return;
+          }
+
+          const aspMap = data.asp || {};
+          const lowMap = data.lowAsk || {};
+
+          for (const r of rows) {
+            const eid = r.edition_id;
+            if (!eid) continue;
+
+            const aspVal = aspMap[eid];
+            const lowVal = lowMap[eid];
+
+            const aspNum = aspVal !== null && aspVal !== undefined ? Number(aspVal) : null;
+            const lowNum = lowVal !== null && lowVal !== undefined ? Number(lowVal) : null;
+
+            r.asp_90d = Number.isNaN(aspNum) ? null : aspNum;
+            r.low_ask = Number.isNaN(lowNum) ? null : lowNum;
+          }
+        } catch (err) {
+          console.error("Error fetching prices:", err);
+        }
+      }
+
+      // Collapsible sidebar groups
+      document.querySelectorAll(".sidebar-group-header").forEach((header) => {
+        header.addEventListener("click", () => {
+          const group = header.parentElement;
+          const icon = header.querySelector(".sidebar-group-toggle");
+          const collapsed = group.classList.toggle("collapsed");
+          if (icon) {
+            icon.textContent = collapsed ? "▸" : "▾";
+          }
+        });
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const wallet = input.value.trim();
+
+        if (!isWallet(wallet)) {
+          setStatus("Enter a valid 0x wallet address.", true);
+          summaryEl.style.display = "none";
+          summaryStatsEl.style.display = "none";
+          filtersEl.style.display = "none";
+          tableContainerEl.style.display = "none";
+          paginationEl.style.display = "none";
+          return;
+        }
+
+        // reset filters/sort for new wallet
+        filterTextEl.value = "";
+        filterTierEl.value = "";
+        activeTeamFilter = "";
+        activeSetFilter = "";
+        activeSeriesFilter = "";
+        currentSortKey = "last_event_ts";
+        currentSortDir = "desc";
+        currentPage = 1;
+
+        setStatus("Loading...");
+        submitBtn.disabled = true;
+        tbody.innerHTML = "";
+        summaryEl.style.display = "none";
+        summaryStatsEl.style.display = "none";
+        filtersEl.style.display = "none";
+        tableContainerEl.style.display = "none";
+        paginationEl.style.display = "none";
+
+        try {
+          const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
+          const json = await res.json();
+
+          if (!json.ok) {
+            setStatus("Error: " + (json.error || "Unknown error"), true);
+            submitBtn.disabled = false;
+            return;
+          }
+
+          fullRows = json.rows || [];
+          currentWallet = json.wallet || wallet;
+
+          if (!fullRows.length) {
+            setStatus(`No moments found for ${currentWallet}`, false);
+            summaryEl.style.display = "none";
+            summaryStatsEl.style.display = "none";
+            filtersEl.style.display = "none";
+            tableContainerEl.style.display = "none";
+            paginationEl.style.display = "none";
+            return;
+          }
+
+          // prices
+          setStatus(`Loaded ${fullRows.length} moments for ${currentWallet} – fetching prices...`);
+          await enrichRowsWithPrices(fullRows);
+
+          // update URL so it’s shareable/bookmarkable
+          updateUrlWithWallet(currentWallet);
+
+          setStatus(`Loaded ${fullRows.length} moments for ${currentWallet}`);
+          addWalletToRecent(currentWallet);
+          applyFiltersAndRender();
+        } catch (err) {
+          console.error(err);
+          setStatus("Request failed: " + err.message, true);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      filterTextEl.addEventListener("input", () => {
+        currentPage = 1;
+        applyFiltersAndRender();
+      });
+
+      filterTierEl.addEventListener("change", () => {
+        currentPage = 1;
+        applyFiltersAndRender();
+      });
+
+      clearFiltersBtn.addEventListener("click", () => {
+        clearAllFilters();
+      });
+
+      downloadCsvBtn.addEventListener("click", () => {
+        downloadCsv();
+      });
+
+      pageSizeSelect.addEventListener("change", () => {
+        pageSize = parseInt(pageSizeSelect.value, 10) || 200;
+        currentPage = 1;
+        applyFiltersAndRender();
+      });
+
+      prevPageBtn.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage -= 1;
+          applyFiltersAndRender();
+        }
+      });
+
+      nextPageBtn.addEventListener("click", () => {
+        currentPage += 1;
+        applyFiltersAndRender();
+      });
+
+      document.querySelectorAll("th[data-key]").forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-key");
+          if (currentSortKey === key) {
+            currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+          } else {
+            currentSortKey = key;
+            currentSortDir = "asc";
+          }
+          applyFiltersAndRender();
+        });
+      });
+
+      copyLinkBtn.addEventListener("click", async () => {
+        if (!currentWallet || !isWallet(currentWallet)) {
+          alert("Load a wallet first.");
+          return;
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set("wallet", currentWallet);
+        const urlStr = url.toString();
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(urlStr);
+            setStatus("Link copied to clipboard.");
+          } else {
+            window.prompt("Copy this link:", urlStr);
+          }
+        } catch (err) {
+          console.error("Clipboard error:", err);
+          window.prompt("Copy this link:", urlStr);
+        }
+      });
+
+      // init recent wallets on load
+      renderRecentWallets();
+
+      // auto-load wallet from URL if present
+      const params = new URLSearchParams(window.location.search);
+      const initialWallet = params.get("wallet");
+      if (initialWallet && isWallet(initialWallet)) {
+        input.value = initialWallet;
+        form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      }
+    </script>
+  </body>
+</html>
