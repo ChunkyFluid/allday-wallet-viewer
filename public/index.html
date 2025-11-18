@@ -32,7 +32,7 @@
       }
 
       .page {
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 0 auto;
         padding: 24px 16px 48px;
       }
@@ -65,7 +65,7 @@
         background: radial-gradient(circle at top left, #020617 0, #020617 40%, #020617 100%);
         border-radius: 16px;
         border: 1px solid var(--border);
-        padding: 16px 16px 12px;
+        padding: 16px;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
         margin-bottom: 16px;
       }
@@ -84,6 +84,12 @@
 
       .wallet-input-wrap {
         flex: 1 1 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .wallet-input-inner {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -159,8 +165,83 @@
         color: var(--accent);
       }
 
+      .layout {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        display: none; /* hidden until data loaded */
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .sidebar .card {
+        margin-bottom: 0;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 8px;
+      }
+
+      .filter-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .filter-input,
+      .filter-select {
+        width: 100%;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.7);
+        color: var(--text);
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        outline: none;
+      }
+
+      .filter-input::placeholder {
+        color: #6b7280;
+      }
+
+      .filter-select {
+        appearance: none;
+      }
+
+      .sidebar-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .ghost-btn {
+        background: transparent;
+        color: var(--muted);
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+
+      .ghost-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .main-pane {
+        flex: 1;
+      }
+
       .table-card {
-        margin-top: 16px;
+        margin-top: 0;
       }
 
       .table-header {
@@ -184,7 +265,7 @@
         overflow: auto;
         border-radius: 12px;
         border: 1px solid var(--border);
-        max-height: calc(100vh - 220px);
+        max-height: calc(100vh - 260px);
       }
 
       table {
@@ -214,6 +295,17 @@
         font-weight: 500;
         color: var(--muted);
         font-size: 0.75rem;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      th .label {
+        margin-right: 4px;
+      }
+
+      .sort-indicator {
+        font-size: 0.7rem;
+        opacity: 0.6;
       }
 
       tbody tr:nth-child(even) {
@@ -230,10 +322,6 @@
 
       .text-right {
         text-align: right;
-      }
-
-      .text-muted {
-        color: var(--muted);
       }
 
       .badge-tier {
@@ -260,13 +348,27 @@
         border-color: rgba(239, 68, 68, 0.8);
       }
 
+      @media (max-width: 960px) {
+        .layout {
+          flex-direction: column;
+        }
+
+        .sidebar {
+          width: 100%;
+        }
+
+        .table-wrapper {
+          max-height: calc(100vh - 320px);
+        }
+      }
+
       @media (max-width: 768px) {
         .page {
           padding: 16px 10px 32px;
         }
 
         .card {
-          padding: 12px 12px 10px;
+          padding: 12px;
         }
 
         table {
@@ -296,12 +398,14 @@
           <div class="form-row">
             <div class="wallet-input-wrap">
               <label for="wallet-input">Wallet</label>
-              <input
-                id="wallet-input"
-                type="text"
-                spellcheck="false"
-                placeholder="0x379c2a0e88d8081f"
-              />
+              <div class="wallet-input-inner">
+                <input
+                  id="wallet-input"
+                  type="text"
+                  spellcheck="false"
+                  placeholder="0x379c2a0e88d8081f"
+                />
+              </div>
             </div>
             <div>
               <button id="load-btn" type="submit">
@@ -313,38 +417,168 @@
               <strong id="results-count">0</strong>
             </div>
           </div>
-          <div id="status" class="status">Enter a wallet and click Load.</div>
+          <div id="status" class="status">
+            Enter a wallet and click Load.
+          </div>
         </form>
       </div>
 
-      <div class="card table-card">
-        <div class="table-header">
-          <div class="table-title">Moments</div>
-          <div class="table-meta">
-            Player, team, tier, set/series, serial, ASP / low ask (if available)
+      <div class="layout">
+        <!-- SIDEBAR FILTERS -->
+        <aside class="sidebar" id="filters-sidebar">
+          <div class="card">
+            <div class="filter-group">
+              <div class="filter-label">Search</div>
+              <input
+                id="filter-text"
+                class="filter-input"
+                type="text"
+                placeholder="Player, team, set, series..."
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Player</div>
+              <select id="filter-player" class="filter-select">
+                <option value="">All players</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Team</div>
+              <select id="filter-team" class="filter-select">
+                <option value="">All teams</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Series</div>
+              <select id="filter-series" class="filter-select">
+                <option value="">All series</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Set</div>
+              <select id="filter-set" class="filter-select">
+                <option value="">All sets</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Tier</div>
+              <select id="filter-tier" class="filter-select">
+                <option value="">All tiers</option>
+                <option value="COMMON">COMMON</option>
+                <option value="RARE">RARE</option>
+                <option value="LEGENDARY">LEGENDARY</option>
+                <option value="ULTIMATE">ULTIMATE</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Position</div>
+              <select id="filter-position" class="filter-select">
+                <option value="">All positions</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <div class="filter-label">Play type</div>
+              <select id="filter-playtype" class="filter-select">
+                <option value="">All play types</option>
+              </select>
+            </div>
+
+            <div class="sidebar-buttons">
+              <button type="button" class="ghost-btn" id="clear-filters">
+                Clear
+              </button>
+              <button type="button" id="download-csv-btn">
+                Download CSV
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="table-wrapper">
-          <table id="results-table" style="display: none">
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Team</th>
-                <th>Pos</th>
-                <th>Tier</th>
-                <th>Set</th>
-                <th>Series</th>
-                <th class="text-right">Serial</th>
-                <th class="text-right">Max Mint</th>
-                <th class="text-right">Low Ask</th>
-                <th class="text-right">ASP (90d)</th>
-                <th>Last Event</th>
-                <th>NFT ID</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+        </aside>
+
+        <!-- MAIN TABLE -->
+        <main class="main-pane">
+          <div class="card table-card">
+            <div class="table-header">
+              <div class="table-title">Moments</div>
+              <div class="table-meta">
+                Player, team, tier, set/series, serial, ASP / low ask (if available)
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table id="results-table" style="display: none">
+                <thead>
+                  <tr>
+                    <th data-sort-key="player">
+                      <span class="label">Player</span>
+                      <span class="sort-indicator" data-sort="player"></span>
+                    </th>
+                    <th data-sort-key="team_name">
+                      <span class="label">Team</span>
+                      <span class="sort-indicator" data-sort="team_name"></span>
+                    </th>
+                    <th data-sort-key="position">
+                      <span class="label">Pos</span>
+                      <span class="sort-indicator" data-sort="position"></span>
+                    </th>
+                    <th data-sort-key="tier">
+                      <span class="label">Tier</span>
+                      <span class="sort-indicator" data-sort="tier"></span>
+                    </th>
+                    <th data-sort-key="set_name">
+                      <span class="label">Set</span>
+                      <span class="sort-indicator" data-sort="set_name"></span>
+                    </th>
+                    <th data-sort-key="series_name">
+                      <span class="label">Series</span>
+                      <span class="sort-indicator" data-sort="series_name"></span>
+                    </th>
+                    <th data-sort-key="serial_number" class="text-right">
+                      <span class="label">Serial</span>
+                      <span
+                        class="sort-indicator"
+                        data-sort="serial_number"
+                      ></span>
+                    </th>
+                    <th data-sort-key="max_mint_size" class="text-right">
+                      <span class="label">Max Mint</span>
+                      <span
+                        class="sort-indicator"
+                        data-sort="max_mint_size"
+                      ></span>
+                    </th>
+                    <th data-sort-key="low_ask" class="text-right">
+                      <span class="label">Low Ask</span>
+                      <span class="sort-indicator" data-sort="low_ask"></span>
+                    </th>
+                    <th data-sort-key="asp_90d" class="text-right">
+                      <span class="label">ASP (90d)</span>
+                      <span class="sort-indicator" data-sort="asp_90d"></span>
+                    </th>
+                    <th data-sort-key="last_event_ts">
+                      <span class="label">Last Event</span>
+                      <span
+                        class="sort-indicator"
+                        data-sort="last_event_ts"
+                      ></span>
+                    </th>
+                    <th data-sort-key="nft_id">
+                      <span class="label">NFT ID</span>
+                      <span class="sort-indicator" data-sort="nft_id"></span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
 
@@ -358,7 +592,22 @@
         const tbody = table.querySelector("tbody");
         const resultsCountEl = document.getElementById("results-count");
 
+        const sidebar = document.getElementById("filters-sidebar");
+        const filterTextEl = document.getElementById("filter-text");
+        const filterPlayerEl = document.getElementById("filter-player");
+        const filterTeamEl = document.getElementById("filter-team");
+        const filterSeriesEl = document.getElementById("filter-series");
+        const filterSetEl = document.getElementById("filter-set");
+        const filterTierEl = document.getElementById("filter-tier");
+        const filterPositionEl = document.getElementById("filter-position");
+        const filterPlaytypeEl = document.getElementById("filter-playtype");
+        const clearFiltersBtn = document.getElementById("clear-filters");
+        const downloadCsvBtn = document.getElementById("download-csv-btn");
+
         let fullRows = [];
+        let filteredRows = [];
+        let currentSortKey = null;
+        let currentSortDir = "asc";
 
         function setStatus(msg, type) {
           statusEl.textContent = msg;
@@ -396,9 +645,7 @@
         }
 
         async function fetchPrices(editionIds) {
-          if (!editionIds.length) {
-            return { asp: {}, lowAsk: {} };
-          }
+          if (!editionIds.length) return { asp: {}, lowAsk: {} };
           const param = encodeURIComponent(editionIds.join(","));
           const res = await fetch("/api/prices?editions=" + param);
           if (!res.ok) return { asp: {}, lowAsk: {} };
@@ -408,6 +655,128 @@
             asp: json.asp || {},
             lowAsk: json.lowAsk || {},
           };
+        }
+
+        function normalizeRows(rows) {
+          return rows.map((r) => {
+            const firstName =
+              r.first_name || r.player_first_name || r.playerName || "";
+            const lastName =
+              r.last_name || r.player_last_name || r.playerSurname || "";
+            const teamName = r.team_name || r.team || r.teamName || "";
+            // play_type is optional; use whatever field is there
+            const playType =
+              r.play_type ||
+              r.playType ||
+              r.play_category ||
+              r.play_name ||
+              "";
+
+            return {
+              ...r,
+              first_name: firstName,
+              last_name: lastName,
+              team_name: teamName,
+              play_type: playType,
+            };
+          });
+        }
+
+        function getUniqueSorted(values) {
+          const set = new Set();
+          for (const v of values) {
+            if (!v) continue;
+            const s = String(v).trim();
+            if (!s) continue;
+            set.add(s);
+          }
+          return Array.from(set).sort((a, b) =>
+            a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
+          );
+        }
+
+        function buildSelect(selectEl, values, allLabel) {
+          const current = selectEl.value || "";
+          selectEl.innerHTML = "";
+          const optAll = document.createElement("option");
+          optAll.value = "";
+          optAll.textContent = allLabel;
+          selectEl.appendChild(optAll);
+
+          const uniques = getUniqueSorted(values);
+          uniques.forEach((val) => {
+            const opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = val;
+            selectEl.appendChild(opt);
+          });
+
+          if (current && uniques.includes(current)) {
+            selectEl.value = current;
+          }
+        }
+
+        function buildSidebarFilters(rows) {
+          const players = rows.map((r) =>
+            ((r.first_name || "") + " " + (r.last_name || "")).trim()
+          );
+          const teams = rows.map((r) => r.team_name || "");
+          const series = rows.map((r) => r.series_name || "");
+          const sets = rows.map((r) => r.set_name || "");
+          const positions = rows.map((r) => r.position || "");
+          const playtypes = rows.map((r) => r.play_type || "");
+
+          buildSelect(filterPlayerEl, players, "All players");
+          buildSelect(filterTeamEl, teams, "All teams");
+          buildSelect(filterSeriesEl, series, "All series");
+          buildSelect(filterSetEl, sets, "All sets");
+          buildSelect(filterPositionEl, positions, "All positions");
+          buildSelect(filterPlaytypeEl, playtypes, "All play types");
+
+          sidebar.style.display = "flex";
+        }
+
+        function compareRows(a, b, key, dir) {
+          let va;
+          let vb;
+
+          if (key === "player") {
+            va = ((a.first_name || "") + " " + (a.last_name || "")).toLowerCase();
+            vb = ((b.first_name || "") + " " + (b.last_name || "")).toLowerCase();
+          } else if (
+            key === "serial_number" ||
+            key === "max_mint_size" ||
+            key === "low_ask" ||
+            key === "asp_90d"
+          ) {
+            const aNum =
+              a[key] === null || a[key] === undefined ? -Infinity : Number(a[key]);
+            const bNum =
+              b[key] === null || b[key] === undefined ? -Infinity : Number(b[key]);
+            va = Number.isNaN(aNum) ? -Infinity : aNum;
+            vb = Number.isNaN(bNum) ? -Infinity : bNum;
+          } else if (key === "last_event_ts") {
+            va = a.last_event_ts ? new Date(a.last_event_ts).getTime() : 0;
+            vb = b.last_event_ts ? new Date(b.last_event_ts).getTime() : 0;
+          } else {
+            va = (a[key] || "").toString().toLowerCase();
+            vb = (b[key] || "").toString().toLowerCase();
+          }
+
+          if (va < vb) return dir === "asc" ? -1 : 1;
+          if (va > vb) return dir === "asc" ? 1 : -1;
+          return 0;
+        }
+
+        function updateSortIndicators() {
+          document.querySelectorAll(".sort-indicator").forEach((el) => {
+            const key = el.getAttribute("data-sort");
+            if (key === currentSortKey) {
+              el.textContent = currentSortDir === "asc" ? "▲" : "▼";
+            } else {
+              el.textContent = "";
+            }
+          });
         }
 
         function renderTable(rows) {
@@ -462,6 +831,129 @@
           table.style.display = rows.length ? "table" : "none";
         }
 
+        function applyFiltersAndRender() {
+          const text = filterTextEl.value.trim().toLowerCase();
+          const selPlayer = filterPlayerEl.value;
+          const selTeam = filterTeamEl.value;
+          const selSeries = filterSeriesEl.value;
+          const selSet = filterSetEl.value;
+          const selTier = filterTierEl.value;
+          const selPos = filterPositionEl.value;
+          const selPlayType = filterPlaytypeEl.value;
+
+          filteredRows = fullRows.filter((r) => {
+            const playerName = ((r.first_name || "") + " " + (r.last_name || ""))
+              .trim();
+            const tierUpper = (r.tier || "").toUpperCase();
+
+            if (selPlayer && playerName !== selPlayer) return false;
+            if (selTeam && (r.team_name || "") !== selTeam) return false;
+            if (selSeries && (r.series_name || "") !== selSeries) return false;
+            if (selSet && (r.set_name || "") !== selSet) return false;
+            if (selTier && tierUpper !== selTier) return false;
+            if (selPos && (r.position || "") !== selPos) return false;
+            if (selPlayType && (r.play_type || "") !== selPlayType) return false;
+
+            if (text) {
+              const haystack = [
+                playerName,
+                r.team_name,
+                r.set_name,
+                r.series_name,
+              ]
+                .map((x) => (x || "").toLowerCase())
+                .join(" ");
+              if (!haystack.includes(text)) return false;
+            }
+
+            return true;
+          });
+
+          if (!currentSortKey) {
+            currentSortKey = "last_event_ts";
+            currentSortDir = "desc";
+          }
+
+          filteredRows.sort((a, b) =>
+            compareRows(a, b, currentSortKey, currentSortDir)
+          );
+          updateSortIndicators();
+          renderTable(filteredRows);
+        }
+
+        function clearFilters() {
+          filterTextEl.value = "";
+          filterPlayerEl.value = "";
+          filterTeamEl.value = "";
+          filterSeriesEl.value = "";
+          filterSetEl.value = "";
+          filterTierEl.value = "";
+          filterPositionEl.value = "";
+          filterPlaytypeEl.value = "";
+          applyFiltersAndRender();
+        }
+
+        function downloadCsv() {
+          const rows = filteredRows.length ? filteredRows : fullRows;
+          if (!rows.length) return;
+
+          const header = [
+            "Player",
+            "Team",
+            "Pos",
+            "Tier",
+            "Set",
+            "Series",
+            "PlayType",
+            "Serial",
+            "MaxMint",
+            "LowAsk",
+            "ASP90d",
+            "LastEventTs",
+            "NftId",
+          ];
+
+          const lines = [header.join(",")];
+
+          for (const r of rows) {
+            const playerName = ((r.first_name || "") + " " + (r.last_name || ""))
+              .trim();
+            const cells = [
+              playerName,
+              r.team_name || "",
+              r.position || "",
+              r.tier || "",
+              r.set_name || "",
+              r.series_name || "",
+              r.play_type || "",
+              r.serial_number != null ? String(r.serial_number) : "",
+              r.max_mint_size != null ? String(r.max_mint_size) : "",
+              r.low_ask != null ? String(r.low_ask) : "",
+              r.asp_90d != null ? String(r.asp_90d) : "",
+              r.last_event_ts || "",
+              r.nft_id || "",
+            ].map((val) => {
+              const s = val == null ? "" : String(val);
+              if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+                return '"' + s.replace(/"/g, '""') + '"';
+              }
+              return s;
+            });
+
+            lines.push(cells.join(","));
+          }
+
+          const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "wallet_moments.csv";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
         form.addEventListener("submit", async (event) => {
           event.preventDefault();
 
@@ -471,11 +963,17 @@
             return;
           }
 
+          if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
+            setStatus("Invalid wallet format.", "error");
+            return;
+          }
+
           setStatus("Loading wallet " + wallet + "...", null);
           loadBtn.disabled = true;
           table.style.display = "none";
           tbody.innerHTML = "";
           resultsCountEl.textContent = "0";
+          sidebar.style.display = "none";
 
           try {
             const res = await fetch(
@@ -496,41 +994,22 @@
             let rows = json.rows || [];
             if (!rows.length) {
               setStatus(
-                "No moments found for wallet " + json.wallet + ".",
+                "No moments found for wallet " + (json.wallet || wallet) + ".",
                 null
               );
               loadBtn.disabled = false;
               return;
             }
 
-            // normalize name/team fields
-            rows = rows.map((r) => {
-              const firstName =
-                r.first_name ||
-                r.player_first_name ||
-                r.playerName ||
-                "";
-              const lastName =
-                r.last_name ||
-                r.player_last_name ||
-                r.playerSurname ||
-                "";
-              const teamName =
-                r.team_name || r.team || r.teamName || "";
-              return {
-                ...r,
-                first_name: firstName,
-                last_name: lastName,
-                team_name: teamName,
-              };
-            });
+            rows = normalizeRows(rows);
 
-            // fetch prices per edition (best effort)
             const editionIds = [
               ...new Set(
                 rows
                   .map((r) => r.edition_id)
-                  .filter((x) => x !== null && x !== undefined && x !== "")
+                  .filter(
+                    (x) => x !== null && x !== undefined && x !== ""
+                  )
               ),
             ];
 
@@ -547,26 +1026,45 @@
             rows = rows.map((r) => {
               const aspVal = aspMap[r.edition_id];
               const lowAskVal = lowAskMap[r.edition_id];
+              const aspNum =
+                aspVal !== undefined && aspVal !== null
+                  ? Number(aspVal)
+                  : null;
+              const lowNum =
+                lowAskVal !== undefined && lowAskVal !== null
+                  ? Number(lowAskVal)
+                  : null;
+
               return {
                 ...r,
+                asp_90d:
+                  aspNum !== null && !Number.isNaN(aspNum) ? aspNum : null,
+                low_ask:
+                  lowNum !== null && !Number.isNaN(lowNum) ? lowNum : null,
                 asp_90d_display:
-                  aspVal !== undefined && aspVal !== null
-                    ? formatMoney(aspVal)
+                  aspNum !== null && !Number.isNaN(aspNum)
+                    ? formatMoney(aspNum)
                     : "",
                 low_ask_display:
-                  lowAskVal !== undefined && lowAskVal !== null
-                    ? formatMoney(lowAskVal)
+                  lowNum !== null && !Number.isNaN(lowNum)
+                    ? formatMoney(lowNum)
                     : "",
               };
             });
 
             fullRows = rows;
+            sidebar.style.display = "flex";
+            buildSidebarFilters(fullRows);
 
             setStatus(
-              `Loaded ${rows.length} moments for wallet ${json.wallet}.`,
+              `Loaded ${rows.length} moments for wallet ${
+                json.wallet || wallet
+              }.`,
               "ok"
             );
-            renderTable(fullRows);
+            currentSortKey = "last_event_ts";
+            currentSortDir = "desc";
+            applyFiltersAndRender();
           } catch (err) {
             console.error(err);
             setStatus(
@@ -578,12 +1076,38 @@
           }
         });
 
+        filterTextEl.addEventListener("input", () => applyFiltersAndRender());
+        filterPlayerEl.addEventListener("change", () => applyFiltersAndRender());
+        filterTeamEl.addEventListener("change", () => applyFiltersAndRender());
+        filterSeriesEl.addEventListener("change", () => applyFiltersAndRender());
+        filterSetEl.addEventListener("change", () => applyFiltersAndRender());
+        filterTierEl.addEventListener("change", () => applyFiltersAndRender());
+        filterPositionEl.addEventListener("change", () => applyFiltersAndRender());
+        filterPlaytypeEl.addEventListener("change", () => applyFiltersAndRender());
+
+        clearFiltersBtn.addEventListener("click", () => clearFilters());
+        downloadCsvBtn.addEventListener("click", () => downloadCsv());
+
+        document
+          .querySelectorAll("th[data-sort-key]")
+          .forEach((th) => {
+            th.addEventListener("click", () => {
+              const key = th.getAttribute("data-sort-key");
+              if (currentSortKey === key) {
+                currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+              } else {
+                currentSortKey = key;
+                currentSortDir = key === "last_event_ts" ? "desc" : "asc";
+              }
+              applyFiltersAndRender();
+            });
+          });
+
         // Support ?wallet=0x... in URL
         const params = new URLSearchParams(window.location.search);
         const initialWallet = params.get("wallet");
         if (initialWallet) {
           walletInput.value = initialWallet;
-          // Trigger a submit programmatically
           form.dispatchEvent(
             new Event("submit", { bubbles: true, cancelable: true })
           );
