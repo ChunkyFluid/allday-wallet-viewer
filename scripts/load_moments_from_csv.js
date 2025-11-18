@@ -20,6 +20,10 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
+pool.on("error", (err) => {
+    console.error("Postgres pool error:", err);
+});
+
 function fileExists(filePath) {
     try {
         fs.accessSync(filePath, fs.constants.F_OK);
@@ -30,7 +34,6 @@ function fileExists(filePath) {
 }
 
 async function loadMoments() {
-    const client = await pool.connect();
     const dataDir = path.join(__dirname, "..", "data");
     const filePath = path.join(dataDir, "moments.csv");
 
@@ -38,85 +41,93 @@ async function loadMoments() {
 
     if (!fileExists(filePath)) {
         console.error("❌ moments.csv not found. Create data/moments.csv first.");
-        client.release();
         await pool.end();
         process.exit(1);
     }
 
-    console.log("Found moments.csv, starting load...");
+    console.log("Found moments.csv, starting load (row-by-row, headers forced to lowercase)...");
 
-    const stream = fs.createReadStream(filePath).pipe(
-        parse({
-            columns: true,
-            skip_empty_lines: true,
-            trim: true
-        })
-    );
+    // Force all header names to lowercase so row.nft_id / row.edition_id work
+const stream = fs.createReadStream(filePath).pipe(
+  parse({
+    columns: (header) => {
+      const cols = header.map((h) => String(h).trim().toLowerCase());
+      console.log("CSV header columns:", cols);
+      return cols;
+    },
+    skip_empty_lines: true,
+    trim: true
+  })
+);
+
+
+    let count = 0;
+    let failed = 0;
 
     try {
-        await client.query("BEGIN");
-
-        let count = 0;
-
         for await (const row of stream) {
-            const { nft_id, edition_id, play_id, serial_number, minted_at, burned_at, current_owner } = row;
+            const nft_id = row.nft_id;
+            const edition_id = row.edition_id;
+            const play_id = row.play_id;
+            const serial_number = row.serial_number;
+            const minted_at = row.minted_at;
+            const burned_at = row.burned_at;
+            const current_owner = row.current_owner;
 
             if (!nft_id || !edition_id) {
                 console.warn("Skipping row with missing nft_id or edition_id:", row);
                 continue;
             }
 
-            await client.query(
-                `
-        INSERT INTO moments (
-          nft_id,
-          edition_id,
-          play_id,
-          serial_number,
-          minted_at,
-          burned_at,
-          current_owner,
-          updated_at
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
-        ON CONFLICT (nft_id)
-        DO UPDATE SET
-          edition_id = EXCLUDED.edition_id,
-          play_id = EXCLUDED.play_id,
-          serial_number = EXCLUDED.serial_number,
-          minted_at = EXCLUDED.minted_at,
-          burned_at = EXCLUDED.burned_at,
-          current_owner = EXCLUDED.current_owner,
-          updated_at = NOW()
-        `,
-                [
-                    nft_id,
-                    edition_id,
-                    play_id || null,
-                    serial_number ? Number(serial_number) : null,
-                    minted_at || null,
-                    burned_at || null,
-                    current_owner || null
-                ]
-            );
+            try {
+                await pool.query(
+                    `
+          INSERT INTO moments (
+            nft_id,
+            edition_id,
+            play_id,
+            serial_number,
+            minted_at,
+            burned_at,
+            current_owner,
+            updated_at
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+          ON CONFLICT (nft_id)
+          DO UPDATE SET
+            edition_id = EXCLUDED.edition_id,
+            play_id = EXCLUDED.play_id,
+            serial_number = EXCLUDED.serial_number,
+            minted_at = EXCLUDED.minted_at,
+            burned_at = EXCLUDED.burned_at,
+            current_owner = EXCLUDED.current_owner,
+            updated_at = NOW()
+          `,
+                    [
+                        nft_id,
+                        edition_id,
+                        play_id || null,
+                        serial_number ? Number(serial_number) : null,
+                        minted_at || null,
+                        burned_at || null,
+                        current_owner || null
+                    ]
+                );
+            } catch (err) {
+                failed += 1;
+                console.error(`Row failed for nft_id=${nft_id}: ${err.code || ""} ${err.message || String(err)}`);
+            }
 
             count += 1;
-            if (count % 100 === 0) {
-                console.log(`Inserted/updated ${count} moments...`);
+            if (count % 1000 === 0) {
+                console.log(`Upserted ${count} moments so far... (failed: ${failed})`);
             }
         }
 
-        await client.query("COMMIT");
-        console.log(`✅ Done. Total moments inserted/updated: ${count}`);
+        console.log(`✅ Done. Total moments inserted/updated: ${count}, failures: ${failed}`);
     } catch (err) {
-        console.error("❌ Error loading moments, rolling back:", err);
-        try {
-            await client.query("ROLLBACK");
-        } catch (rollbackErr) {
-            console.error("Rollback failed:", rollbackErr);
-        }
+        console.error("❌ Fatal error while streaming CSV:", err);
     } finally {
-        client.release();
         await pool.end();
     }
 }
