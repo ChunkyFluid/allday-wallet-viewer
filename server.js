@@ -128,14 +128,38 @@ app.get("/api/top-wallets", async (req, res) => {
     const result = await pgQuery(
       `
       SELECT
-        wallet_address,
-        COUNT(*)::int AS moments
-      FROM wallet_holdings
-      GROUP BY wallet_address
-      ORDER BY moments DESC
-      LIMIT $1;
+        h.wallet_address,
+        h.is_locked,
+        h.last_event_ts,
+        m.nft_id,
+        m.edition_id,
+        m.play_id,
+
+        -- edition-level metadata
+        e.series_id,
+        e.set_id,
+        e.tier,
+        e.max_mint_size,
+        e.series_name,
+        e.set_name
+
+        -- placeholders for player fields for now
+        ,
+        NULL::text  AS first_name,
+        NULL::text  AS last_name,
+        NULL::text  AS team_name,
+        NULL::text  AS position,
+        NULL::int   AS jersey_number,
+        m.serial_number
+      FROM wallet_holdings h
+      JOIN moments m
+        ON m.nft_id = h.nft_id
+      LEFT JOIN editions e
+        ON e.edition_id = m.edition_id
+      WHERE h.wallet_address = $1
+      ORDER BY h.last_event_ts DESC
       `,
-      [safeLimit]
+      [wallet]
     );
 
     return res.json({
@@ -249,48 +273,53 @@ app.get("/api/prices", async (req, res) => {
 });
 
 // ---- NEW: /api/query now uses Neon schema (no nft_core_metadata) ----
+// ---- Wallet query using Neon (moments + editions) ----
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     if (!wallet) {
-      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
-    // Basic format check
+    // Basic wallet format check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Invalid wallet format" });
     }
 
     const result = await pgQuery(
       `
       SELECT
         h.wallet_address,
-        FALSE AS is_locked,                                -- placeholder; fill later if you add lock logic
-        h.last_updated_at AS last_event_ts,                -- from wallet_holdings
+        h.is_locked,
+        h.last_event_ts,
         m.nft_id,
         m.edition_id,
         m.play_id,
+        -- edition-level metadata
         e.series_id,
         e.set_id,
         e.tier,
-        m.serial_number,
         e.max_mint_size,
-        NULL::text AS first_name,                          -- can be filled from plays.player_name later
-        NULL::text AS last_name,
-        p.team_name,
-        p.position,
-        NULL::text AS jersey_number,
         e.series_name,
-        e.set_name
+        e.set_name,
+        e.first_name,
+        e.last_name,
+        e.team_name,
+        e.position,
+        e.jersey_number,
+        -- moment-level
+        m.serial_number
       FROM wallet_holdings h
       JOIN moments m
         ON m.nft_id = h.nft_id
-      JOIN editions e
+      LEFT JOIN editions e
         ON e.edition_id = m.edition_id
-      LEFT JOIN plays p
-        ON p.play_id = m.play_id
       WHERE h.wallet_address = $1
-      ORDER BY h.last_updated_at DESC NULLS LAST;
+      ORDER BY h.last_event_ts DESC
       `,
       [wallet]
     );
@@ -299,13 +328,16 @@ app.get("/api/query", async (req, res) => {
       ok: true,
       wallet,
       count: result.rowCount,
-      rows: result.rows
+      rows: result.rows,
     });
   } catch (err) {
     console.error("Error in /api/query:", err);
-    return res.status(500).json({ ok: false, error: err.message || String(err) });
+    return res
+      .status(500)
+      .json({ ok: false, error: err.message || String(err) });
   }
 });
+
 
 // ---- Neon test route ----
 app.get("/api/test-neon", async (req, res) => {
