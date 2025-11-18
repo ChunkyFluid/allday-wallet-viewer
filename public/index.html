@@ -719,817 +719,815 @@
     </div>
 
     <script>
-      const form = document.getElementById("wallet-form");
-      const input = document.getElementById("wallet-input");
-      const statusEl = document.getElementById("status");
-      const summaryEl = document.getElementById("summary");
-      const summaryWalletEl = document.getElementById("summary-wallet");
-      const summaryCountEl = document.getElementById("summary-count");
-      const summaryStatsEl = document.getElementById("summary-stats");
-      const summaryTiersEl = document.getElementById("summary-tiers");
-      const summaryTeamsEl = document.getElementById("summary-teams");
-      const summarySetsEl = document.getElementById("summary-sets");
-      const summarySeriesEl = document.getElementById("summary-series");
-      const filtersEl = document.getElementById("filters");
-      const filterTextEl = document.getElementById("filter-text");
-      const filterTierEl = document.getElementById("filter-tier");
-      const clearFiltersBtn = document.getElementById("clear-filters-btn");
-      const tableContainerEl = document.getElementById("table-container");
-      const tbody = document.getElementById("results-body");
-      const submitBtn = document.getElementById("submit-btn");
-      const copyLinkBtn = document.getElementById("copy-link-btn");
-      const recentEl = document.getElementById("recent");
-      const recentListEl = document.getElementById("recent-list");
-      const downloadCsvBtn = document.getElementById("download-csv-btn");
+            const form = document.getElementById("wallet-form");
+            const input = document.getElementById("wallet-input");
+            const statusEl = document.getElementById("status");
+            const summaryEl = document.getElementById("summary");
+            const summaryWalletEl = document.getElementById("summary-wallet");
+            const summaryCountEl = document.getElementById("summary-count");
+            const summaryStatsEl = document.getElementById("summary-stats");
+            const summaryTiersEl = document.getElementById("summary-tiers");
+            const summaryTeamsEl = document.getElementById("summary-teams");
+            const summarySetsEl = document.getElementById("summary-sets");
+            const summarySeriesEl = document.getElementById("summary-series");
+            const filtersEl = document.getElementById("filters");
+            const filterTextEl = document.getElementById("filter-text");
+            const filterTierEl = document.getElementById("filter-tier");
+            const clearFiltersBtn = document.getElementById("clear-filters-btn");
+            const tableContainerEl = document.getElementById("table-container");
+            const tbody = document.getElementById("results-body");
+            const submitBtn = document.getElementById("submit-btn");
+            const copyLinkBtn = document.getElementById("copy-link-btn");
+            const recentEl = document.getElementById("recent");
+            const recentListEl = document.getElementById("recent-list");
+            const downloadCsvBtn = document.getElementById("download-csv-btn");
 
-      const paginationEl = document.getElementById("pagination");
-      const pageInfoEl = document.getElementById("page-info");
-      const pageSizeSelect = document.getElementById("page-size");
-      const prevPageBtn = document.getElementById("prev-page-btn");
-      const nextPageBtn = document.getElementById("next-page-btn");
+            const paginationEl = document.getElementById("pagination");
+            const pageInfoEl = document.getElementById("page-info");
+            const pageSizeSelect = document.getElementById("page-size");
+            const prevPageBtn = document.getElementById("prev-page-btn");
+            const nextPageBtn = document.getElementById("next-page-btn");
 
-      let fullRows = [];
-      let filteredRows = [];
-      let currentRows = [];
-      let currentSortKey = "last_event_ts";
-      let currentSortDir = "desc";
-      let currentWallet = "";
+            let fullRows = [];
+            let filteredRows = [];
+            let currentRows = [];
+            let currentSortKey = "last_event_ts";
+            let currentSortDir = "desc";
+            let currentWallet = "";
 
-      let pageSize = parseInt(pageSizeSelect.value, 10) || 200;
-      let currentPage = 1;
+            let pageSize = parseInt(pageSizeSelect.value, 10) || 200;
+            let currentPage = 1;
 
-      // sticky sidebar filters
-      let activeTeamFilter = "";
-      let activeSetFilter = "";
-      let activeSeriesFilter = "";
+            // sticky sidebar filters
+            let activeTeamFilter = "";
+            let activeSetFilter = "";
+            let activeSeriesFilter = "";
 
-      const RECENT_KEY = "allday_recent_wallets";
-      const RECENT_LIMIT = 8;
+            const RECENT_KEY = "allday_recent_wallets";
+            const RECENT_LIMIT = 8;
 
-      function setStatus(msg, isError = false) {
-        statusEl.textContent = msg || "";
-        statusEl.classList.toggle("error", !!isError);
-      }
-
-      function isWallet(str) {
-        return /^0x[0-9a-fA-F]{4,64}$/.test((str || "").trim());
-      }
-
-      function formatDate(ts) {
-        if (!ts) return "";
-        try {
-          const d = new Date(ts);
-          if (Number.isNaN(d.getTime())) return "";
-          return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        } catch {
-          return "";
-        }
-      }
-
-      function formatCurrency(num) {
-        if (num == null || Number.isNaN(num)) return "";
-        const n = Number(num);
-        if (Number.isNaN(n)) return "";
-        return (
-          "$" +
-          n.toLocaleString(undefined, {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2
-          })
-        );
-      }
-
-      function computeSummary(rows, wallet) {
-        if (!rows || !rows.length) {
-          summaryEl.style.display = "none";
-          summaryStatsEl.style.display = "none";
-          filtersEl.style.display = "none";
-          tableContainerEl.style.display = "none";
-          return;
-        }
-
-        summaryWalletEl.textContent = "Wallet: " + wallet;
-        summaryCountEl.textContent = " · Total moments: " + rows.length.toString();
-
-        const tierCounts = {};
-        const teamCounts = {};
-        const setCounts = {};
-        const seriesCounts = {};
-        const playerSet = new Set();
-        const positionSet = new Set();
-
-        let totalLowAsk = 0;
-        let totalAsp = 0;
-        let countLow = 0;
-        let countAsp = 0;
-
-        for (const r of rows) {
-          const tier = (r.tier || "UNKNOWN").toUpperCase();
-          tierCounts[tier] = (tierCounts[tier] || 0) + 1;
-
-          const team = r.team_name || "Unknown";
-          teamCounts[team] = (teamCounts[team] || 0) + 1;
-
-          const setName = r.set_name || "Unknown";
-          setCounts[setName] = (setCounts[setName] || 0) + 1;
-
-          const seriesName = r.series_name || "Unknown";
-          seriesCounts[seriesName] = (seriesCounts[seriesName] || 0) + 1;
-
-          const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
-          if (playerName) {
-            playerSet.add(playerName);
-          }
-          if (r.position) {
-            positionSet.add(r.position);
-          }
-
-          if (typeof r.low_ask === "number") {
-            totalLowAsk += r.low_ask;
-            countLow++;
-          }
-          if (typeof r.asp_90d === "number") {
-            totalAsp += r.asp_90d;
-            countAsp++;
-          }
-        }
-
-        // Tiers
-        summaryTiersEl.innerHTML = "";
-        Object.entries(tierCounts)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([tier, count]) => {
-            const div = document.createElement("div");
-            div.className = "pill";
-            div.textContent = tier + " · " + count;
-
-            const isActive = filterTierEl.value === tier;
-            if (isActive) {
-              div.style.borderColor = "#22c55e";
-              div.style.background = "#022c16";
+            function setStatus(msg, isError = false) {
+              statusEl.textContent = msg || "";
+              statusEl.classList.toggle("error", !!isError);
             }
-            div.style.cursor = "pointer";
-            div.title = "Click to toggle filter for this tier";
 
-            div.addEventListener("click", () => {
-              if (filterTierEl.value === tier) {
-                filterTierEl.value = "";
-              } else {
-                filterTierEl.value = tier;
+            function isWallet(str) {
+              return /^0x[0-9a-fA-F]{4,64}$/.test((str || "").trim());
+            }
+
+            function formatDate(ts) {
+              if (!ts) return "";
+              try {
+                const d = new Date(ts);
+                if (Number.isNaN(d.getTime())) return "";
+                return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              } catch {
+                return "";
               }
+            }
+
+            function formatCurrency(num) {
+              if (num == null || Number.isNaN(num)) return "";
+              const n = Number(num);
+              if (Number.isNaN(n)) return "";
+              return (
+                "$" +
+                n.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2
+                })
+              );
+            }
+
+            function computeSummary(rows, wallet) {
+              if (!rows || !rows.length) {
+                summaryEl.style.display = "none";
+                summaryStatsEl.style.display = "none";
+                filtersEl.style.display = "none";
+                tableContainerEl.style.display = "none";
+                return;
+              }
+
+              summaryWalletEl.textContent = "Wallet: " + wallet;
+              summaryCountEl.textContent = " · Total moments: " + rows.length.toString();
+
+              const tierCounts = {};
+              const teamCounts = {};
+              const setCounts = {};
+              const seriesCounts = {};
+              const playerSet = new Set();
+              const positionSet = new Set();
+
+              let totalLowAsk = 0;
+              let totalAsp = 0;
+              let countLow = 0;
+              let countAsp = 0;
+
+              for (const r of rows) {
+                const tier = (r.tier || "UNKNOWN").toUpperCase();
+                tierCounts[tier] = (tierCounts[tier] || 0) + 1;
+
+                const team = r.team_name || "Unknown";
+                teamCounts[team] = (teamCounts[team] || 0) + 1;
+
+                const setName = r.set_name || "Unknown";
+                setCounts[setName] = (setCounts[setName] || 0) + 1;
+
+                const seriesName = r.series_name || "Unknown";
+                seriesCounts[seriesName] = (seriesCounts[seriesName] || 0) + 1;
+
+                const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
+                if (playerName) {
+                  playerSet.add(playerName);
+                }
+                if (r.position) {
+                  positionSet.add(r.position);
+                }
+
+                if (typeof r.low_ask === "number") {
+                  totalLowAsk += r.low_ask;
+                  countLow++;
+                }
+                if (typeof r.asp_90d === "number") {
+                  totalAsp += r.asp_90d;
+                  countAsp++;
+                }
+              }
+
+              // Tiers
+              summaryTiersEl.innerHTML = "";
+              Object.entries(tierCounts)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([tier, count]) => {
+                  const div = document.createElement("div");
+                  div.className = "pill";
+                  div.textContent = tier + " · " + count;
+
+                  const isActive = filterTierEl.value === tier;
+                  if (isActive) {
+                    div.style.borderColor = "#22c55e";
+                    div.style.background = "#022c16";
+                  }
+                  div.style.cursor = "pointer";
+                  div.title = "Click to toggle filter for this tier";
+
+                  div.addEventListener("click", () => {
+                    if (filterTierEl.value === tier) {
+                      filterTierEl.value = "";
+                    } else {
+                      filterTierEl.value = tier;
+                    }
+                    currentPage = 1;
+                    applyFiltersAndRender();
+                  });
+
+                  summaryTiersEl.appendChild(div);
+                });
+
+              // Teams
+              summaryTeamsEl.innerHTML = "";
+              Object.entries(teamCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .forEach(([team, count]) => {
+                  const div = document.createElement("div");
+                  div.className = "pill";
+                  div.textContent = team + " · " + count;
+
+                  const isActive = activeTeamFilter === team;
+                  if (isActive) {
+                    div.style.borderColor = "#22c55e";
+                    div.style.background = "#022c16";
+                  }
+                  div.style.cursor = "pointer";
+                  div.title = "Click to toggle filter for this team";
+
+                  div.addEventListener("click", () => {
+                    if (activeTeamFilter === team) {
+                      activeTeamFilter = "";
+                    } else {
+                      activeTeamFilter = team;
+                    }
+                    currentPage = 1;
+                    applyFiltersAndRender();
+                  });
+
+                  summaryTeamsEl.appendChild(div);
+                });
+
+              // Sets
+              summarySetsEl.innerHTML = "";
+              Object.entries(setCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 30)
+                .forEach(([setName, count]) => {
+                  const div = document.createElement("div");
+                  div.className = "pill";
+                  div.textContent = setName + " · " + count;
+
+                  const isActive = activeSetFilter === setName;
+                  if (isActive) {
+                    div.style.borderColor = "#22c55e";
+                    div.style.background = "#022c16";
+                  }
+                  div.style.cursor = "pointer";
+                  div.title = "Click to toggle filter for this set";
+
+                  div.addEventListener("click", () => {
+                    if (activeSetFilter === setName) {
+                      activeSetFilter = "";
+                    } else {
+                      activeSetFilter = setName;
+                    }
+                    currentPage = 1;
+                    applyFiltersAndRender();
+                  });
+
+                  summarySetsEl.appendChild(div);
+                });
+
+              // Series
+              summarySeriesEl.innerHTML = "";
+              Object.entries(seriesCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .forEach(([seriesName, count]) => {
+                  const div = document.createElement("div");
+                  div.className = "pill";
+                  div.textContent = seriesName + " · " + count;
+
+                  const isActive = activeSeriesFilter === seriesName;
+                  if (isActive) {
+                    div.style.borderColor = "#22c55e";
+                    div.style.background = "#022c16";
+                  }
+                  div.style.cursor = "pointer";
+                  div.title = "Click to toggle filter for this series";
+
+                  div.addEventListener("click", () => {
+                    if (activeSeriesFilter === seriesName) {
+                      activeSeriesFilter = "";
+                    } else {
+                      activeSeriesFilter = seriesName;
+                    }
+                    currentPage = 1;
+                    applyFiltersAndRender();
+                  });
+
+                  summarySeriesEl.appendChild(div);
+                });
+
+              const numTeams = Object.keys(teamCounts).length;
+              const numSets = Object.keys(setCounts).length;
+              const numSeries = Object.keys(seriesCounts).length;
+
+              const parts = [
+                `Players: ${playerSet.size}`,
+                `Teams: ${numTeams}`,
+                `Sets: ${numSets}`,
+                `Series: ${numSeries}`,
+                `Positions: ${positionSet.size}`
+              ];
+
+              if (countLow > 0) {
+                parts.push(`Est (Low Ask): ${formatCurrency(totalLowAsk)}`);
+              }
+              if (countAsp > 0) {
+                parts.push(`Est (ASP 90d): ${formatCurrency(totalAsp)}`);
+              }
+
+              summaryStatsEl.textContent = parts.join(" · ");
+              summaryStatsEl.style.display = "block";
+
+              summaryEl.style.display = "block";
+              filtersEl.style.display = "flex";
+              tableContainerEl.style.display = "block";
+            }
+
+            function sortFilteredRows() {
+              if (!currentSortKey) return;
+              const key = currentSortKey;
+              const dir = currentSortDir === "asc" ? 1 : -1;
+
+              filteredRows.sort((a, b) => {
+                let va, vb;
+
+                if (key === "player") {
+                  va = (a.first_name || "") + " " + (a.last_name || "");
+                  vb = (b.first_name || "") + " " + (b.last_name || "");
+                } else {
+                  va = a[key];
+                  vb = b[key];
+                }
+
+                if (key === "serial_number" || key === "max_mint_size" || key === "low_ask" || key === "asp_90d") {
+                  const na = Number(va);
+                  const nb = Number(vb);
+                  if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
+                  if (Number.isNaN(na)) return -1 * dir;
+                  if (Number.isNaN(nb)) return 1 * dir;
+                  return (na - nb) * dir;
+                }
+
+                if (key === "last_event_ts") {
+                  const da = new Date(a.last_event_ts || 0).getTime();
+                  const db = new Date(b.last_event_ts || 0).getTime();
+                  return (da - db) * dir;
+                }
+
+                const sa = va === null || va === undefined ? "" : String(va).toLowerCase();
+                const sb = vb === null || vb === undefined ? "" : String(vb).toLowerCase();
+                if (sa < sb) return -1 * dir;
+                if (sa > sb) return 1 * dir;
+                return 0;
+              });
+
+              document.querySelectorAll("th .sort-indicator").forEach((span) => {
+                const k = span.getAttribute("data-key");
+                if (k === currentSortKey) {
+                  span.textContent = currentSortDir === "asc" ? "▲" : "▼";
+                } else {
+                  span.textContent = "";
+                }
+              });
+            }
+
+            function updatePagination(total, totalPages) {
+              if (!total) {
+                paginationEl.style.display = "none";
+                pageInfoEl.textContent = "";
+                return;
+              }
+
+              const start = (currentPage - 1) * pageSize + 1;
+              const end = Math.min(start + pageSize - 1, total);
+              pageInfoEl.textContent = `Showing ${start}-${end} of ${total}`;
+
+              prevPageBtn.disabled = currentPage <= 1;
+              nextPageBtn.disabled = currentPage >= totalPages;
+
+              paginationEl.style.display = "flex";
+            }
+
+            function applyFiltersAndRender() {
+              if (!fullRows.length) {
+                tbody.innerHTML = "";
+                summaryEl.style.display = "none";
+                summaryStatsEl.style.display = "none";
+                filtersEl.style.display = "none";
+                tableContainerEl.style.display = "none";
+                paginationEl.style.display = "none";
+                return;
+              }
+
+              const text = filterTextEl.value.trim().toLowerCase();
+              const tierFilter = filterTierEl.value;
+              const teamFilter = activeTeamFilter;
+              const setFilter = activeSetFilter;
+              const seriesFilter = activeSeriesFilter;
+
+              filteredRows = fullRows.filter((r) => {
+                const tier = (r.tier || "UNKNOWN").toUpperCase();
+                const teamName = r.team_name || "Unknown";
+                const setName = r.set_name || "Unknown";
+                const seriesName = r.series_name || "Unknown";
+
+                if (tierFilter && tier !== tierFilter) return false;
+                if (teamFilter && teamName !== teamFilter) return false;
+                if (setFilter && setName !== setFilter) return false;
+                if (seriesFilter && seriesName !== seriesFilter) return false;
+
+                if (text) {
+                  const haystack = [r.first_name, r.last_name, r.team_name, r.set_name, r.series_name]
+                    .map((x) => (x || "").toLowerCase())
+                    .join(" ");
+                  if (!haystack.includes(text)) return false;
+                }
+
+                return true;
+              });
+
+              if (!currentSortKey) {
+                currentSortKey = "last_event_ts";
+                currentSortDir = "desc";
+              }
+              sortFilteredRows();
+
+              const total = filteredRows.length;
+              const totalPages = Math.max(1, Math.ceil(total / pageSize));
+              if (currentPage > totalPages) currentPage = totalPages;
+              if (currentPage < 1) currentPage = 1;
+
+              const startIdx = (currentPage - 1) * pageSize;
+              const endIdx = startIdx + pageSize;
+              currentRows = filteredRows.slice(startIdx, endIdx);
+
+              renderTable();
+              updatePagination(total, totalPages);
+              computeSummary(fullRows, currentWallet);
+            }
+
+            function renderTable() {
+              tbody.innerHTML = "";
+
+              for (const r of currentRows) {
+                const tr = document.createElement("tr");
+                const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
+
+                const cols = [
+                  playerName,
+                  r.team_name || "",
+                  r.position || "",
+                  r.tier || "",
+                  r.set_name || "",
+                  r.series_name || "",
+                  r.serial_number != null ? r.serial_number : "",
+                  r.max_mint_size != null ? r.max_mint_size : "",
+                  r.low_ask != null ? formatCurrency(r.low_ask) : "",
+                  r.asp_90d != null ? formatCurrency(r.asp_90d) : "",
+                  formatDate(r.last_event_ts),
+                  r.nft_id
+                ];
+
+                cols.forEach((val, idx) => {
+                  const td = document.createElement("td");
+                  if (idx === 3 && r.tier) {
+                    td.innerHTML = "";
+                    const span = document.createElement("span");
+                    span.className = "tag";
+                    span.textContent = r.tier;
+                    td.appendChild(span);
+                  } else {
+                    td.textContent = val;
+                  }
+                  tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+              }
+            }
+
+            function clearAllFilters() {
+              filterTextEl.value = "";
+              filterTierEl.value = "";
+              activeTeamFilter = "";
+              activeSetFilter = "";
+              activeSeriesFilter = "";
+              currentSortKey = "last_event_ts";
+              currentSortDir = "desc";
               currentPage = 1;
               applyFiltersAndRender();
-            });
-
-            summaryTiersEl.appendChild(div);
-          });
-
-        // Teams
-        summaryTeamsEl.innerHTML = "";
-        Object.entries(teamCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 20)
-          .forEach(([team, count]) => {
-            const div = document.createElement("div");
-            div.className = "pill";
-            div.textContent = team + " · " + count;
-
-            const isActive = activeTeamFilter === team;
-            if (isActive) {
-              div.style.borderColor = "#22c55e";
-              div.style.background = "#022c16";
             }
-            div.style.cursor = "pointer";
-            div.title = "Click to toggle filter for this team";
 
-            div.addEventListener("click", () => {
-              if (activeTeamFilter === team) {
-                activeTeamFilter = "";
-              } else {
-                activeTeamFilter = team;
+            function loadRecentWallets() {
+              try {
+                const raw = localStorage.getItem(RECENT_KEY);
+                if (!raw) return [];
+                const arr = JSON.parse(raw);
+                if (!Array.isArray(arr)) return [];
+                return arr.filter((w) => typeof w === "string" && isWallet(w));
+              } catch {
+                return [];
               }
-              currentPage = 1;
-              applyFiltersAndRender();
-            });
-
-            summaryTeamsEl.appendChild(div);
-          });
-
-        // Sets
-        summarySetsEl.innerHTML = "";
-        Object.entries(setCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 30)
-          .forEach(([setName, count]) => {
-            const div = document.createElement("div");
-            div.className = "pill";
-            div.textContent = setName + " · " + count;
-
-            const isActive = activeSetFilter === setName;
-            if (isActive) {
-              div.style.borderColor = "#22c55e";
-              div.style.background = "#022c16";
             }
-            div.style.cursor = "pointer";
-            div.title = "Click to toggle filter for this set";
 
-            div.addEventListener("click", () => {
-              if (activeSetFilter === setName) {
-                activeSetFilter = "";
-              } else {
-                activeSetFilter = setName;
+            function saveRecentWallets(wallets) {
+              try {
+                localStorage.setItem(RECENT_KEY, JSON.stringify(wallets));
+              } catch {
+                // ignore
               }
-              currentPage = 1;
-              applyFiltersAndRender();
-            });
-
-            summarySetsEl.appendChild(div);
-          });
-
-        // Series
-        summarySeriesEl.innerHTML = "";
-        Object.entries(seriesCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 20)
-          .forEach(([seriesName, count]) => {
-            const div = document.createElement("div");
-            div.className = "pill";
-            div.textContent = seriesName + " · " + count;
-
-            const isActive = activeSeriesFilter === seriesName;
-            if (isActive) {
-              div.style.borderColor = "#22c55e";
-              div.style.background = "#022c16";
             }
-            div.style.cursor = "pointer";
-            div.title = "Click to toggle filter for this series";
 
-            div.addEventListener("click", () => {
-              if (activeSeriesFilter === seriesName) {
-                activeSeriesFilter = "";
-              } else {
-                activeSeriesFilter = seriesName;
+            function addWalletToRecent(wallet) {
+              if (!isWallet(wallet)) return;
+              const lower = wallet.toLowerCase();
+              let wallets = loadRecentWallets().filter((w) => w.toLowerCase() !== lower);
+              wallets.unshift(wallet);
+              if (wallets.length > RECENT_LIMIT) {
+                wallets = wallets.slice(0, RECENT_LIMIT);
               }
-              currentPage = 1;
-              applyFiltersAndRender();
+              saveRecentWallets(wallets);
+              renderRecentWallets();
+            }
+
+            function renderRecentWallets() {
+              const wallets = loadRecentWallets();
+              recentListEl.innerHTML = "";
+
+              if (!wallets.length) {
+                recentEl.style.display = "none";
+                return;
+              }
+
+              wallets.forEach((w) => {
+                const div = document.createElement("div");
+                div.className = "link-pill";
+                div.textContent = w;
+                div.addEventListener("click", () => {
+                  input.value = w;
+                  form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+                });
+                recentListEl.appendChild(div);
+              });
+
+              recentEl.style.display = "flex";
+            }
+
+            function rowsToCsv(rows) {
+              const headers = [
+                "wallet_address",
+                "nft_id",
+                "edition_id",
+                "play_id",
+                "series_id",
+                "set_id",
+                "tier",
+                "serial_number",
+                "max_mint_size",
+                "first_name",
+                "last_name",
+                "team_name",
+                "position",
+                "jersey_number",
+                "series_name",
+                "set_name",
+                "last_event_ts",
+                "low_ask",
+                "asp_90d"
+              ];
+
+              const escapeCell = (val) => {
+                if (val === null || val === undefined) return "";
+                const s = String(val);
+                if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+                  return '"' + s.replace(/"/g, '""') + '"';
+                }
+                return s;
+              };
+
+              const lines = [];
+              lines.push(headers.join(","));
+
+              for (const r of rows) {
+                const rowVals = [
+                  r.wallet_address,
+                  r.nft_id,
+                  r.edition_id,
+                  r.play_id,
+                  r.series_id,
+                  r.set_id,
+                  r.tier,
+                  r.serial_number,
+                  r.max_mint_size,
+                  r.first_name,
+                  r.last_name,
+                  r.team_name,
+                  r.position,
+                  r.jersey_number,
+                  r.series_name,
+                  r.set_name,
+                  r.last_event_ts,
+                  r.low_ask,
+                  r.asp_90d
+                ].map(escapeCell);
+                lines.push(rowVals.join(","));
+              }
+
+              return lines.join("\n");
+            }
+
+            function downloadCsv() {
+              if (!filteredRows.length) {
+                alert("No rows to export.");
+                return;
+              }
+              const csv = rowsToCsv(filteredRows);
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              const wallet = currentWallet || "wallet";
+              a.href = url;
+              a.download = `allday_${wallet}_moments.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+
+            function updateUrlWithWallet(wallet) {
+              if (!isWallet(wallet)) return;
+              const url = new URL(window.location.href);
+              url.searchParams.set("wallet", wallet);
+              window.history.replaceState({}, "", url.toString());
+            }
+
+            async function enrichRowsWithPrices(rows) {
+              const editions = [...new Set(rows.map((r) => r.edition_id).filter(Boolean))];
+              if (!editions.length) return;
+
+              try {
+                const resp = await fetch(`/api/prices?editions=${encodeURIComponent(editions.join(","))}`);
+                if (!resp.ok) {
+                  console.warn("prices API failed", await resp.text());
+                  return;
+                }
+
+                const data = await resp.json();
+                console.log("prices response", data);
+
+                if (!data.ok) {
+                  console.warn("prices API error", data.error);
+                  return;
+                }
+
+                const aspMap = data.asp || {};
+                const lowMap = data.lowAsk || {};
+
+                for (const r of rows) {
+                  const eid = r.edition_id;
+                  if (!eid) continue;
+
+                  const aspVal = aspMap[eid];
+                  const lowVal = lowMap[eid];
+
+                  const aspNum = aspVal !== null && aspVal !== undefined ? Number(aspVal) : null;
+                  const lowNum = lowVal !== null && lowVal !== undefined ? Number(lowVal) : null;
+
+                  r.asp_90d = Number.isNaN(aspNum) ? null : aspNum;
+                  r.low_ask = Number.isNaN(lowNum) ? null : lowNum;
+                }
+              } catch (err) {
+                console.error("Error fetching prices:", err);
+              }
+            }
+
+            // Collapsible sidebar groups
+            document.querySelectorAll(".sidebar-group-header").forEach((header) => {
+              header.addEventListener("click", () => {
+                const group = header.parentElement;
+                const icon = header.querySelector(".sidebar-group-toggle");
+                const collapsed = group.classList.toggle("collapsed");
+                if (icon) {
+                  icon.textContent = collapsed ? "▸" : "▾";
+                }
+              });
             });
 
-            summarySeriesEl.appendChild(div);
-          });
+            form.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const wallet = input.value.trim();
 
-        const numTeams = Object.keys(teamCounts).length;
-        const numSets = Object.keys(setCounts).length;
-        const numSeries = Object.keys(seriesCounts).length;
+              if (!isWallet(wallet)) {
+                setStatus("Enter a valid 0x wallet address.", true);
+                summaryEl.style.display = "none";
+                summaryStatsEl.style.display = "none";
+                filtersEl.style.display = "none";
+                tableContainerEl.style.display = "none";
+                paginationEl.style.display = "none";
+                return;
+              }
 
-        const parts = [
-          `Players: ${playerSet.size}`,
-          `Teams: ${numTeams}`,
-          `Sets: ${numSets}`,
-          `Series: ${numSeries}`,
-          `Positions: ${positionSet.size}`
-        ];
+              // reset filters/sort for new wallet
+              filterTextEl.value = "";
+              filterTierEl.value = "";
+              activeTeamFilter = "";
+              activeSetFilter = "";
+              activeSeriesFilter = "";
+              currentSortKey = "last_event_ts";
+              currentSortDir = "desc";
+              currentPage = 1;
 
-        if (countLow > 0) {
-          parts.push(`Est (Low Ask): ${formatCurrency(totalLowAsk)}`);
-        }
-        if (countAsp > 0) {
-          parts.push(`Est (ASP 90d): ${formatCurrency(totalAsp)}`);
-        }
+              setStatus("Loading...");
+              submitBtn.disabled = true;
+              tbody.innerHTML = "";
+              summaryEl.style.display = "none";
+              summaryStatsEl.style.display = "none";
+              filtersEl.style.display = "none";
+              tableContainerEl.style.display = "none";
+              paginationEl.style.display = "none";
 
-        summaryStatsEl.textContent = parts.join(" · ");
-        summaryStatsEl.style.display = "block";
+              try {
+                const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
+                const json = await res.json();
 
-        summaryEl.style.display = "block";
-        filtersEl.style.display = "flex";
-        tableContainerEl.style.display = "block";
-      }
+                if (!json.ok) {
+                  setStatus("Error: " + (json.error || "Unknown error"), true);
+                  submitBtn.disabled = false;
+                  return;
+                }
 
-      function sortFilteredRows() {
-        if (!currentSortKey) return;
-        const key = currentSortKey;
-        const dir = currentSortDir === "asc" ? 1 : -1;
+      // normalize rows from API so we always have first_name / last_name / team_name keys
+      fullRows = (json.rows || []).map((r) => {
+        const firstName =
+          r.first_name ||
+          r.player_first_name ||
+          r.playerName ||
+          "";
+        const lastName =
+          r.last_name ||
+          r.player_last_name ||
+          r.playerSurname ||
+          "";
+        const teamName =
+          r.team_name ||
+          r.team ||
+          r.teamName ||
+          "";
 
-        filteredRows.sort((a, b) => {
-          let va, vb;
-
-          if (key === "player") {
-            va = (a.first_name || "") + " " + (a.last_name || "");
-            vb = (b.first_name || "") + " " + (b.last_name || "");
-          } else {
-            va = a[key];
-            vb = b[key];
-          }
-
-          if (key === "serial_number" || key === "max_mint_size" || key === "low_ask" || key === "asp_90d") {
-            const na = Number(va);
-            const nb = Number(vb);
-            if (Number.isNaN(na) && Number.isNaN(nb)) return 0;
-            if (Number.isNaN(na)) return -1 * dir;
-            if (Number.isNaN(nb)) return 1 * dir;
-            return (na - nb) * dir;
-          }
-
-          if (key === "last_event_ts") {
-            const da = new Date(a.last_event_ts || 0).getTime();
-            const db = new Date(b.last_event_ts || 0).getTime();
-            return (da - db) * dir;
-          }
-
-          const sa = va === null || va === undefined ? "" : String(va).toLowerCase();
-          const sb = vb === null || vb === undefined ? "" : String(vb).toLowerCase();
-          if (sa < sb) return -1 * dir;
-          if (sa > sb) return 1 * dir;
-          return 0;
-        });
-
-        document.querySelectorAll("th .sort-indicator").forEach((span) => {
-          const k = span.getAttribute("data-key");
-          if (k === currentSortKey) {
-            span.textContent = currentSortDir === "asc" ? "▲" : "▼";
-          } else {
-            span.textContent = "";
-          }
-        });
-      }
-
-      function updatePagination(total, totalPages) {
-        if (!total) {
-          paginationEl.style.display = "none";
-          pageInfoEl.textContent = "";
-          return;
-        }
-
-        const start = (currentPage - 1) * pageSize + 1;
-        const end = Math.min(start + pageSize - 1, total);
-        pageInfoEl.textContent = `Showing ${start}-${end} of ${total}`;
-
-        prevPageBtn.disabled = currentPage <= 1;
-        nextPageBtn.disabled = currentPage >= totalPages;
-
-        paginationEl.style.display = "flex";
-      }
-
-      function applyFiltersAndRender() {
-        if (!fullRows.length) {
-          tbody.innerHTML = "";
-          summaryEl.style.display = "none";
-          summaryStatsEl.style.display = "none";
-          filtersEl.style.display = "none";
-          tableContainerEl.style.display = "none";
-          paginationEl.style.display = "none";
-          return;
-        }
-
-        const text = filterTextEl.value.trim().toLowerCase();
-        const tierFilter = filterTierEl.value;
-        const teamFilter = activeTeamFilter;
-        const setFilter = activeSetFilter;
-        const seriesFilter = activeSeriesFilter;
-
-        filteredRows = fullRows.filter((r) => {
-          const tier = (r.tier || "UNKNOWN").toUpperCase();
-          const teamName = r.team_name || "Unknown";
-          const setName = r.set_name || "Unknown";
-          const seriesName = r.series_name || "Unknown";
-
-          if (tierFilter && tier !== tierFilter) return false;
-          if (teamFilter && teamName !== teamFilter) return false;
-          if (setFilter && setName !== setFilter) return false;
-          if (seriesFilter && seriesName !== seriesFilter) return false;
-
-          if (text) {
-            const haystack = [r.first_name, r.last_name, r.team_name, r.set_name, r.series_name]
-              .map((x) => (x || "").toLowerCase())
-              .join(" ");
-            if (!haystack.includes(text)) return false;
-          }
-
-          return true;
-        });
-
-        if (!currentSortKey) {
-          currentSortKey = "last_event_ts";
-          currentSortDir = "desc";
-        }
-        sortFilteredRows();
-
-        const total = filteredRows.length;
-        const totalPages = Math.max(1, Math.ceil(total / pageSize));
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const startIdx = (currentPage - 1) * pageSize;
-        const endIdx = startIdx + pageSize;
-        currentRows = filteredRows.slice(startIdx, endIdx);
-
-        renderTable();
-        updatePagination(total, totalPages);
-        computeSummary(fullRows, currentWallet);
-      }
-
-      function renderTable() {
-        tbody.innerHTML = "";
-
-        for (const r of currentRows) {
-          const tr = document.createElement("tr");
-          const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
-
-          const cols = [
-            playerName,
-            r.team_name || "",
-            r.position || "",
-            r.tier || "",
-            r.set_name || "",
-            r.series_name || "",
-            r.serial_number != null ? r.serial_number : "",
-            r.max_mint_size != null ? r.max_mint_size : "",
-            r.low_ask != null ? formatCurrency(r.low_ask) : "",
-            r.asp_90d != null ? formatCurrency(r.asp_90d) : "",
-            formatDate(r.last_event_ts),
-            r.nft_id
-          ];
-
-          cols.forEach((val, idx) => {
-            const td = document.createElement("td");
-            if (idx === 3 && r.tier) {
-              td.innerHTML = "";
-              const span = document.createElement("span");
-              span.className = "tag";
-              span.textContent = r.tier;
-              td.appendChild(span);
-            } else {
-              td.textContent = val;
-            }
-            tr.appendChild(td);
-          });
-
-          tbody.appendChild(tr);
-        }
-      }
-
-      function clearAllFilters() {
-        filterTextEl.value = "";
-        filterTierEl.value = "";
-        activeTeamFilter = "";
-        activeSetFilter = "";
-        activeSeriesFilter = "";
-        currentSortKey = "last_event_ts";
-        currentSortDir = "desc";
-        currentPage = 1;
-        applyFiltersAndRender();
-      }
-
-      function loadRecentWallets() {
-        try {
-          const raw = localStorage.getItem(RECENT_KEY);
-          if (!raw) return [];
-          const arr = JSON.parse(raw);
-          if (!Array.isArray(arr)) return [];
-          return arr.filter((w) => typeof w === "string" && isWallet(w));
-        } catch {
-          return [];
-        }
-      }
-
-      function saveRecentWallets(wallets) {
-        try {
-          localStorage.setItem(RECENT_KEY, JSON.stringify(wallets));
-        } catch {
-          // ignore
-        }
-      }
-
-      function addWalletToRecent(wallet) {
-        if (!isWallet(wallet)) return;
-        const lower = wallet.toLowerCase();
-        let wallets = loadRecentWallets().filter((w) => w.toLowerCase() !== lower);
-        wallets.unshift(wallet);
-        if (wallets.length > RECENT_LIMIT) {
-          wallets = wallets.slice(0, RECENT_LIMIT);
-        }
-        saveRecentWallets(wallets);
-        renderRecentWallets();
-      }
-
-      function renderRecentWallets() {
-        const wallets = loadRecentWallets();
-        recentListEl.innerHTML = "";
-
-        if (!wallets.length) {
-          recentEl.style.display = "none";
-          return;
-        }
-
-        wallets.forEach((w) => {
-          const div = document.createElement("div");
-          div.className = "link-pill";
-          div.textContent = w;
-          div.addEventListener("click", () => {
-            input.value = w;
-            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-          });
-          recentListEl.appendChild(div);
-        });
-
-        recentEl.style.display = "flex";
-      }
-
-      function rowsToCsv(rows) {
-        const headers = [
-          "wallet_address",
-          "nft_id",
-          "edition_id",
-          "play_id",
-          "series_id",
-          "set_id",
-          "tier",
-          "serial_number",
-          "max_mint_size",
-          "first_name",
-          "last_name",
-          "team_name",
-          "position",
-          "jersey_number",
-          "series_name",
-          "set_name",
-          "last_event_ts",
-          "low_ask",
-          "asp_90d"
-        ];
-
-        const escapeCell = (val) => {
-          if (val === null || val === undefined) return "";
-          const s = String(val);
-          if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-            return '"' + s.replace(/"/g, '""') + '"';
-          }
-          return s;
+        return {
+          ...r,
+          first_name: firstName,
+          last_name: lastName,
+          team_name: teamName
         };
-
-        const lines = [];
-        lines.push(headers.join(","));
-
-        for (const r of rows) {
-          const rowVals = [
-            r.wallet_address,
-            r.nft_id,
-            r.edition_id,
-            r.play_id,
-            r.series_id,
-            r.set_id,
-            r.tier,
-            r.serial_number,
-            r.max_mint_size,
-            r.first_name,
-            r.last_name,
-            r.team_name,
-            r.position,
-            r.jersey_number,
-            r.series_name,
-            r.set_name,
-            r.last_event_ts,
-            r.low_ask,
-            r.asp_90d
-          ].map(escapeCell);
-          lines.push(rowVals.join(","));
-        }
-
-        return lines.join("\n");
-      }
-
-      function downloadCsv() {
-        if (!filteredRows.length) {
-          alert("No rows to export.");
-          return;
-        }
-        const csv = rowsToCsv(filteredRows);
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        const wallet = currentWallet || "wallet";
-        a.href = url;
-        a.download = `allday_${wallet}_moments.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-
-      function updateUrlWithWallet(wallet) {
-        if (!isWallet(wallet)) return;
-        const url = new URL(window.location.href);
-        url.searchParams.set("wallet", wallet);
-        window.history.replaceState({}, "", url.toString());
-      }
-
-      async function enrichRowsWithPrices(rows) {
-        const editions = [...new Set(rows.map((r) => r.edition_id).filter(Boolean))];
-        if (!editions.length) return;
-
-        try {
-          const resp = await fetch(`/api/prices?editions=${encodeURIComponent(editions.join(","))}`);
-          if (!resp.ok) {
-            console.warn("prices API failed", await resp.text());
-            return;
-          }
-
-          const data = await resp.json();
-          console.log("prices response", data);
-
-          if (!data.ok) {
-            console.warn("prices API error", data.error);
-            return;
-          }
-
-          const aspMap = data.asp || {};
-          const lowMap = data.lowAsk || {};
-
-          for (const r of rows) {
-            const eid = r.edition_id;
-            if (!eid) continue;
-
-            const aspVal = aspMap[eid];
-            const lowVal = lowMap[eid];
-
-            const aspNum = aspVal !== null && aspVal !== undefined ? Number(aspVal) : null;
-            const lowNum = lowVal !== null && lowVal !== undefined ? Number(lowVal) : null;
-
-            r.asp_90d = Number.isNaN(aspNum) ? null : aspNum;
-            r.low_ask = Number.isNaN(lowNum) ? null : lowNum;
-          }
-        } catch (err) {
-          console.error("Error fetching prices:", err);
-        }
-      }
-
-      // Collapsible sidebar groups
-      document.querySelectorAll(".sidebar-group-header").forEach((header) => {
-        header.addEventListener("click", () => {
-          const group = header.parentElement;
-          const icon = header.querySelector(".sidebar-group-toggle");
-          const collapsed = group.classList.toggle("collapsed");
-          if (icon) {
-            icon.textContent = collapsed ? "▸" : "▾";
-          }
-        });
       });
 
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const wallet = input.value.trim();
+      currentWallet = json.wallet || wallet;
 
-        if (!isWallet(wallet)) {
-          setStatus("Enter a valid 0x wallet address.", true);
-          summaryEl.style.display = "none";
-          summaryStatsEl.style.display = "none";
-          filtersEl.style.display = "none";
-          tableContainerEl.style.display = "none";
-          paginationEl.style.display = "none";
-          return;
-        }
 
-        // reset filters/sort for new wallet
-        filterTextEl.value = "";
-        filterTierEl.value = "";
-        activeTeamFilter = "";
-        activeSetFilter = "";
-        activeSeriesFilter = "";
-        currentSortKey = "last_event_ts";
-        currentSortDir = "desc";
-        currentPage = 1;
+            filterTextEl.addEventListener("input", () => {
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
 
-        setStatus("Loading...");
-        submitBtn.disabled = true;
-        tbody.innerHTML = "";
-        summaryEl.style.display = "none";
-        summaryStatsEl.style.display = "none";
-        filtersEl.style.display = "none";
-        tableContainerEl.style.display = "none";
-        paginationEl.style.display = "none";
+            filterTierEl.addEventListener("change", () => {
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
 
-        try {
-          const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
-          const json = await res.json();
+            clearFiltersBtn.addEventListener("click", () => {
+              clearAllFilters();
+            });
 
-          if (!json.ok) {
-            setStatus("Error: " + (json.error || "Unknown error"), true);
-            submitBtn.disabled = false;
-            return;
-          }
+            downloadCsvBtn.addEventListener("click", () => {
+              downloadCsv();
+            });
 
-          fullRows = json.rows || [];
-          currentWallet = json.wallet || wallet;
+            pageSizeSelect.addEventListener("change", () => {
+              pageSize = parseInt(pageSizeSelect.value, 10) || 200;
+              currentPage = 1;
+              applyFiltersAndRender();
+            });
 
-          if (!fullRows.length) {
-            setStatus(`No moments found for ${currentWallet}`, false);
-            summaryEl.style.display = "none";
-            summaryStatsEl.style.display = "none";
-            filtersEl.style.display = "none";
-            tableContainerEl.style.display = "none";
-            paginationEl.style.display = "none";
-            return;
-          }
+            prevPageBtn.addEventListener("click", () => {
+              if (currentPage > 1) {
+                currentPage -= 1;
+                applyFiltersAndRender();
+              }
+            });
 
-          // prices
-          setStatus(`Loaded ${fullRows.length} moments for ${currentWallet} – fetching prices...`);
-          await enrichRowsWithPrices(fullRows);
+            nextPageBtn.addEventListener("click", () => {
+              currentPage += 1;
+              applyFiltersAndRender();
+            });
 
-          // update URL so it’s shareable/bookmarkable
-          updateUrlWithWallet(currentWallet);
+            document.querySelectorAll("th[data-key]").forEach((th) => {
+              th.addEventListener("click", () => {
+                const key = th.getAttribute("data-key");
+                if (currentSortKey === key) {
+                  currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+                } else {
+                  currentSortKey = key;
+                  currentSortDir = "asc";
+                }
+                applyFiltersAndRender();
+              });
+            });
 
-          setStatus(`Loaded ${fullRows.length} moments for ${currentWallet}`);
-          addWalletToRecent(currentWallet);
-          applyFiltersAndRender();
-        } catch (err) {
-          console.error(err);
-          setStatus("Request failed: " + err.message, true);
-        } finally {
-          submitBtn.disabled = false;
-        }
-      });
+            copyLinkBtn.addEventListener("click", async () => {
+              if (!currentWallet || !isWallet(currentWallet)) {
+                alert("Load a wallet first.");
+                return;
+              }
 
-      filterTextEl.addEventListener("input", () => {
-        currentPage = 1;
-        applyFiltersAndRender();
-      });
+              const url = new URL(window.location.href);
+              url.searchParams.set("wallet", currentWallet);
+              const urlStr = url.toString();
 
-      filterTierEl.addEventListener("change", () => {
-        currentPage = 1;
-        applyFiltersAndRender();
-      });
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  await navigator.clipboard.writeText(urlStr);
+                  setStatus("Link copied to clipboard.");
+                } else {
+                  window.prompt("Copy this link:", urlStr);
+                }
+              } catch (err) {
+                console.error("Clipboard error:", err);
+                window.prompt("Copy this link:", urlStr);
+              }
+            });
 
-      clearFiltersBtn.addEventListener("click", () => {
-        clearAllFilters();
-      });
+            // init recent wallets on load
+            renderRecentWallets();
 
-      downloadCsvBtn.addEventListener("click", () => {
-        downloadCsv();
-      });
-
-      pageSizeSelect.addEventListener("change", () => {
-        pageSize = parseInt(pageSizeSelect.value, 10) || 200;
-        currentPage = 1;
-        applyFiltersAndRender();
-      });
-
-      prevPageBtn.addEventListener("click", () => {
-        if (currentPage > 1) {
-          currentPage -= 1;
-          applyFiltersAndRender();
-        }
-      });
-
-      nextPageBtn.addEventListener("click", () => {
-        currentPage += 1;
-        applyFiltersAndRender();
-      });
-
-      document.querySelectorAll("th[data-key]").forEach((th) => {
-        th.addEventListener("click", () => {
-          const key = th.getAttribute("data-key");
-          if (currentSortKey === key) {
-            currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
-          } else {
-            currentSortKey = key;
-            currentSortDir = "asc";
-          }
-          applyFiltersAndRender();
-        });
-      });
-
-      copyLinkBtn.addEventListener("click", async () => {
-        if (!currentWallet || !isWallet(currentWallet)) {
-          alert("Load a wallet first.");
-          return;
-        }
-
-        const url = new URL(window.location.href);
-        url.searchParams.set("wallet", currentWallet);
-        const urlStr = url.toString();
-
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(urlStr);
-            setStatus("Link copied to clipboard.");
-          } else {
-            window.prompt("Copy this link:", urlStr);
-          }
-        } catch (err) {
-          console.error("Clipboard error:", err);
-          window.prompt("Copy this link:", urlStr);
-        }
-      });
-
-      // init recent wallets on load
-      renderRecentWallets();
-
-      // auto-load wallet from URL if present
-      const params = new URLSearchParams(window.location.search);
-      const initialWallet = params.get("wallet");
-      if (initialWallet && isWallet(initialWallet)) {
-        input.value = initialWallet;
-        form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-      }
+            // auto-load wallet from URL if present
+            const params = new URLSearchParams(window.location.search);
+            const initialWallet = params.get("wallet");
+            if (initialWallet && isWallet(initialWallet)) {
+              input.value = initialWallet;
+              form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+            }
     </script>
   </body>
 </html>
