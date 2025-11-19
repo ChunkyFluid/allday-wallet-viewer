@@ -1,187 +1,192 @@
 // scripts/load_wallet_holdings_from_csv.js
+// Stream + batch insert wallet_holdings.csv into Neon using multi-row INSERTs,
+// while skipping rows whose nft_id is not present in moments (to satisfy FK).
+
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Pool } from "pg";
-import dotenv from "dotenv";
 import { parse } from "csv-parse";
-
-dotenv.config();
+import { pgQuery } from "../db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const pool = new Pool({
-  host: process.env.PGHOST,
-  port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE,
-  ssl: { rejectUnauthorized: false }
-});
+const csvPath = path.join(__dirname, "..", "data", "wallet_holdings.csv");
 
-pool.on("error", (err) => {
-  console.error("Postgres pool error:", err);
-});
+// Tune as needed
+const BATCH_SIZE = 1000;
 
-function fileExists(filePath) {
-  try {
-    fs.accessSync(filePath, fs.constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
+// Build multi-row INSERT ... ON CONFLICT for wallet_holdings
+function buildBatchInsert(rows) {
+    const cols = ["wallet_address", "nft_id", "is_locked", "last_event_ts"];
+
+    const values = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const r of rows) {
+        values.push(`(${cols.map(() => `$${paramIndex++}`).join(", ")})`);
+        params.push(r.wallet_address, r.nft_id, r.is_locked, r.last_event_ts);
+    }
+
+    const sql = `
+    INSERT INTO wallet_holdings (${cols.join(", ")})
+    VALUES ${values.join(", ")}
+    ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
+      is_locked     = EXCLUDED.is_locked,
+      last_event_ts = EXCLUDED.last_event_ts,
+      last_updated_at = NOW();
+  `;
+
+    return { sql, params };
+}
+
+// Given a batch, filter to only rows whose nft_id exists in moments
+async function filterBatchByExistingMoments(batch) {
+    if (!batch.length) return { filtered: [], skippedForMissingMoment: 0 };
+
+    const uniqueNftIds = [...new Set(batch.map((r) => r.nft_id).filter(Boolean))];
+
+    if (!uniqueNftIds.length) {
+        return { filtered: [], skippedForMissingMoment: batch.length };
+    }
+
+    // Ask Postgres which of these nft_ids exist in moments
+    const res = await pgQuery(
+        `
+      SELECT nft_id
+      FROM moments
+      WHERE nft_id = ANY($1::text[])
+    `,
+        [uniqueNftIds]
+    );
+
+    const validIds = new Set(res.rows.map((row) => String(row.nft_id)));
+
+    const filtered = batch.filter((r) => validIds.has(r.nft_id));
+    const skippedForMissingMoment = batch.length - filtered.length;
+
+    return { filtered, skippedForMissingMoment };
 }
 
 async function loadWalletHoldings() {
-  const dataDir = path.join(__dirname, "..", "data");
-  const filePath = path.join(dataDir, "wallet_holdings.csv");
+    console.log("Postgres config:", {
+        host: process.env.PGHOST,
+        database: process.env.PGDATABASE,
+        ssl: !!process.env.PGSSLMODE
+    });
 
-  console.log("Looking for CSV at:", filePath);
-
-  if (!fileExists(filePath)) {
-    console.error("❌ wallet_holdings.csv not found in /data.");
-    await pool.end();
-    process.exit(1);
-  }
-
-  console.log(
-    "Found wallet_holdings.csv, starting load (row-by-row, headers forced to lowercase)..."
-  );
-
-  const client = await pool.connect();
-
-  const stream = fs.createReadStream(filePath).pipe(
-    parse({
-      columns(header) {
-        const cols = header.map((h) => String(h).trim().toLowerCase());
-        console.log("CSV header columns (wallet_holdings):", cols);
-        return cols;
-      },
-      skip_empty_lines: true,
-      trim: true
-    })
-  );
-
-  let inserted = 0;
-  let skippedMissingKeys = 0;
-  let skippedMissingMoment = 0;
-  let otherFailures = 0;
-
-  try {
-    for await (const row of stream) {
-      const walletAddressRaw = row.wallet_address;
-      const nftId = row.nft_id;
-      const isLockedRaw = row.is_locked;
-      const lastEventTsRaw = row.last_event_ts;
-
-      if (!walletAddressRaw || !nftId) {
-        skippedMissingKeys += 1;
-        console.warn(
-          "Skipping row with missing wallet_address or nft_id:",
-          row
-        );
-        continue;
-      }
-
-      const walletAddress = String(walletAddressRaw).toLowerCase();
-
-      // Normalize is_locked -> boolean (default false)
-      let isLocked = false;
-      if (typeof isLockedRaw === "string") {
-        const v = isLockedRaw.trim().toLowerCase();
-        isLocked = v === "true" || v === "1" || v === "t" || v === "yes";
-      } else if (typeof isLockedRaw === "boolean") {
-        isLocked = isLockedRaw;
-      }
-
-      // Normalize timestamp; let Postgres parse the string
-      const lastEventTs =
-        lastEventTsRaw && String(lastEventTsRaw).trim() !== ""
-          ? String(lastEventTsRaw).trim()
-          : null;
-
-      const tsForWallet = lastEventTs || new Date().toISOString();
-
-      try {
-        // Upsert wallet
-        await client.query(
-          `
-          INSERT INTO wallets (
-            wallet_address,
-            username,
-            first_seen_at,
-            last_seen_at,
-            updated_at
-          )
-          VALUES ($1, NULL, $2, $2, NOW())
-          ON CONFLICT (wallet_address)
-          DO UPDATE SET
-            last_seen_at = GREATEST(wallets.last_seen_at, EXCLUDED.last_seen_at),
-            updated_at = NOW()
-          `,
-          [walletAddress, tsForWallet]
-        );
-
-        // Upsert holding – may fail if nft_id not in moments
-        await client.query(
-          `
-          INSERT INTO wallet_holdings (
-            wallet_address,
-            nft_id,
-            is_locked,
-            last_event_ts
-          )
-          VALUES ($1, $2, $3, $4)
-          ON CONFLICT (wallet_address, nft_id)
-          DO UPDATE SET
-            is_locked     = EXCLUDED.is_locked,
-            last_event_ts = EXCLUDED.last_event_ts
-          `,
-          [walletAddress, nftId, isLocked, lastEventTs]
-        );
-
-        inserted += 1;
-        if (inserted % 100 === 0) {
-          console.log(`Inserted/updated ${inserted} wallet holdings...`);
-        }
-      } catch (err) {
-        // Foreign-key violation: nft_id not present in moments
-        if (
-          err.code === "23503" &&
-          err.constraint === "wallet_holdings_nft_id_fkey"
-        ) {
-          skippedMissingMoment += 1;
-          console.warn(
-            `Skipping holding for wallet=${walletAddress}, nft_id=${nftId}: no matching row in moments.`
-          );
-          continue;
-        }
-
-        otherFailures += 1;
-        console.error(
-          `Row failed for wallet=${walletAddress}, nft_id=${nftId}: ${
-            err.code || ""
-          } ${err.message || String(err)}`
-        );
-      }
+    if (!fs.existsSync(csvPath)) {
+        console.error("❌ wallet_holdings.csv not found at:", csvPath);
+        process.exit(1);
     }
 
-    console.log("==========================================");
+    console.log("Looking for CSV at:", csvPath);
     console.log(
-      `✅ Done. Wallet holdings inserted/updated: ${inserted},` +
-        ` skipped_missing_moment: ${skippedMissingMoment},` +
-        ` skipped_missing_keys: ${skippedMissingKeys},` +
-        ` other_failures: ${otherFailures}`
+        "Found wallet_holdings.csv, starting load (streaming + batched inserts, verifying nft_id exists in moments)..."
     );
-    console.log("==========================================");
-  } finally {
-    client.release();
-    await pool.end();
-  }
+
+    const parser = fs.createReadStream(csvPath).pipe(
+        parse({
+            columns: (header) => header.map((h) => h.toLowerCase().trim()),
+            skip_empty_lines: true,
+            trim: true
+        })
+    );
+
+    let batch = [];
+    let totalInserted = 0;
+    let totalFailedRows = 0;
+    let totalSkippedMissingKeys = 0;
+    let totalSkippedMissingMoment = 0;
+    let rowCount = 0;
+
+    try {
+        for await (const row of parser) {
+            rowCount++;
+
+            const wallet_address = row.wallet_address && String(row.wallet_address).trim().toLowerCase();
+            const nft_id = row.nft_id && String(row.nft_id).trim();
+
+            if (!wallet_address || !nft_id) {
+                totalSkippedMissingKeys++;
+                continue;
+            }
+
+            const is_locked_raw =
+                row.is_locked !== undefined && row.is_locked !== null ? String(row.is_locked).trim().toLowerCase() : "";
+            const is_locked = is_locked_raw === "true" || is_locked_raw === "t" || is_locked_raw === "1";
+
+            const last_event_ts =
+                row.last_event_ts && String(row.last_event_ts).trim() !== "" ? row.last_event_ts : null;
+
+            batch.push({
+                wallet_address,
+                nft_id,
+                is_locked,
+                last_event_ts
+            });
+
+            if (batch.length >= BATCH_SIZE) {
+                try {
+                    // Filter out rows whose nft_id does NOT exist in moments
+                    const { filtered, skippedForMissingMoment } = await filterBatchByExistingMoments(batch);
+
+                    totalSkippedMissingMoment += skippedForMissingMoment;
+
+                    if (filtered.length > 0) {
+                        const { sql, params } = buildBatchInsert(filtered);
+                        await pgQuery(sql, params);
+                        totalInserted += filtered.length;
+                    }
+                } catch (err) {
+                    totalFailedRows += batch.length;
+                    console.error(
+                        `❌ Batch insert failed for ${batch.length} rows at rowCount=${rowCount}:`,
+                        err.message || err
+                    );
+                }
+
+                batch = [];
+
+                if (totalInserted % (BATCH_SIZE * 10) === 0) {
+                    console.log(
+                        `Upserted ~${totalInserted} wallet holdings so far... (failed_rows: ${totalFailedRows}, skipped_missing_keys: ${totalSkippedMissingKeys}, skipped_missing_moment: ${totalSkippedMissingMoment})`
+                    );
+                }
+            }
+        }
+
+        // Flush last partial batch
+        if (batch.length > 0) {
+            try {
+                const { filtered, skippedForMissingMoment } = await filterBatchByExistingMoments(batch);
+                totalSkippedMissingMoment += skippedForMissingMoment;
+
+                if (filtered.length > 0) {
+                    const { sql, params } = buildBatchInsert(filtered);
+                    await pgQuery(sql, params);
+                    totalInserted += filtered.length;
+                }
+            } catch (err) {
+                totalFailedRows += batch.length;
+                console.error(`❌ Final batch insert failed for ${batch.length} rows:`, err.message || err);
+            }
+        }
+
+        console.log("==========================================");
+        console.log(
+            `✅ Done. Wallet holdings inserted/updated: ${totalInserted}, failed_rows: ${totalFailedRows}, skipped_missing_keys: ${totalSkippedMissingKeys}, skipped_missing_moment: ${totalSkippedMissingMoment}`
+        );
+        console.log("Total CSV rows seen:", rowCount);
+        console.log("==========================================");
+    } catch (err) {
+        console.error("❌ Fatal error while streaming wallet_holdings CSV:", err);
+        process.exit(1);
+    }
 }
 
 loadWalletHoldings().catch((err) => {
-  console.error("Unexpected top-level error:", err);
-  process.exit(1);
+    console.error("Unexpected top-level error:", err);
+    process.exit(1);
 });

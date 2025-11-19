@@ -1,138 +1,179 @@
 // scripts/load_moments_from_csv.js
+// Stream + batch insert moments.csv into Neon using multi-row INSERTs.
+
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Pool } from "pg";
-import dotenv from "dotenv";
 import { parse } from "csv-parse";
-
-dotenv.config();
+import { pgQuery } from "../db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const pool = new Pool({
-    host: process.env.PGHOST,
-    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE,
-    ssl: { rejectUnauthorized: false }
-});
+// Where the CSV is expected
+const csvPath = path.join(__dirname, "..", "data", "moments.csv");
 
-pool.on("error", (err) => {
-    console.error("Postgres pool error:", err);
-});
+// Tune this if needed; bigger = fewer SQL calls, but larger statements
+const BATCH_SIZE = 1000;
 
-function fileExists(filePath) {
-    try {
-        fs.accessSync(filePath, fs.constants.F_OK);
-        return true;
-    } catch {
-        return false;
-    }
+function buildBatchInsert(rows) {
+  // Columns in the moments table
+  const cols = [
+    "nft_id",
+    "edition_id",
+    "play_id",
+    "serial_number",
+    "minted_at",
+    "burned_at",
+    "current_owner",
+  ];
+
+  const values = [];
+  const params = [];
+  let paramIndex = 1;
+
+  for (const r of rows) {
+    values.push(
+      `(${cols.map(() => `$${paramIndex++}`).join(", ")})`
+    );
+    params.push(
+      r.nft_id,
+      r.edition_id,
+      r.play_id,
+      r.serial_number,
+      r.minted_at,
+      r.burned_at,
+      r.current_owner
+    );
+  }
+
+  const sql = `
+    INSERT INTO moments (${cols.join(", ")})
+    VALUES ${values.join(", ")}
+    ON CONFLICT (nft_id) DO UPDATE SET
+      edition_id   = EXCLUDED.edition_id,
+      play_id      = EXCLUDED.play_id,
+      serial_number = EXCLUDED.serial_number,
+      minted_at    = EXCLUDED.minted_at,
+      burned_at    = EXCLUDED.burned_at,
+      current_owner = EXCLUDED.current_owner;
+  `;
+
+  return { sql, params };
 }
 
 async function loadMoments() {
-    const dataDir = path.join(__dirname, "..", "data");
-    const filePath = path.join(dataDir, "moments.csv");
+  if (!fs.existsSync(csvPath)) {
+    console.error("❌ moments.csv not found at:", csvPath);
+    process.exit(1);
+  }
 
-    console.log("Looking for CSV at:", filePath);
+  console.log("Looking for CSV at:", csvPath);
+  console.log(
+    "Found moments.csv, starting load (streaming + batched inserts)..."
+  );
 
-    if (!fileExists(filePath)) {
-        console.error("❌ moments.csv not found. Create data/moments.csv first.");
-        await pool.end();
-        process.exit(1);
-    }
+  const parser = fs
+    .createReadStream(csvPath)
+    .pipe(
+      parse({
+        // Force headers to lowercase and trimmed
+        columns: (header) => header.map((h) => h.toLowerCase().trim()),
+        skip_empty_lines: true,
+        trim: true,
+      })
+    );
 
-    console.log("Found moments.csv, starting load (row-by-row, headers forced to lowercase)...");
+  let batch = [];
+  let totalInserted = 0;
+  let totalFailed = 0;
+  let totalSkippedMissingKeys = 0;
+  let rowCount = 0;
 
-    // Force all header names to lowercase so row.nft_id / row.edition_id work
-const stream = fs.createReadStream(filePath).pipe(
-  parse({
-    columns: (header) => {
-      const cols = header.map((h) => String(h).trim().toLowerCase());
-      console.log("CSV header columns:", cols);
-      return cols;
-    },
-    skip_empty_lines: true,
-    trim: true
-  })
-);
+  try {
+    for await (const row of parser) {
+      rowCount++;
 
+      const nft_id = row.nft_id && String(row.nft_id).trim();
+      const edition_id = row.edition_id && String(row.edition_id).trim();
 
-    let count = 0;
-    let failed = 0;
+      if (!nft_id || !edition_id) {
+        totalSkippedMissingKeys++;
+        continue;
+      }
 
-    try {
-        for await (const row of stream) {
-            const nft_id = row.nft_id;
-            const edition_id = row.edition_id;
-            const play_id = row.play_id;
-            const serial_number = row.serial_number;
-            const minted_at = row.minted_at;
-            const burned_at = row.burned_at;
-            const current_owner = row.current_owner;
+      const play_id = row.play_id ? String(row.play_id).trim() : null;
+      const serial_number =
+        row.serial_number && row.serial_number !== ""
+          ? Number(row.serial_number)
+          : null;
+      const minted_at = row.minted_at || null;
+      const burned_at = row.burned_at || null;
+      const current_owner =
+        row.current_owner && String(row.current_owner).trim() !== ""
+          ? String(row.current_owner).trim()
+          : null;
 
-            if (!nft_id || !edition_id) {
-                console.warn("Skipping row with missing nft_id or edition_id:", row);
-                continue;
-            }
+      batch.push({
+        nft_id,
+        edition_id,
+        play_id,
+        serial_number,
+        minted_at,
+        burned_at,
+        current_owner,
+      });
 
-            try {
-                await pool.query(
-                    `
-          INSERT INTO moments (
-            nft_id,
-            edition_id,
-            play_id,
-            serial_number,
-            minted_at,
-            burned_at,
-            current_owner,
-            updated_at
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
-          ON CONFLICT (nft_id)
-          DO UPDATE SET
-            edition_id = EXCLUDED.edition_id,
-            play_id = EXCLUDED.play_id,
-            serial_number = EXCLUDED.serial_number,
-            minted_at = EXCLUDED.minted_at,
-            burned_at = EXCLUDED.burned_at,
-            current_owner = EXCLUDED.current_owner,
-            updated_at = NOW()
-          `,
-                    [
-                        nft_id,
-                        edition_id,
-                        play_id || null,
-                        serial_number ? Number(serial_number) : null,
-                        minted_at || null,
-                        burned_at || null,
-                        current_owner || null
-                    ]
-                );
-            } catch (err) {
-                failed += 1;
-                console.error(`Row failed for nft_id=${nft_id}: ${err.code || ""} ${err.message || String(err)}`);
-            }
-
-            count += 1;
-            if (count % 1000 === 0) {
-                console.log(`Upserted ${count} moments so far... (failed: ${failed})`);
-            }
+      if (batch.length >= BATCH_SIZE) {
+        try {
+          const { sql, params } = buildBatchInsert(batch);
+          await pgQuery(sql, params);
+          totalInserted += batch.length;
+        } catch (err) {
+          totalFailed += batch.length;
+          console.error(
+            `❌ Batch insert failed for ${batch.length} rows at rowCount=${rowCount}:`,
+            err.message || err
+          );
         }
+        batch = [];
 
-        console.log(`✅ Done. Total moments inserted/updated: ${count}, failures: ${failed}`);
-    } catch (err) {
-        console.error("❌ Fatal error while streaming CSV:", err);
-    } finally {
-        await pool.end();
+        if (totalInserted % (BATCH_SIZE * 10) === 0) {
+          console.log(
+            `Upserted ~${totalInserted} moments so far... (failed: ${totalFailed}, skipped_missing_keys: ${totalSkippedMissingKeys})`
+          );
+        }
+      }
     }
+
+    // Flush final partial batch
+    if (batch.length > 0) {
+      try {
+        const { sql, params } = buildBatchInsert(batch);
+        await pgQuery(sql, params);
+        totalInserted += batch.length;
+      } catch (err) {
+        totalFailed += batch.length;
+        console.error(
+          `❌ Final batch insert failed for ${batch.length} rows:`,
+          err.message || err
+        );
+      }
+    }
+
+    console.log("==========================================");
+    console.log(
+      `✅ Done. Total moments inserted/updated: ${totalInserted}, failed_batches_rows: ${totalFailed}, skipped_missing_keys: ${totalSkippedMissingKeys}`
+    );
+    console.log("Total CSV rows seen:", rowCount);
+    console.log("==========================================");
+  } catch (err) {
+    console.error("❌ Fatal error while streaming CSV:", err);
+    process.exit(1);
+  } finally {
+    // Let pg pool close in db.js if needed; otherwise we could explicitly end it
+    // but pgQuery is using a shared pool, so just exit.
+  }
 }
 
-loadMoments().catch((err) => {
-    console.error("Unexpected top-level error:", err);
-    process.exit(1);
-});
+loadMoments();
