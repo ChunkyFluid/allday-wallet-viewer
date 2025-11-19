@@ -118,7 +118,8 @@ app.get("/api/collection", async (req, res) => {
 });
 
 // GET /api/top-wallets?limit=50
-// Returns top wallets by moment count from wallet_holdings
+// Returns top wallets by moment count from wallet_holdings,
+// with optional display_name from wallet_profiles.
 app.get("/api/top-wallets", async (req, res) => {
   try {
     const rawLimit = parseInt(req.query.limit, 10);
@@ -129,37 +130,16 @@ app.get("/api/top-wallets", async (req, res) => {
       `
       SELECT
         h.wallet_address,
-        h.is_locked,
-        h.last_event_ts,
-        m.nft_id,
-        m.edition_id,
-        m.play_id,
-
-        -- edition-level metadata
-        e.series_id,
-        e.set_id,
-        e.tier,
-        e.max_mint_size,
-        e.series_name,
-        e.set_name
-
-        -- placeholders for player fields for now
-        ,
-        NULL::text  AS first_name,
-        NULL::text  AS last_name,
-        NULL::text  AS team_name,
-        NULL::text  AS position,
-        NULL::int   AS jersey_number,
-        m.serial_number
+        COALESCE(p.display_name, NULL) AS display_name,
+        COUNT(*)::int AS moments
       FROM wallet_holdings h
-      JOIN moments m
-        ON m.nft_id = h.nft_id
-      LEFT JOIN editions e
-        ON e.edition_id = m.edition_id
-      WHERE h.wallet_address = $1
-      ORDER BY h.last_event_ts DESC
+      LEFT JOIN wallet_profiles p
+        ON p.wallet_address = h.wallet_address
+      GROUP BY h.wallet_address, p.display_name
+      ORDER BY moments DESC
+      LIMIT $1;
       `,
-      [wallet]
+      [safeLimit]
     );
 
     return res.json({
@@ -272,8 +252,6 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
-// ---- NEW: /api/query now uses Neon schema (no nft_core_metadata) ----
-// ---- Wallet query using Neon (moments + editions) ----
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -281,26 +259,60 @@ app.get("/api/query", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
+    // Basic Flow/Dapper-style address check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // Use Snowflake + your big query
-    await ensureSnowflakeConnected();
-    const sqlText = buildSqlForWallet(wallet);
-    const rows = await executeSql(sqlText);
+    // Pull from Neon: wallet_holdings + nft_core_metadata
+    const result = await pgQuery(
+      `
+      SELECT
+        h.wallet_address,
+        h.is_locked,
+        h.last_event_ts,
+        m.nft_id,
+        m.edition_id,
+        m.play_id,
+        m.series_id,
+        m.set_id,
+        m.tier,
+        m.serial_number,
+        m.max_mint_size,
+        m.first_name,
+        m.last_name,
+        m.first_name || ' ' || m.last_name AS player_name,
+        m.team_name,
+        m.position,
+        m.jersey_number,
+        m.series_name,
+        m.set_name,
+        'https://nflallday.com/moments/'  || m.nft_id     AS nfl_allday_url,
+        'https://nflallday.com/listing/moment/' || m.edition_id AS listing_url,
+        CASE WHEN h.is_locked THEN 'NFTLocked' ELSE 'Deposit' END AS event_type,
+        COUNT(*) OVER (
+          PARTITION BY m.edition_id, m.set_id, m.series_id, h.wallet_address
+        ) > 1 AS is_duplicate
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m
+        ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1
+      ORDER BY h.last_event_ts;
+      `,
+      [wallet]
+    );
 
     return res.json({
       ok: true,
       wallet,
-      count: rows.length,
-      rows,
+      count: result.rowCount,
+      rows: result.rows,
     });
   } catch (err) {
-    console.error("Error in /api/query (Snowflake):", err);
+    console.error("Error in /api/query (Neon):", err);
     return res.status(500).json({
       ok: false,
-      error: err && err.message ? err.message : String(err),
+      error: err.message || String(err),
     });
   }
 });
