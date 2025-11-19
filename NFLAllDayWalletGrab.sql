@@ -38,6 +38,27 @@ edition_metadata AS (
       AND tx_succeeded = TRUE
 ),
 
+play_metadata AS (
+    SELECT 
+        event_data:id::STRING as play_id,
+        MAX(CASE WHEN metadata.value:key.value::STRING = 'playerFirstName' 
+                 THEN metadata.value:value.value::STRING END) as first_name,
+        MAX(CASE WHEN metadata.value:key.value::STRING = 'playerLastName' 
+                 THEN metadata.value:value.value::STRING END) as last_name,
+        MAX(CASE WHEN metadata.value:key.value::STRING = 'teamName' 
+                 THEN metadata.value:value.value::STRING END) as team_name,
+        MAX(CASE WHEN metadata.value:key.value::STRING = 'playerPosition' 
+                 THEN metadata.value:value.value::STRING END) as position,
+        MAX(CASE WHEN metadata.value:key.value::STRING = 'playerNumber' 
+                 THEN metadata.value:value.value::STRING END) as player_number
+    FROM flow_onchain_core_data.core.fact_events ,
+         TABLE(FLATTEN(event_data:metadata)) as metadata
+    WHERE event_contract = 'A.e4cf4bdc1751c65d.AllDay'
+      AND event_type = 'PlayCreated'
+      AND tx_succeeded = TRUE
+    GROUP BY event_data:id::STRING
+),
+
 series_names AS (
     -- Get series names
     SELECT 
@@ -72,9 +93,15 @@ core_nft_metadata AS (
     e.set_id AS setID,
     st.set_name AS setName,
     e.tier,
-    m.serial_number AS serialNumber
+    m.serial_number AS serialNumber,
+    p.first_name AS firstName,
+    p.last_name AS lastName,
+    p.team_name AS teamName,
+    p.position AS position,
+    p.player_number AS jerseyNumber
   FROM minted_nfts m
   LEFT JOIN edition_metadata e ON m.edition_id = e.edition_id
+  LEFT JOIN play_metadata p ON e.play_id = p.play_id
   LEFT JOIN series_names s ON e.series_id = s.series_id
   LEFT JOIN set_names st ON e.set_id = st.set_id
   WHERE m.nft_id IS NOT NULL
@@ -94,7 +121,7 @@ my_deposit_events AS (
     FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS 
   WHERE 
     EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay' AND
-    LOWER(EVENT_DATA:to::STRING) = LOWER('0x7541bafd155b683e') AND
+    LOWER(EVENT_DATA:to::STRING) = LOWER('0x379c2a0e88d8081f') AND
     EVENT_TYPE = 'Deposit' AND
     TX_SUCCEEDED = true AND
     BLOCK_TIMESTAMP >= '2021-01-01'
@@ -114,7 +141,7 @@ my_withdraw_events AS (
     FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS 
   WHERE 
     EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay' AND
-    LOWER(EVENT_DATA:from::STRING) = LOWER('0x7541bafd155b683e') AND
+    LOWER(EVENT_DATA:from::STRING) = LOWER('0x379c2a0e88d8081f') AND
     EVENT_TYPE = 'Withdraw' AND
     TX_SUCCEEDED = true AND
     BLOCK_TIMESTAMP >= '2021-01-01'
@@ -153,7 +180,7 @@ my_locked_events AS (
     FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS 
   WHERE 
     EVENT_CONTRACT = 'A.b6f2481eba4df97b.NFTLocker' AND
-    LOWER(EVENT_DATA:to::STRING) = LOWER('0x7541bafd155b683e') AND
+    LOWER(EVENT_DATA:to::STRING) = LOWER('0x379c2a0e88d8081f') AND
     EVENT_TYPE = 'NFTLocked' AND
     TX_SUCCEEDED = true AND
     BLOCK_TIMESTAMP >= '2021-01-01'
@@ -169,7 +196,7 @@ my_unlocked_events AS (
     FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS 
   WHERE 
     EVENT_CONTRACT = 'A.b6f2481eba4df97b.NFTLocker' AND
-    LOWER(EVENT_DATA:from::STRING) = LOWER('0x7541bafd155b683e') AND
+    LOWER(EVENT_DATA:from::STRING) = LOWER('0x379c2a0e88d8081f') AND
     EVENT_TYPE = 'NFTUnlocked' AND
     TX_SUCCEEDED = true AND
     BLOCK_TIMESTAMP >= '2021-01-01'
@@ -201,23 +228,30 @@ my_nfts AS (
 )
 
   SELECT 
+    d.firstName,
+    d.lastName,
+    d.firstName || ' ' || d.lastName as playerName,
+    d.teamName,
+    d.position,
+    d.jerseyNumber,
     d.serialNumber,
     d.setName,
     d.tier,
-    d.seriesName,
     d.maxMintSize,
-    d.playID,
-    d.setID,
-    -- Generate NFL All Day marketplace URL
+    d.seriesName,
     'https://nflallday.com/moments/' || d.nft_id as nfl_allday_url,
+    'https://nflallday.com/listing/moment/' || d.editionID,
     c.Wallet_Address,
     c.EVENT_TYPE,
     d.editionID,
-    'https://nflallday.com/listing/moment/' || d.editionID,
     d.seriesID,
+    d.playID,
+    d.setID,
     d.nft_id,
-    c.block_timestamp
-    
+    c.block_timestamp,
+    COUNT(*) OVER (
+        PARTITION BY d.editionID, d.setID, d.seriesID, c.Wallet_Address
+    ) > 1 AS is_duplicate
   FROM
     core_nft_metadata as d INNER JOIN 
     my_nfts as c ON d.nft_id = c.NFT_ID

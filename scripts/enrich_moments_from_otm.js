@@ -12,114 +12,109 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
-  host: process.env.PGHOST,
-  port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE,
-  ssl: { rejectUnauthorized: false }
+    host: process.env.PGHOST,
+    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    database: process.env.PGDATABASE,
+    ssl: { rejectUnauthorized: false }
 });
 
 pool.on("error", (err) => {
-  console.error("Postgres pool error:", err);
+    console.error("Postgres pool error:", err);
 });
 
 function fileExists(filePath) {
-  try {
-    fs.accessSync(filePath, fs.constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
+    try {
+        fs.accessSync(filePath, fs.constants.F_OK);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function parseEditionIdFromLink(link) {
-  if (!link) return null;
-  const str = String(link);
-  const m = str.match(/edition\/(\d+)/);
-  return m ? m[1] : null;
+    if (!link) return null;
+    const str = String(link);
+    const m = str.match(/edition\/(\d+)/);
+    return m ? m[1] : null;
 }
 
 function splitPlayerName(name) {
-  if (!name) return { firstName: null, lastName: null };
-  const parts = String(name).trim().split(/\s+/);
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: null };
-  }
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(" ")
-  };
+    if (!name) return { firstName: null, lastName: null };
+    const parts = String(name).trim().split(/\s+/);
+    if (parts.length === 1) {
+        return { firstName: parts[0], lastName: null };
+    }
+    return {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(" ")
+    };
 }
 
 async function enrichFromOTM() {
-  const dataDir = path.join(__dirname, "..", "data");
-  const filePath = path.join(dataDir, "otm_values.csv");
+    const dataDir = path.join(__dirname, "..", "data");
+    const filePath = path.join(dataDir, "otm_values.csv");
 
-  console.log("Looking for OTM CSV at:", filePath);
+    console.log("Looking for OTM CSV at:", filePath);
 
-  if (!fileExists(filePath)) {
-    console.error(
-      "❌ otm_values.csv not found in /data. Put your NFL All Day Values CSV there and name it otm_values.csv."
+    if (!fileExists(filePath)) {
+        console.error(
+            "❌ otm_values.csv not found in /data. Put your NFL All Day Values CSV there and name it otm_values.csv."
+        );
+        await pool.end();
+        process.exit(1);
+    }
+
+    console.log("Found otm_values.csv, starting enrich (editions: player + team + set metadata)...");
+
+    const client = await pool.connect();
+
+    const stream = fs.createReadStream(filePath).pipe(
+        parse({
+            columns: true,
+            skip_empty_lines: true,
+            trim: true
+        })
     );
-    await pool.end();
-    process.exit(1);
-  }
 
-  console.log(
-    "Found otm_values.csv, starting enrich (editions: player + team + set metadata)..."
-  );
+    let totalRows = 0;
+    let editionsMatched = 0;
+    let editionsUpdated = 0;
+    let failed = 0;
 
-  const client = await pool.connect();
+    try {
+        for await (const row of stream) {
+            totalRows += 1;
 
-  const stream = fs.createReadStream(filePath).pipe(
-    parse({
-      columns: true,
-      skip_empty_lines: true,
-      trim: true
-    })
-  );
+            const link = row["Link"] || row["link"];
+            const editionId = parseEditionIdFromLink(link);
+            if (!editionId) {
+                continue;
+            }
 
-  let totalRows = 0;
-  let editionsMatched = 0;
-  let editionsUpdated = 0;
-  let failed = 0;
+            const playerName = row["Player Name"] || row["player name"] || "";
+            const { firstName, lastName } = splitPlayerName(playerName);
 
-  try {
-    for await (const row of stream) {
-      totalRows += 1;
+            const teamName = row["Team"] || row["team"] || null;
+            const position = row["Position"] || row["position"] || null;
 
-      const link = row["Link"] || row["link"];
-      const editionId = parseEditionIdFromLink(link);
-      if (!editionId) {
-        continue;
-      }
+            const jerseyNumberRaw = row["Jersey Number"] || row["jersey number"] || null;
+            const jerseyNumber = jerseyNumberRaw ? Number(String(jerseyNumberRaw).replace(/[^\d]/g, "")) || null : null;
 
-      const playerName = row["Player Name"] || row["player name"] || "";
-      const { firstName, lastName } = splitPlayerName(playerName);
+            const setName = row["Set"] || row["set"] || null;
+            const seriesName = row["Series"] || row["series"] || null;
+            const tier = row["Tier"] || row["tier"] || null;
 
-      const teamName = row["Team"] || row["team"] || null;
-      const position = row["Position"] || row["position"] || null;
+            const setIdRaw = row["Set ID"] || row["set id"] || null;
+            const setId = setIdRaw != null ? String(setIdRaw) : null;
 
-      const jerseyNumberRaw =
-        row["Jersey Number"] || row["jersey number"] || null;
-      const jerseyNumber = jerseyNumberRaw
-        ? Number(String(jerseyNumberRaw).replace(/[^\d]/g, "")) || null
-        : null;
+            const playIdRaw = row["Play ID"] || row["play id"] || null;
+            const playId = playIdRaw != null ? String(playIdRaw) : null;
 
-      const setName = row["Set"] || row["set"] || null;
-      const seriesName = row["Series"] || row["series"] || null;
-      const tier = row["Tier"] || row["tier"] || null;
-
-      const setIdRaw = row["Set ID"] || row["set id"] || null;
-      const setId = setIdRaw != null ? String(setIdRaw) : null;
-
-      const playIdRaw = row["Play ID"] || row["play id"] || null;
-      const playId = playIdRaw != null ? String(playIdRaw) : null;
-
-      try {
-        const edRes = await client.query(
-          `
+            try {
+                const edRes = await client.query(
+                    `
           UPDATE editions
           SET
             set_id        = COALESCE($2, set_id),
@@ -134,57 +129,55 @@ async function enrichFromOTM() {
             jersey_number = COALESCE($11, jersey_number)
           WHERE edition_id = $1
           `,
-          [
-            editionId,
-            setId,
-            setName,
-            seriesName,
-            tier,
-            playId,
-            firstName,
-            lastName,
-            teamName,
-            position,
-            jerseyNumber
-          ]
-        );
+                    [
+                        editionId,
+                        setId,
+                        setName,
+                        seriesName,
+                        tier,
+                        playId,
+                        firstName,
+                        lastName,
+                        teamName,
+                        position,
+                        jerseyNumber
+                    ]
+                );
 
-        if (edRes.rowCount > 0) {
-          editionsMatched += 1;
-          editionsUpdated += edRes.rowCount;
+                if (edRes.rowCount > 0) {
+                    editionsMatched += 1;
+                    editionsUpdated += edRes.rowCount;
+                }
+            } catch (err) {
+                failed += 1;
+                console.error(
+                    `Row failed for edition_id=${editionId}: ${err.code || ""} ${err.message || String(err)}`
+                );
+            }
+
+            if (totalRows % 500 === 0) {
+                console.log(
+                    `Processed ${totalRows} OTM rows... editions matched: ${editionsMatched}, failed: ${failed}`
+                );
+            }
         }
-      } catch (err) {
-        failed += 1;
-        console.error(
-          `Row failed for edition_id=${editionId}: ${err.code || ""} ${
-            err.message || String(err)
-          }`
-        );
-      }
 
-      if (totalRows % 500 === 0) {
-        console.log(
-          `Processed ${totalRows} OTM rows... editions matched: ${editionsMatched}, failed: ${failed}`
-        );
-      }
+        console.log("==========================================");
+        console.log("✅ OTM enrich complete (editions: player + team + set metadata).");
+        console.log(`Total OTM rows processed: ${totalRows}`);
+        console.log(`Editions matched in editions table: ${editionsMatched}`);
+        console.log(`Total editions rows updated: ${editionsUpdated}`);
+        console.log(`Failed updates: ${failed}`);
+        console.log("==========================================");
+    } catch (err) {
+        console.error("❌ Fatal error while streaming OTM CSV:", err);
+    } finally {
+        client.release();
+        await pool.end();
     }
-
-    console.log("==========================================");
-    console.log("✅ OTM enrich complete (editions: player + team + set metadata).");
-    console.log(`Total OTM rows processed: ${totalRows}`);
-    console.log(`Editions matched in editions table: ${editionsMatched}`);
-    console.log(`Total editions rows updated: ${editionsUpdated}`);
-    console.log(`Failed updates: ${failed}`);
-    console.log("==========================================");
-  } catch (err) {
-    console.error("❌ Fatal error while streaming OTM CSV:", err);
-  } finally {
-    client.release();
-    await pool.end();
-  }
 }
 
 enrichFromOTM().catch((err) => {
-  console.error("Unexpected top-level error in enrichFromOTM:", err);
-  process.exit(1);
+    console.error("Unexpected top-level error in enrichFromOTM:", err);
+    process.exit(1);
 });

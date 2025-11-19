@@ -278,63 +278,30 @@ app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     if (!wallet) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Missing ?wallet=0x..." });
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
-    // Basic wallet format check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Invalid wallet format" });
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    const result = await pgQuery(
-      `
-      SELECT
-        h.wallet_address,
-        h.is_locked,
-        h.last_event_ts,
-        m.nft_id,
-        m.edition_id,
-        m.play_id,
-        -- edition-level metadata
-        e.series_id,
-        e.set_id,
-        e.tier,
-        e.max_mint_size,
-        e.series_name,
-        e.set_name,
-        e.first_name,
-        e.last_name,
-        e.team_name,
-        e.position,
-        e.jersey_number,
-        -- moment-level
-        m.serial_number
-      FROM wallet_holdings h
-      JOIN moments m
-        ON m.nft_id = h.nft_id
-      LEFT JOIN editions e
-        ON e.edition_id = m.edition_id
-      WHERE h.wallet_address = $1
-      ORDER BY h.last_event_ts DESC
-      `,
-      [wallet]
-    );
+    // Use Snowflake + your big query
+    await ensureSnowflakeConnected();
+    const sqlText = buildSqlForWallet(wallet);
+    const rows = await executeSql(sqlText);
 
     return res.json({
       ok: true,
       wallet,
-      count: result.rowCount,
-      rows: result.rows,
+      count: rows.length,
+      rows,
     });
   } catch (err) {
-    console.error("Error in /api/query:", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: err.message || String(err) });
+    console.error("Error in /api/query (Snowflake):", err);
+    return res.status(500).json({
+      ok: false,
+      error: err && err.message ? err.message : String(err),
+    });
   }
 });
 

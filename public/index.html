@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -24,7 +24,11 @@
 
       body {
         margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
           sans-serif;
         background: radial-gradient(circle at top, #020617 0, #020617 40%, #020617 100%);
         color: var(--text);
@@ -399,12 +403,7 @@
             <div class="wallet-input-wrap">
               <label for="wallet-input">Wallet</label>
               <div class="wallet-input-inner">
-                <input
-                  id="wallet-input"
-                  type="text"
-                  spellcheck="false"
-                  placeholder="0x379c2a0e88d8081f"
-                />
+                <input id="wallet-input" type="text" spellcheck="false" placeholder="0x379c2a0e88d8081f" />
               </div>
             </div>
             <div>
@@ -417,9 +416,7 @@
               <strong id="results-count">0</strong>
             </div>
           </div>
-          <div id="status" class="status">
-            Enter a wallet and click Load.
-          </div>
+          <div id="status" class="status">Enter a wallet and click Load.</div>
         </form>
       </div>
 
@@ -434,8 +431,7 @@
                 class="filter-input"
                 type="text"
                 placeholder="Player, team, set, series..."
-                autocomplete="off"
-              />
+                autocomplete="off" />
             </div>
 
             <div class="filter-group">
@@ -492,12 +488,8 @@
             </div>
 
             <div class="sidebar-buttons">
-              <button type="button" class="ghost-btn" id="clear-filters">
-                Clear
-              </button>
-              <button type="button" id="download-csv-btn">
-                Download CSV
-              </button>
+              <button type="button" class="ghost-btn" id="clear-filters">Clear</button>
+              <button type="button" id="download-csv-btn">Download CSV</button>
             </div>
           </div>
         </aside>
@@ -507,9 +499,7 @@
           <div class="card table-card">
             <div class="table-header">
               <div class="table-title">Moments</div>
-              <div class="table-meta">
-                Player, team, tier, set/series, serial, ASP / low ask (if available)
-              </div>
+              <div class="table-meta">Player, team, tier, set/series, serial, ASP / low ask (if available)</div>
             </div>
             <div class="table-wrapper">
               <table id="results-table" style="display: none">
@@ -541,17 +531,11 @@
                     </th>
                     <th data-sort-key="serial_number" class="text-right">
                       <span class="label">Serial</span>
-                      <span
-                        class="sort-indicator"
-                        data-sort="serial_number"
-                      ></span>
+                      <span class="sort-indicator" data-sort="serial_number"></span>
                     </th>
                     <th data-sort-key="max_mint_size" class="text-right">
                       <span class="label">Max Mint</span>
-                      <span
-                        class="sort-indicator"
-                        data-sort="max_mint_size"
-                      ></span>
+                      <span class="sort-indicator" data-sort="max_mint_size"></span>
                     </th>
                     <th data-sort-key="low_ask" class="text-right">
                       <span class="label">Low Ask</span>
@@ -563,10 +547,7 @@
                     </th>
                     <th data-sort-key="last_event_ts">
                       <span class="label">Last Event</span>
-                      <span
-                        class="sort-indicator"
-                        data-sort="last_event_ts"
-                      ></span>
+                      <span class="sort-indicator" data-sort="last_event_ts"></span>
                     </th>
                     <th data-sort-key="nft_id">
                       <span class="label">NFT ID</span>
@@ -634,12 +615,12 @@
             d.toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
-              day: "2-digit",
+              day: "2-digit"
             }) +
             " " +
             d.toLocaleTimeString(undefined, {
               hour: "2-digit",
-              minute: "2-digit",
+              minute: "2-digit"
             })
           );
         }
@@ -653,31 +634,24 @@
           if (!json.ok) return { asp: {}, lowAsk: {} };
           return {
             asp: json.asp || {},
-            lowAsk: json.lowAsk || {},
+            lowAsk: json.lowAsk || {}
           };
         }
 
         function normalizeRows(rows) {
           return rows.map((r) => {
-            const firstName =
-              r.first_name || r.player_first_name || r.playerName || "";
-            const lastName =
-              r.last_name || r.player_last_name || r.playerSurname || "";
+            const firstName = r.first_name || r.player_first_name || r.playerName || "";
+            const lastName = r.last_name || r.player_last_name || r.playerSurname || "";
             const teamName = r.team_name || r.team || r.teamName || "";
             // play_type is optional; use whatever field is there
-            const playType =
-              r.play_type ||
-              r.playType ||
-              r.play_category ||
-              r.play_name ||
-              "";
+            const playType = r.play_type || r.playType || r.play_category || r.play_name || "";
 
             return {
               ...r,
               first_name: firstName,
               last_name: lastName,
               team_name: teamName,
-              play_type: playType,
+              play_type: playType
             };
           });
         }
@@ -717,9 +691,7 @@
         }
 
         function buildSidebarFilters(rows) {
-          const players = rows.map((r) =>
-            ((r.first_name || "") + " " + (r.last_name || "")).trim()
-          );
+          const players = rows.map((r) => ((r.first_name || "") + " " + (r.last_name || "")).trim());
           const teams = rows.map((r) => r.team_name || "");
           const series = rows.map((r) => r.series_name || "");
           const sets = rows.map((r) => r.set_name || "");
@@ -743,16 +715,9 @@
           if (key === "player") {
             va = ((a.first_name || "") + " " + (a.last_name || "")).toLowerCase();
             vb = ((b.first_name || "") + " " + (b.last_name || "")).toLowerCase();
-          } else if (
-            key === "serial_number" ||
-            key === "max_mint_size" ||
-            key === "low_ask" ||
-            key === "asp_90d"
-          ) {
-            const aNum =
-              a[key] === null || a[key] === undefined ? -Infinity : Number(a[key]);
-            const bNum =
-              b[key] === null || b[key] === undefined ? -Infinity : Number(b[key]);
+          } else if (key === "serial_number" || key === "max_mint_size" || key === "low_ask" || key === "asp_90d") {
+            const aNum = a[key] === null || a[key] === undefined ? -Infinity : Number(a[key]);
+            const bNum = b[key] === null || b[key] === undefined ? -Infinity : Number(b[key]);
             va = Number.isNaN(aNum) ? -Infinity : aNum;
             vb = Number.isNaN(bNum) ? -Infinity : bNum;
           } else if (key === "last_event_ts") {
@@ -785,8 +750,7 @@
           for (const r of rows) {
             const tr = document.createElement("tr");
 
-            const playerName = ((r.first_name || "") + " " + (r.last_name || ""))
-              .trim();
+            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
 
             const tierBadge = document.createElement("span");
             tierBadge.textContent = r.tier || "";
@@ -807,7 +771,7 @@
               r.low_ask_display || "",
               r.asp_90d_display || "",
               formatDate(r.last_event_ts),
-              r.nft_id,
+              r.nft_id
             ];
 
             cells.forEach((val, idx) => {
@@ -842,8 +806,7 @@
           const selPlayType = filterPlaytypeEl.value;
 
           filteredRows = fullRows.filter((r) => {
-            const playerName = ((r.first_name || "") + " " + (r.last_name || ""))
-              .trim();
+            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
             const tierUpper = (r.tier || "").toUpperCase();
 
             if (selPlayer && playerName !== selPlayer) return false;
@@ -855,12 +818,7 @@
             if (selPlayType && (r.play_type || "") !== selPlayType) return false;
 
             if (text) {
-              const haystack = [
-                playerName,
-                r.team_name,
-                r.set_name,
-                r.series_name,
-              ]
+              const haystack = [playerName, r.team_name, r.set_name, r.series_name]
                 .map((x) => (x || "").toLowerCase())
                 .join(" ");
               if (!haystack.includes(text)) return false;
@@ -874,9 +832,7 @@
             currentSortDir = "desc";
           }
 
-          filteredRows.sort((a, b) =>
-            compareRows(a, b, currentSortKey, currentSortDir)
-          );
+          filteredRows.sort((a, b) => compareRows(a, b, currentSortKey, currentSortDir));
           updateSortIndicators();
           renderTable(filteredRows);
         }
@@ -910,14 +866,13 @@
             "LowAsk",
             "ASP90d",
             "LastEventTs",
-            "NftId",
+            "NftId"
           ];
 
           const lines = [header.join(",")];
 
           for (const r of rows) {
-            const playerName = ((r.first_name || "") + " " + (r.last_name || ""))
-              .trim();
+            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
             const cells = [
               playerName,
               r.team_name || "",
@@ -931,7 +886,7 @@
               r.low_ask != null ? String(r.low_ask) : "",
               r.asp_90d != null ? String(r.asp_90d) : "",
               r.last_event_ts || "",
-              r.nft_id || "",
+              r.nft_id || ""
             ].map((val) => {
               const s = val == null ? "" : String(val);
               if (s.includes('"') || s.includes(",") || s.includes("\n")) {
@@ -976,9 +931,7 @@
           sidebar.style.display = "none";
 
           try {
-            const res = await fetch(
-              "/api/query?wallet=" + encodeURIComponent(wallet)
-            );
+            const res = await fetch("/api/query?wallet=" + encodeURIComponent(wallet));
             if (!res.ok) {
               setStatus("API error: " + res.status, "error");
               loadBtn.disabled = false;
@@ -993,10 +946,7 @@
 
             let rows = json.rows || [];
             if (!rows.length) {
-              setStatus(
-                "No moments found for wallet " + (json.wallet || wallet) + ".",
-                null
-              );
+              setStatus("No moments found for wallet " + (json.wallet || wallet) + ".", null);
               loadBtn.disabled = false;
               return;
             }
@@ -1004,13 +954,7 @@
             rows = normalizeRows(rows);
 
             const editionIds = [
-              ...new Set(
-                rows
-                  .map((r) => r.edition_id)
-                  .filter(
-                    (x) => x !== null && x !== undefined && x !== ""
-                  )
-              ),
+              ...new Set(rows.map((r) => r.edition_id).filter((x) => x !== null && x !== undefined && x !== ""))
             ];
 
             let aspMap = {};
@@ -1026,29 +970,15 @@
             rows = rows.map((r) => {
               const aspVal = aspMap[r.edition_id];
               const lowAskVal = lowAskMap[r.edition_id];
-              const aspNum =
-                aspVal !== undefined && aspVal !== null
-                  ? Number(aspVal)
-                  : null;
-              const lowNum =
-                lowAskVal !== undefined && lowAskVal !== null
-                  ? Number(lowAskVal)
-                  : null;
+              const aspNum = aspVal !== undefined && aspVal !== null ? Number(aspVal) : null;
+              const lowNum = lowAskVal !== undefined && lowAskVal !== null ? Number(lowAskVal) : null;
 
               return {
                 ...r,
-                asp_90d:
-                  aspNum !== null && !Number.isNaN(aspNum) ? aspNum : null,
-                low_ask:
-                  lowNum !== null && !Number.isNaN(lowNum) ? lowNum : null,
-                asp_90d_display:
-                  aspNum !== null && !Number.isNaN(aspNum)
-                    ? formatMoney(aspNum)
-                    : "",
-                low_ask_display:
-                  lowNum !== null && !Number.isNaN(lowNum)
-                    ? formatMoney(lowNum)
-                    : "",
+                asp_90d: aspNum !== null && !Number.isNaN(aspNum) ? aspNum : null,
+                low_ask: lowNum !== null && !Number.isNaN(lowNum) ? lowNum : null,
+                asp_90d_display: aspNum !== null && !Number.isNaN(aspNum) ? formatMoney(aspNum) : "",
+                low_ask_display: lowNum !== null && !Number.isNaN(lowNum) ? formatMoney(lowNum) : ""
               };
             });
 
@@ -1056,21 +986,13 @@
             sidebar.style.display = "flex";
             buildSidebarFilters(fullRows);
 
-            setStatus(
-              `Loaded ${rows.length} moments for wallet ${
-                json.wallet || wallet
-              }.`,
-              "ok"
-            );
+            setStatus(`Loaded ${rows.length} moments for wallet ${json.wallet || wallet}.`, "ok");
             currentSortKey = "last_event_ts";
             currentSortDir = "desc";
             applyFiltersAndRender();
           } catch (err) {
             console.error(err);
-            setStatus(
-              "Error: " + (err && err.message ? err.message : String(err)),
-              "error"
-            );
+            setStatus("Error: " + (err && err.message ? err.message : String(err)), "error");
           } finally {
             loadBtn.disabled = false;
           }
@@ -1088,29 +1010,25 @@
         clearFiltersBtn.addEventListener("click", () => clearFilters());
         downloadCsvBtn.addEventListener("click", () => downloadCsv());
 
-        document
-          .querySelectorAll("th[data-sort-key]")
-          .forEach((th) => {
-            th.addEventListener("click", () => {
-              const key = th.getAttribute("data-sort-key");
-              if (currentSortKey === key) {
-                currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
-              } else {
-                currentSortKey = key;
-                currentSortDir = key === "last_event_ts" ? "desc" : "asc";
-              }
-              applyFiltersAndRender();
-            });
+        document.querySelectorAll("th[data-sort-key]").forEach((th) => {
+          th.addEventListener("click", () => {
+            const key = th.getAttribute("data-sort-key");
+            if (currentSortKey === key) {
+              currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+            } else {
+              currentSortKey = key;
+              currentSortDir = key === "last_event_ts" ? "desc" : "asc";
+            }
+            applyFiltersAndRender();
           });
+        });
 
         // Support ?wallet=0x... in URL
         const params = new URLSearchParams(window.location.search);
         const initialWallet = params.get("wallet");
         if (initialWallet) {
           walletInput.value = initialWallet;
-          form.dispatchEvent(
-            new Event("submit", { bubbles: true, cancelable: true })
-          );
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
         }
       })();
     </script>
