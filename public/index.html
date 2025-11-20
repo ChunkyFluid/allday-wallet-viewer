@@ -1,21 +1,25 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <title>NFL ALL DAY Wallet Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
         color-scheme: dark;
-        --bg: #020617;
-        --bg-card: #02081f;
-        --bg-input: #020617;
-        --border: #1f2937;
-        --accent: #22c55e;
-        --accent-soft: rgba(34, 197, 94, 0.15);
+        --bg: #05060a;
+        --bg-alt: #0b0d14;
+        --panel: #111522;
+        --panel-alt: #181d2c;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.14);
         --text: #e5e7eb;
-        --muted: #9ca3af;
-        --danger: #f97373;
+        --text-muted: #9ca3af;
+        --border: #1f2937;
+        --danger: #ef4444;
+        --success: #22c55e;
+        --locked: #f97316;
+        --locked-soft: rgba(249, 115, 22, 0.16);
       }
 
       * {
@@ -30,1005 +34,898 @@
           BlinkMacSystemFont,
           "Segoe UI",
           sans-serif;
-        background: radial-gradient(circle at top, #020617 0, #020617 40%, #020617 100%);
+        background: radial-gradient(circle at top, #020617 0, #020617 30%, #020617 60%, #020617 100%);
         color: var(--text);
-        min-height: 100vh;
       }
 
-      .page {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 24px 16px 48px;
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
 
       header {
-        margin-bottom: 24px;
-      }
-
-      .title-row {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(to right, #020617, #020617 40%, #020617 100%);
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        align-items: baseline;
         gap: 12px;
-        flex-wrap: wrap;
       }
 
-      h1 {
-        margin: 0;
-        font-size: 1.5rem;
-        letter-spacing: 0.03em;
-      }
-
-      .sub {
-        margin: 4px 0 0;
-        font-size: 0.9rem;
-        color: var(--muted);
-      }
-
-      .card {
-        background: radial-gradient(circle at top left, #020617 0, #020617 40%, #020617 100%);
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        padding: 16px;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-        margin-bottom: 16px;
-      }
-
-      .form-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-      }
-
-      label {
-        font-size: 0.85rem;
-        color: var(--muted);
-      }
-
-      .wallet-input-wrap {
-        flex: 1 1 260px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .wallet-input-inner {
+      .logo {
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #f9fafb;
         display: flex;
         align-items: center;
         gap: 8px;
       }
 
-      input[type="text"] {
+      .logo-pill {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        border: 2px solid var(--accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: var(--accent);
+      }
+
+      .header-right {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      main.layout {
         flex: 1;
-        min-width: 0;
-        padding: 8px 10px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--bg-input);
-        color: var(--text);
-        font-size: 0.9rem;
-        outline: none;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 0;
+        min-height: 0;
       }
 
-      input[type="text"]::placeholder {
-        color: #6b7280;
+      @media (max-width: 900px) {
+        main.layout {
+          grid-template-columns: 1fr;
+        }
+        aside.sidebar {
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
       }
 
-      input[type="text"]:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
-      }
-
-      button {
-        border: none;
-        border-radius: 999px;
-        padding: 8px 16px;
-        font-size: 0.9rem;
-        font-weight: 500;
-        cursor: pointer;
-        background: linear-gradient(135deg, #22c55e, #16a34a);
-        color: #020617;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      button:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: 0.75rem;
-        border: 1px solid var(--border);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--muted);
-      }
-
-      .pill strong {
-        color: var(--accent);
-      }
-
-      .status {
-        margin-top: 8px;
-        font-size: 0.8rem;
-        color: var(--muted);
-      }
-
-      .status-error {
-        color: var(--danger);
-      }
-
-      .status-ok {
-        color: var(--accent);
-      }
-
-      .layout {
+      aside.sidebar {
+        background: var(--bg-alt);
+        border-right: 1px solid var(--border);
+        padding: 16px;
         display: flex;
-        gap: 16px;
-        align-items: flex-start;
-      }
-
-      .sidebar {
-        width: 260px;
-        flex-shrink: 0;
-        display: none; /* hidden until data loaded */
         flex-direction: column;
-        gap: 12px;
+        gap: 16px;
       }
 
-      .sidebar .card {
-        margin-bottom: 0;
+      .sidebar h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin: 0 0 4px 0;
       }
 
       .filter-group {
+        margin-bottom: 10px;
+      }
+
+      .filter-group label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      .filter-group select {
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--panel-alt);
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .filter-group select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent-soft);
+      }
+
+      .filters-reset {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--accent);
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        padding: 0;
+        text-align: left;
+      }
+
+      section.content {
+        padding: 16px 16px 20px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        margin-bottom: 8px;
+        gap: 12px;
+        min-width: 0;
       }
 
-      .filter-label {
-        font-size: 0.75rem;
-        color: var(--muted);
-      }
-
-      .filter-input,
-      .filter-select {
-        width: 100%;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(15, 23, 42, 0.7);
-        color: var(--text);
-        padding: 6px 10px;
-        font-size: 0.8rem;
-        outline: none;
-      }
-
-      .filter-input::placeholder {
-        color: #6b7280;
-      }
-
-      .filter-select {
-        appearance: none;
-      }
-
-      .sidebar-buttons {
+      .wallet-form-row {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
-        margin-top: 4px;
+        align-items: center;
       }
 
-      .ghost-btn {
-        background: transparent;
-        color: var(--muted);
+      .wallet-input {
+        flex: 1 1 220px;
+        max-width: 420px;
+        padding: 7px 10px;
         border-radius: 999px;
         border: 1px solid var(--border);
-        padding: 6px 10px;
-        font-size: 0.8rem;
-        cursor: pointer;
+        background: var(--panel-alt);
+        color: var(--text);
+        font-size: 13px;
       }
 
-      .ghost-btn:hover {
+      .wallet-input::placeholder {
+        color: var(--text-muted);
+      }
+
+      .wallet-input:focus {
+        outline: none;
         border-color: var(--accent);
-        color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent-soft);
       }
 
-      .main-pane {
-        flex: 1;
-      }
-
-      .table-card {
-        margin-top: 0;
-      }
-
-      .table-header {
-        display: flex;
-        justify-content: space-between;
+      .btn {
+        border-radius: 999px;
+        border: none;
+        padding: 7px 14px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
         align-items: center;
-        margin-bottom: 8px;
+        gap: 6px;
       }
 
-      .table-title {
-        font-size: 0.95rem;
+      .btn-primary {
+        background: var(--accent);
+        color: #f9fafb;
+      }
+
+      .btn-primary:hover {
+        background: #2563eb;
+      }
+
+      .status-bar {
+        font-size: 12px;
+        color: var(--text-muted);
+        min-height: 16px;
+      }
+
+      .status-bar.error {
+        color: var(--danger);
+      }
+
+      .card-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+      }
+
+      .card {
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        font-size: 12px;
+      }
+
+      .card-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 2px;
+      }
+
+      .card-value {
+        font-size: 13px;
         font-weight: 500;
       }
 
-      .table-meta {
-        font-size: 0.75rem;
-        color: var(--muted);
+      .wallet-header {
+        font-size: 14px;
+        font-weight: 500;
       }
 
-      .table-wrapper {
-        overflow: auto;
+      .wallet-header span.address {
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .table-container {
+        margin-top: 8px;
         border-radius: 12px;
+        overflow: hidden;
         border: 1px solid var(--border);
-        max-height: calc(100vh - 260px);
+        background: var(--panel);
       }
 
       table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.8rem;
-        background: #020617;
+        font-size: 12px;
       }
 
       thead {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: rgba(15, 23, 42, 0.98);
-        backdrop-filter: blur(8px);
+        background: #020617;
       }
 
       th,
       td {
         padding: 6px 8px;
-        border-bottom: 1px solid #0f172a;
-        text-align: left;
+        border-bottom: 1px solid #111827;
         white-space: nowrap;
       }
 
       th {
-        font-weight: 500;
-        color: var(--muted);
-        font-size: 0.75rem;
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
         cursor: pointer;
         user-select: none;
       }
 
-      th .label {
-        margin-right: 4px;
-      }
-
-      .sort-indicator {
-        font-size: 0.7rem;
-        opacity: 0.6;
-      }
-
-      tbody tr:nth-child(even) {
-        background: #020617;
-      }
-
-      tbody tr:nth-child(odd) {
-        background: #020617;
-      }
-
-      tbody tr:hover {
+      th.sortable:hover {
         background: rgba(15, 23, 42, 0.9);
       }
 
-      .text-right {
-        text-align: right;
+      th .sort-indicator {
+        font-size: 10px;
+        opacity: 0.6;
+        margin-left: 4px;
       }
 
-      .badge-tier {
+      tbody tr:nth-child(even) {
+        background: var(--panel-alt);
+      }
+
+      tbody tr:hover {
+        background: #020617;
+      }
+
+      .player-cell {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .player-name {
+        font-weight: 500;
+        font-size: 12px;
+      }
+
+      .player-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .badge {
         display: inline-flex;
         padding: 2px 8px;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        font-size: 0.7rem;
+        font-size: 11px;
+        font-weight: 500;
+        align-items: center;
+        justify-content: center;
       }
 
-      .badge-tier-Common {
-        border-color: rgba(148, 163, 184, 0.7);
+      .badge-tier {
+        background: rgba(37, 99, 235, 0.15);
+        color: #bfdbfe;
+        border: 1px solid rgba(37, 99, 235, 0.5);
       }
 
-      .badge-tier-Rare {
-        border-color: rgba(56, 189, 248, 0.8);
+      .badge-locked {
+        background: var(--locked-soft);
+        color: #fed7aa;
+        border: 1px solid rgba(249, 115, 22, 0.7);
       }
 
-      .badge-tier-Legendary {
-        border-color: rgba(249, 115, 22, 0.8);
+      .badge-unlocked {
+        background: rgba(34, 197, 94, 0.12);
+        color: #bbf7d0;
+        border: 1px solid rgba(34, 197, 94, 0.7);
       }
 
-      .badge-tier-Ultimate {
-        border-color: rgba(239, 68, 68, 0.8);
+      .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
       }
 
-      @media (max-width: 960px) {
-        .layout {
-          flex-direction: column;
-        }
-
-        .sidebar {
-          width: 100%;
-        }
-
-        .table-wrapper {
-          max-height: calc(100vh - 320px);
-        }
+      .link-cell a {
+        font-size: 11px;
       }
 
-      @media (max-width: 768px) {
-        .page {
-          padding: 16px 10px 32px;
-        }
-
-        .card {
-          padding: 12px;
-        }
-
-        table {
-          font-size: 0.75rem;
-        }
-
-        th,
-        td {
-          padding: 5px 6px;
-        }
+      .empty-state {
+        padding: 12px;
+        font-size: 13px;
+        color: var(--text-muted);
       }
     </style>
   </head>
   <body>
-    <div class="page">
+    <div class="app">
       <header>
-        <div class="title-row">
-          <div>
-            <h1>NFL ALL DAY Wallet Viewer</h1>
-            <p class="sub">Query Neon-backed data for any Dapper wallet.</p>
-          </div>
+        <div class="logo">
+          <span class="logo-pill">AD</span>
+          ALL DAY Wallet Viewer
         </div>
+        <div class="header-right">Neon-backed • Snowflake ETL • Dapper names</div>
       </header>
 
-      <div class="card">
-        <form id="wallet-form" autocomplete="off">
-          <div class="form-row">
-            <div class="wallet-input-wrap">
-              <label for="wallet-input">Wallet</label>
-              <div class="wallet-input-inner">
-                <input id="wallet-input" type="text" spellcheck="false" placeholder="0x379c2a0e88d8081f" />
-              </div>
-            </div>
-            <div>
-              <button id="load-btn" type="submit">
-                <span>Load Wallet</span>
-              </button>
-            </div>
-            <div class="pill">
-              <span>Results:</span>
-              <strong id="results-count">0</strong>
-            </div>
-          </div>
-          <div id="status" class="status">Enter a wallet and click Load.</div>
-        </form>
-      </div>
-
-      <div class="layout">
-        <!-- SIDEBAR FILTERS -->
-        <aside class="sidebar" id="filters-sidebar">
-          <div class="card">
+      <main class="layout">
+        <aside class="sidebar">
+          <div>
+            <h2>Filters</h2>
             <div class="filter-group">
-              <div class="filter-label">Search</div>
-              <input
-                id="filter-text"
-                class="filter-input"
-                type="text"
-                placeholder="Player, team, set, series..."
-                autocomplete="off" />
-            </div>
-
-            <div class="filter-group">
-              <div class="filter-label">Player</div>
-              <select id="filter-player" class="filter-select">
-                <option value="">All players</option>
-              </select>
-            </div>
-
-            <div class="filter-group">
-              <div class="filter-label">Team</div>
-              <select id="filter-team" class="filter-select">
+              <label for="filterTeam">Team</label>
+              <select id="filterTeam">
                 <option value="">All teams</option>
               </select>
             </div>
-
             <div class="filter-group">
-              <div class="filter-label">Series</div>
-              <select id="filter-series" class="filter-select">
+              <label for="filterPlayer">Player</label>
+              <select id="filterPlayer">
+                <option value="">All players</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filterSeries">Series</label>
+              <select id="filterSeries">
                 <option value="">All series</option>
               </select>
             </div>
-
             <div class="filter-group">
-              <div class="filter-label">Set</div>
-              <select id="filter-set" class="filter-select">
+              <label for="filterSet">Set</label>
+              <select id="filterSet">
                 <option value="">All sets</option>
               </select>
             </div>
-
             <div class="filter-group">
-              <div class="filter-label">Tier</div>
-              <select id="filter-tier" class="filter-select">
+              <label for="filterTier">Tier</label>
+              <select id="filterTier">
                 <option value="">All tiers</option>
-                <option value="COMMON">COMMON</option>
-                <option value="RARE">RARE</option>
-                <option value="LEGENDARY">LEGENDARY</option>
-                <option value="ULTIMATE">ULTIMATE</option>
               </select>
             </div>
-
             <div class="filter-group">
-              <div class="filter-label">Position</div>
-              <select id="filter-position" class="filter-select">
+              <label for="filterPosition">Position</label>
+              <select id="filterPosition">
                 <option value="">All positions</option>
               </select>
             </div>
-
             <div class="filter-group">
-              <div class="filter-label">Play type</div>
-              <select id="filter-playtype" class="filter-select">
-                <option value="">All play types</option>
+              <label for="filterLocked">Locked status</label>
+              <select id="filterLocked">
+                <option value="">Locked + Unlocked</option>
+                <option value="locked">Locked only</option>
+                <option value="unlocked">Unlocked only</option>
               </select>
             </div>
-
-            <div class="sidebar-buttons">
-              <button type="button" class="ghost-btn" id="clear-filters">Clear</button>
-              <button type="button" id="download-csv-btn">Download CSV</button>
-            </div>
+            <button type="button" class="filters-reset" id="resetFilters">Reset filters</button>
           </div>
         </aside>
 
-        <!-- MAIN TABLE -->
-        <main class="main-pane">
-          <div class="card table-card">
-            <div class="table-header">
-              <div class="table-title">Moments</div>
-              <div class="table-meta">Player, team, tier, set/series, serial, ASP / low ask (if available)</div>
+        <section class="content">
+          <form id="walletForm">
+            <div class="wallet-form-row">
+              <input
+                id="walletInput"
+                class="wallet-input"
+                type="text"
+                placeholder="Paste Dapper wallet address (0x...)"
+                autocomplete="off" />
+              <button class="btn btn-primary" type="submit">Load wallet</button>
             </div>
-            <div class="table-wrapper">
-              <table id="results-table" style="display: none">
-                <thead>
-                  <tr>
-                    <th data-sort-key="player">
-                      <span class="label">Player</span>
-                      <span class="sort-indicator" data-sort="player"></span>
-                    </th>
-                    <th data-sort-key="team_name">
-                      <span class="label">Team</span>
-                      <span class="sort-indicator" data-sort="team_name"></span>
-                    </th>
-                    <th data-sort-key="position">
-                      <span class="label">Pos</span>
-                      <span class="sort-indicator" data-sort="position"></span>
-                    </th>
-                    <th data-sort-key="tier">
-                      <span class="label">Tier</span>
-                      <span class="sort-indicator" data-sort="tier"></span>
-                    </th>
-                    <th data-sort-key="set_name">
-                      <span class="label">Set</span>
-                      <span class="sort-indicator" data-sort="set_name"></span>
-                    </th>
-                    <th data-sort-key="series_name">
-                      <span class="label">Series</span>
-                      <span class="sort-indicator" data-sort="series_name"></span>
-                    </th>
-                    <th data-sort-key="serial_number" class="text-right">
-                      <span class="label">Serial</span>
-                      <span class="sort-indicator" data-sort="serial_number"></span>
-                    </th>
-                    <th data-sort-key="max_mint_size" class="text-right">
-                      <span class="label">Max Mint</span>
-                      <span class="sort-indicator" data-sort="max_mint_size"></span>
-                    </th>
-                    <th data-sort-key="low_ask" class="text-right">
-                      <span class="label">Low Ask</span>
-                      <span class="sort-indicator" data-sort="low_ask"></span>
-                    </th>
-                    <th data-sort-key="asp_90d" class="text-right">
-                      <span class="label">ASP (90d)</span>
-                      <span class="sort-indicator" data-sort="asp_90d"></span>
-                    </th>
-                    <th data-sort-key="last_event_ts">
-                      <span class="label">Last Event</span>
-                      <span class="sort-indicator" data-sort="last_event_ts"></span>
-                    </th>
-                    <th data-sort-key="nft_id">
-                      <span class="label">NFT ID</span>
-                      <span class="sort-indicator" data-sort="nft_id"></span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+          </form>
+
+          <div id="status" class="status-bar"></div>
+          <div id="walletHeader" class="wallet-header"></div>
+
+          <div class="card-row" id="summaryRow" style="display: none">
+            <div class="card">
+              <div class="card-title">Total Moments</div>
+              <div class="card-value" id="summaryTotal">0</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Unlocked</div>
+              <div class="card-value" id="summaryUnlocked">0</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Locked</div>
+              <div class="card-value" id="summaryLocked">0</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Sum Low Ask</div>
+              <div class="card-value" id="summaryLowAsk">$0.00</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Sum ASP (90d)</div>
+              <div class="card-value" id="summaryAsp">$0.00</div>
             </div>
           </div>
-        </main>
-      </div>
+
+          <div class="table-container" id="tableContainer" style="display: none">
+            <table>
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort-key="player">Player<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="team">Team<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="position">Pos<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="tier">Tier<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="series">Series<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="set">Set<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="serial">Serial<span class="sort-indicator"></span></th>
+                  <th class="sortable num" data-sort-key="lowAsk">Low Ask<span class="sort-indicator"></span></th>
+                  <th class="sortable num" data-sort-key="asp">ASP 90d<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="locked">Locked?<span class="sort-indicator"></span></th>
+                  <th class="sortable" data-sort-key="date">Last Event<span class="sort-indicator"></span></th>
+                  <th>Links</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+          </div>
+
+          <div id="emptyState" class="empty-state" style="display: none">No moments found for this wallet.</div>
+        </section>
+      </main>
     </div>
 
     <script>
-      (() => {
-        const form = document.getElementById("wallet-form");
-        const walletInput = document.getElementById("wallet-input");
-        const loadBtn = document.getElementById("load-btn");
-        const statusEl = document.getElementById("status");
-        const table = document.getElementById("results-table");
-        const tbody = table.querySelector("tbody");
-        const resultsCountEl = document.getElementById("results-count");
+      const walletForm = document.getElementById("walletForm");
+      const walletInput = document.getElementById("walletInput");
+      const statusEl = document.getElementById("status");
+      const walletHeaderEl = document.getElementById("walletHeader");
+      const summaryRowEl = document.getElementById("summaryRow");
+      const summaryTotalEl = document.getElementById("summaryTotal");
+      const summaryUnlockedEl = document.getElementById("summaryUnlocked");
+      const summaryLockedEl = document.getElementById("summaryLocked");
+      const summaryLowAskEl = document.getElementById("summaryLowAsk");
+      const summaryAspEl = document.getElementById("summaryAsp");
+      const tableContainerEl = document.getElementById("tableContainer");
+      const resultsBody = document.getElementById("resultsBody");
+      const emptyStateEl = document.getElementById("emptyState");
 
-        const sidebar = document.getElementById("filters-sidebar");
-        const filterTextEl = document.getElementById("filter-text");
-        const filterPlayerEl = document.getElementById("filter-player");
-        const filterTeamEl = document.getElementById("filter-team");
-        const filterSeriesEl = document.getElementById("filter-series");
-        const filterSetEl = document.getElementById("filter-set");
-        const filterTierEl = document.getElementById("filter-tier");
-        const filterPositionEl = document.getElementById("filter-position");
-        const filterPlaytypeEl = document.getElementById("filter-playtype");
-        const clearFiltersBtn = document.getElementById("clear-filters");
-        const downloadCsvBtn = document.getElementById("download-csv-btn");
+      const filterTeam = document.getElementById("filterTeam");
+      const filterPlayer = document.getElementById("filterPlayer");
+      const filterSeries = document.getElementById("filterSeries");
+      const filterSet = document.getElementById("filterSet");
+      const filterTier = document.getElementById("filterTier");
+      const filterPosition = document.getElementById("filterPosition");
+      const filterLocked = document.getElementById("filterLocked");
+      const resetFiltersBtn = document.getElementById("resetFilters");
 
-        let fullRows = [];
-        let filteredRows = [];
-        let currentSortKey = null;
-        let currentSortDir = "asc";
+      let allRows = [];
+      let currentFilteredRows = [];
+      let currentWallet = null;
+      let currentSort = { key: "date", dir: "desc" };
 
-        function setStatus(msg, type) {
-          statusEl.textContent = msg;
-          statusEl.className = "status";
-          if (type === "error") {
-            statusEl.classList.add("status-error");
-          } else if (type === "ok") {
-            statusEl.classList.add("status-ok");
-          }
+      function setStatus(msg, isError = false) {
+        statusEl.textContent = msg || "";
+        statusEl.classList.toggle("error", !!isError);
+      }
+
+      function formatCurrency(n) {
+        if (n == null || isNaN(n)) return "";
+        return "$" + Number(n).toFixed(2);
+      }
+
+      function formatDate(ts) {
+        if (!ts) return "";
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      async function fetchProfile(wallet) {
+        try {
+          const res = await fetch(`/api/wallet-profile?wallet=${encodeURIComponent(wallet)}`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          if (!data.ok) return null;
+          return data.profile || null;
+        } catch {
+          return null;
+        }
+      }
+
+      async function fetchPrices(editionIds) {
+        if (!editionIds.length) {
+          return { asp: {}, lowAsk: {} };
+        }
+        const uniq = [...new Set(editionIds)];
+        const qs = encodeURIComponent(uniq.join(","));
+        const res = await fetch(`/api/prices?editions=${qs}`);
+        if (!res.ok) {
+          return { asp: {}, lowAsk: {} };
+        }
+        const data = await res.json();
+        if (!data.ok) {
+          return { asp: {}, lowAsk: {} };
+        }
+        return {
+          asp: data.asp || {},
+          lowAsk: data.lowAsk || {}
+        };
+      }
+
+      function fillSelect(selectEl, values, placeholder) {
+        const sorted = Array.from(values)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        selectEl.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholder;
+        selectEl.appendChild(opt);
+        for (const v of sorted) {
+          const o = document.createElement("option");
+          o.value = v;
+          o.textContent = v;
+          selectEl.appendChild(o);
+        }
+      }
+
+      function buildFilters(rows) {
+        const teams = new Set();
+        const players = new Set();
+        const series = new Set();
+        const sets = new Set();
+        const tiers = new Set();
+        const positions = new Set();
+
+        for (const r of rows) {
+          if (r.team_name) teams.add(r.team_name);
+          if (r.player_name && r.player_name.trim()) players.add(r.player_name.trim());
+          if (r.series_name) series.add(r.series_name);
+          if (r.set_name) sets.add(r.set_name);
+          if (r.tier) tiers.add(r.tier);
+          if (r.position) positions.add(r.position);
         }
 
-        function formatMoney(v) {
-          if (v === null || v === undefined || v === "") return "";
-          const num = Number(v);
-          if (!Number.isFinite(num)) return "";
-          return "$" + num.toFixed(2);
+        fillSelect(filterTeam, teams, "All teams");
+        fillSelect(filterPlayer, players, "All players");
+        fillSelect(filterSeries, series, "All series");
+        fillSelect(filterSet, sets, "All sets");
+        fillSelect(filterTier, tiers, "All tiers");
+        fillSelect(filterPosition, positions, "All positions");
+        filterLocked.value = "";
+      }
+
+      function applyFilters() {
+        const t = filterTeam.value;
+        const p = filterPlayer.value;
+        const s = filterSeries.value;
+        const set = filterSet.value;
+        const tier = filterTier.value;
+        const pos = filterPosition.value;
+        const locked = filterLocked.value;
+
+        const filtered = allRows.filter((r) => {
+          if (t && r.team_name !== t) return false;
+          if (p && (r.player_name || "").trim() !== p) return false;
+          if (s && r.series_name !== s) return false;
+          if (set && r.set_name !== set) return false;
+          if (tier && r.tier !== tier) return false;
+          if (pos && r.position !== pos) return false;
+          if (locked === "locked" && !r.is_locked) return false;
+          if (locked === "unlocked" && r.is_locked) return false;
+          return true;
+        });
+
+        currentFilteredRows = filtered;
+        renderSummary(filtered);
+        renderTable(filtered);
+      }
+
+      function resetFilters() {
+        filterTeam.value = "";
+        filterPlayer.value = "";
+        filterSeries.value = "";
+        filterSet.value = "";
+        filterTier.value = "";
+        filterPosition.value = "";
+        filterLocked.value = "";
+        applyFilters();
+      }
+
+      function renderSummary(rows) {
+        if (!rows.length) {
+          summaryRowEl.style.display = "none";
+          return;
         }
+        const total = rows.length;
+        const locked = rows.filter((r) => r.is_locked).length;
+        const unlocked = total - locked;
+        const lowAskSum = rows.reduce((acc, r) => acc + (r.low_ask != null ? Number(r.low_ask) : 0), 0);
+        const aspSum = rows.reduce((acc, r) => acc + (r.asp_90d != null ? Number(r.asp_90d) : 0), 0);
 
-        function formatDate(str) {
-          if (!str) return "";
-          const d = new Date(str);
-          if (Number.isNaN(d.getTime())) return str;
-          return (
-            d.toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "2-digit"
-            }) +
-            " " +
-            d.toLocaleTimeString(undefined, {
-              hour: "2-digit",
-              minute: "2-digit"
-            })
-          );
-        }
+        summaryTotalEl.textContent = total;
+        summaryUnlockedEl.textContent = unlocked;
+        summaryLockedEl.textContent = locked;
+        summaryLowAskEl.textContent = formatCurrency(lowAskSum);
+        summaryAspEl.textContent = formatCurrency(aspSum);
+        summaryRowEl.style.display = "grid";
+      }
 
-        async function fetchPrices(editionIds) {
-          if (!editionIds.length) return { asp: {}, lowAsk: {} };
-          const param = encodeURIComponent(editionIds.join(","));
-          const res = await fetch("/api/prices?editions=" + param);
-          if (!res.ok) return { asp: {}, lowAsk: {} };
-          const json = await res.json();
-          if (!json.ok) return { asp: {}, lowAsk: {} };
-          return {
-            asp: json.asp || {},
-            lowAsk: json.lowAsk || {}
-          };
-        }
-
-        function normalizeRows(rows) {
-          return rows.map((r) => {
-            const firstName = r.first_name || r.player_first_name || r.playerName || "";
-            const lastName = r.last_name || r.player_last_name || r.playerSurname || "";
-            const teamName = r.team_name || r.team || r.teamName || "";
-            // play_type is optional; use whatever field is there
-            const playType = r.play_type || r.playType || r.play_category || r.play_name || "";
-
-            return {
-              ...r,
-              first_name: firstName,
-              last_name: lastName,
-              team_name: teamName,
-              play_type: playType
-            };
-          });
-        }
-
-        function getUniqueSorted(values) {
-          const set = new Set();
-          for (const v of values) {
-            if (!v) continue;
-            const s = String(v).trim();
-            if (!s) continue;
-            set.add(s);
-          }
-          return Array.from(set).sort((a, b) =>
-            a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
-          );
-        }
-
-        function buildSelect(selectEl, values, allLabel) {
-          const current = selectEl.value || "";
-          selectEl.innerHTML = "";
-          const optAll = document.createElement("option");
-          optAll.value = "";
-          optAll.textContent = allLabel;
-          selectEl.appendChild(optAll);
-
-          const uniques = getUniqueSorted(values);
-          uniques.forEach((val) => {
-            const opt = document.createElement("option");
-            opt.value = val;
-            opt.textContent = val;
-            selectEl.appendChild(opt);
-          });
-
-          if (current && uniques.includes(current)) {
-            selectEl.value = current;
-          }
-        }
-
-        function buildSidebarFilters(rows) {
-          const players = rows.map((r) => ((r.first_name || "") + " " + (r.last_name || "")).trim());
-          const teams = rows.map((r) => r.team_name || "");
-          const series = rows.map((r) => r.series_name || "");
-          const sets = rows.map((r) => r.set_name || "");
-          const positions = rows.map((r) => r.position || "");
-          const playtypes = rows.map((r) => r.play_type || "");
-
-          buildSelect(filterPlayerEl, players, "All players");
-          buildSelect(filterTeamEl, teams, "All teams");
-          buildSelect(filterSeriesEl, series, "All series");
-          buildSelect(filterSetEl, sets, "All sets");
-          buildSelect(filterPositionEl, positions, "All positions");
-          buildSelect(filterPlaytypeEl, playtypes, "All play types");
-
-          sidebar.style.display = "flex";
-        }
-
-        function compareRows(a, b, key, dir) {
-          let va;
-          let vb;
-
-          if (key === "player") {
-            va = ((a.first_name || "") + " " + (a.last_name || "")).toLowerCase();
-            vb = ((b.first_name || "") + " " + (b.last_name || "")).toLowerCase();
-          } else if (key === "serial_number" || key === "max_mint_size" || key === "low_ask" || key === "asp_90d") {
-            const aNum = a[key] === null || a[key] === undefined ? -Infinity : Number(a[key]);
-            const bNum = b[key] === null || b[key] === undefined ? -Infinity : Number(b[key]);
-            va = Number.isNaN(aNum) ? -Infinity : aNum;
-            vb = Number.isNaN(bNum) ? -Infinity : bNum;
-          } else if (key === "last_event_ts") {
-            va = a.last_event_ts ? new Date(a.last_event_ts).getTime() : 0;
-            vb = b.last_event_ts ? new Date(b.last_event_ts).getTime() : 0;
+      function setSortIndicator() {
+        const ths = document.querySelectorAll("th.sortable");
+        ths.forEach((th) => {
+          const span = th.querySelector(".sort-indicator");
+          if (!span) return;
+          const key = th.getAttribute("data-sort-key");
+          if (key === currentSort.key) {
+            span.textContent = currentSort.dir === "asc" ? "▲" : "▼";
           } else {
-            va = (a[key] || "").toString().toLowerCase();
-            vb = (b[key] || "").toString().toLowerCase();
+            span.textContent = "";
           }
+        });
+      }
 
-          if (va < vb) return dir === "asc" ? -1 : 1;
-          if (va > vb) return dir === "asc" ? 1 : -1;
-          return 0;
+      function compareRows(a, b, sort) {
+        const dir = sort.dir === "asc" ? 1 : -1;
+        const key = sort.key;
+
+        function num(v) {
+          return v == null || isNaN(v) ? null : Number(v);
         }
 
-        function updateSortIndicators() {
-          document.querySelectorAll(".sort-indicator").forEach((el) => {
-            const key = el.getAttribute("data-sort");
-            if (key === currentSortKey) {
-              el.textContent = currentSortDir === "asc" ? "▲" : "▼";
-            } else {
-              el.textContent = "";
-            }
-          });
+        let av, bv;
+
+        switch (key) {
+          case "player":
+            av = (a.player_name || "").toLowerCase();
+            bv = (b.player_name || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "team":
+            av = (a.team_name || "").toLowerCase();
+            bv = (b.team_name || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "position":
+            av = (a.position || "").toLowerCase();
+            bv = (b.position || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "tier":
+            av = (a.tier || "").toLowerCase();
+            bv = (b.tier || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "series":
+            av = (a.series_name || "").toLowerCase();
+            bv = (b.series_name || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "set":
+            av = (a.set_name || "").toLowerCase();
+            bv = (b.set_name || "").toLowerCase();
+            return av.localeCompare(bv) * dir;
+          case "serial":
+            av = num(a.serial_number);
+            bv = num(b.serial_number);
+            break;
+          case "lowAsk":
+            av = num(a.low_ask);
+            bv = num(b.low_ask);
+            break;
+          case "asp":
+            av = num(a.asp_90d);
+            bv = num(b.asp_90d);
+            break;
+          case "locked":
+            av = a.is_locked ? 1 : 0;
+            bv = b.is_locked ? 1 : 0;
+            break;
+          case "date":
+          default:
+            av = a.last_event_ts ? Date.parse(a.last_event_ts) : 0;
+            bv = b.last_event_ts ? Date.parse(b.last_event_ts) : 0;
+            break;
         }
 
-        function renderTable(rows) {
-          tbody.innerHTML = "";
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1 * dir;
+        if (bv == null) return -1 * dir;
+        if (av === bv) return 0;
+        return av < bv ? -1 * dir : 1 * dir;
+      }
 
-          for (const r of rows) {
-            const tr = document.createElement("tr");
-
-            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
-
-            const tierBadge = document.createElement("span");
-            tierBadge.textContent = r.tier || "";
-            tierBadge.className = "badge-tier";
-            if (r.tier) {
-              tierBadge.classList.add("badge-tier-" + r.tier);
-            }
-
-            const cells = [
-              playerName,
-              r.team_name || "",
-              r.position || "",
-              { badge: tierBadge },
-              r.set_name || "",
-              r.series_name || "",
-              r.serial_number != null ? String(r.serial_number) : "",
-              r.max_mint_size != null ? String(r.max_mint_size) : "",
-              r.low_ask_display || "",
-              r.asp_90d_display || "",
-              formatDate(r.last_event_ts),
-              r.nft_id
-            ];
-
-            cells.forEach((val, idx) => {
-              const td = document.createElement("td");
-              if (idx === 6 || idx === 7 || idx === 8 || idx === 9) {
-                td.classList.add("text-right");
-              }
-
-              if (val && typeof val === "object" && val.badge) {
-                td.appendChild(val.badge);
-              } else {
-                td.textContent = val;
-              }
-              tr.appendChild(td);
-            });
-
-            tbody.appendChild(tr);
-          }
-
-          resultsCountEl.textContent = String(rows.length);
-          table.style.display = rows.length ? "table" : "none";
+      function renderTable(rows) {
+        if (!rows.length) {
+          tableContainerEl.style.display = "none";
+          emptyStateEl.style.display = "block";
+          resultsBody.innerHTML = "";
+          return;
         }
 
-        function applyFiltersAndRender() {
-          const text = filterTextEl.value.trim().toLowerCase();
-          const selPlayer = filterPlayerEl.value;
-          const selTeam = filterTeamEl.value;
-          const selSeries = filterSeriesEl.value;
-          const selSet = filterSetEl.value;
-          const selTier = filterTierEl.value;
-          const selPos = filterPositionEl.value;
-          const selPlayType = filterPlaytypeEl.value;
+        const sorted = [...rows].sort((a, b) => compareRows(a, b, currentSort));
+        setSortIndicator();
 
-          filteredRows = fullRows.filter((r) => {
-            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
-            const tierUpper = (r.tier || "").toUpperCase();
+        const html = sorted
+          .map((r) => {
+            const playerName = r.player_name || ((r.first_name || "") + " " + (r.last_name || "")).trim();
+            const team = r.team_name || "";
+            const pos = r.position || "";
+            const tier = r.tier || "";
+            const series = r.series_name || "";
+            const setName = r.set_name || "";
+            const serialStr = r.serial_number != null ? "#" + r.serial_number : "";
+            const maxStr = r.max_mint_size != null ? " / " + r.max_mint_size : "";
+            const lockedLabel = r.is_locked ? "Locked" : "Unlocked";
+            const lockedClass = r.is_locked ? "badge badge-locked" : "badge badge-unlocked";
+            const lowAskStr = r.low_ask != null ? formatCurrency(r.low_ask) : "";
+            const aspStr = r.asp_90d != null ? formatCurrency(r.asp_90d) : "";
+            const lastEvent = formatDate(r.last_event_ts);
+            const momentUrl = r.nfl_allday_url || (r.nft_id ? `https://nflallday.com/moments/${r.nft_id}` : "");
+            const listingUrl =
+              r.listing_url || (r.edition_id ? `https://nflallday.com/listing/moment/${r.edition_id}` : "");
 
-            if (selPlayer && playerName !== selPlayer) return false;
-            if (selTeam && (r.team_name || "") !== selTeam) return false;
-            if (selSeries && (r.series_name || "") !== selSeries) return false;
-            if (selSet && (r.set_name || "") !== selSet) return false;
-            if (selTier && tierUpper !== selTier) return false;
-            if (selPos && (r.position || "") !== selPos) return false;
-            if (selPlayType && (r.play_type || "") !== selPlayType) return false;
+            return `
+            <tr>
+              <td>
+                <div class="player-cell">
+                  <span class="player-name">${playerName || "-"}</span>
+                  <span class="player-meta">${team || ""}</span>
+                </div>
+              </td>
+              <td>${team || "-"}</td>
+              <td>${pos || "-"}</td>
+              <td><span class="badge badge-tier">${tier || "-"}</span></td>
+              <td>${series || "-"}</td>
+              <td>${setName || "-"}</td>
+              <td class="num">${serialStr}${maxStr}</td>
+              <td class="num">${lowAskStr || ""}</td>
+              <td class="num">${aspStr || ""}</td>
+              <td><span class="${lockedClass}">${lockedLabel}</span></td>
+              <td>${lastEvent || ""}</td>
+              <td class="link-cell">
+                ${momentUrl ? `<a href="${momentUrl}" target="_blank">Moment</a>` : ""}
+                ${listingUrl ? ` · <a href="${listingUrl}" target="_blank">Listing</a>` : ""}
+              </td>
+            </tr>
+          `;
+          })
+          .join("");
 
-            if (text) {
-              const haystack = [playerName, r.team_name, r.set_name, r.series_name]
-                .map((x) => (x || "").toLowerCase())
-                .join(" ");
-              if (!haystack.includes(text)) return false;
-            }
+        resultsBody.innerHTML = html;
+        tableContainerEl.style.display = "block";
+        emptyStateEl.style.display = "none";
+      }
 
-            return true;
-          });
+      async function fetchWallet(wallet) {
+        currentWallet = wallet;
+        setStatus("Loading wallet...");
+        walletHeaderEl.textContent = "";
+        summaryRowEl.style.display = "none";
+        tableContainerEl.style.display = "none";
+        emptyStateEl.style.display = "none";
+        resultsBody.innerHTML = "";
 
-          if (!currentSortKey) {
-            currentSortKey = "last_event_ts";
-            currentSortDir = "desc";
-          }
+        try {
+          const [profile, queryRes] = await Promise.all([
+            fetchProfile(wallet),
+            fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`).then((r) => r.json())
+          ]);
 
-          filteredRows.sort((a, b) => compareRows(a, b, currentSortKey, currentSortDir));
-          updateSortIndicators();
-          renderTable(filteredRows);
-        }
-
-        function clearFilters() {
-          filterTextEl.value = "";
-          filterPlayerEl.value = "";
-          filterTeamEl.value = "";
-          filterSeriesEl.value = "";
-          filterSetEl.value = "";
-          filterTierEl.value = "";
-          filterPositionEl.value = "";
-          filterPlaytypeEl.value = "";
-          applyFiltersAndRender();
-        }
-
-        function downloadCsv() {
-          const rows = filteredRows.length ? filteredRows : fullRows;
-          if (!rows.length) return;
-
-          const header = [
-            "Player",
-            "Team",
-            "Pos",
-            "Tier",
-            "Set",
-            "Series",
-            "PlayType",
-            "Serial",
-            "MaxMint",
-            "LowAsk",
-            "ASP90d",
-            "LastEventTs",
-            "NftId"
-          ];
-
-          const lines = [header.join(",")];
-
-          for (const r of rows) {
-            const playerName = ((r.first_name || "") + " " + (r.last_name || "")).trim();
-            const cells = [
-              playerName,
-              r.team_name || "",
-              r.position || "",
-              r.tier || "",
-              r.set_name || "",
-              r.series_name || "",
-              r.play_type || "",
-              r.serial_number != null ? String(r.serial_number) : "",
-              r.max_mint_size != null ? String(r.max_mint_size) : "",
-              r.low_ask != null ? String(r.low_ask) : "",
-              r.asp_90d != null ? String(r.asp_90d) : "",
-              r.last_event_ts || "",
-              r.nft_id || ""
-            ].map((val) => {
-              const s = val == null ? "" : String(val);
-              if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-                return '"' + s.replace(/"/g, '""') + '"';
-              }
-              return s;
-            });
-
-            lines.push(cells.join(","));
-          }
-
-          const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "wallet_moments.csv";
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-
-          const wallet = walletInput.value.trim().toLowerCase();
-          if (!wallet) {
-            setStatus("Enter a wallet address.", "error");
+          if (!queryRes.ok) {
+            setStatus(queryRes.error || "Error loading wallet", true);
             return;
           }
 
-          if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-            setStatus("Invalid wallet format.", "error");
+          const rows = queryRes.rows || [];
+          allRows = rows;
+
+          if (profile && profile.display_name) {
+            walletHeaderEl.innerHTML = `${profile.display_name} <span class="address">(${wallet})</span>`;
+          } else {
+            walletHeaderEl.textContent = wallet;
+          }
+
+          if (!rows.length) {
+            setStatus("Wallet has no moments.");
+            emptyStateEl.style.display = "block";
             return;
           }
 
-          setStatus("Loading wallet " + wallet + "...", null);
-          loadBtn.disabled = true;
-          table.style.display = "none";
-          tbody.innerHTML = "";
-          resultsCountEl.textContent = "0";
-          sidebar.style.display = "none";
+          // prices
+          const editionIds = rows.map((r) => r.edition_id).filter((x) => x != null);
+          const priceData = await fetchPrices(editionIds);
 
-          try {
-            const res = await fetch("/api/query?wallet=" + encodeURIComponent(wallet));
-            if (!res.ok) {
-              setStatus("API error: " + res.status, "error");
-              loadBtn.disabled = false;
-              return;
-            }
-            const json = await res.json();
-            if (!json.ok) {
-              setStatus(json.error || "API returned error", "error");
-              loadBtn.disabled = false;
-              return;
-            }
+          const aspMap = priceData.asp || {};
+          const lowAskMap = priceData.lowAsk || {};
 
-            let rows = json.rows || [];
-            if (!rows.length) {
-              setStatus("No moments found for wallet " + (json.wallet || wallet) + ".", null);
-              loadBtn.disabled = false;
-              return;
-            }
+          allRows = rows.map((r) => ({
+            ...r,
+            asp_90d: r.edition_id && aspMap[r.edition_id] != null ? Number(aspMap[r.edition_id]) : null,
+            low_ask: r.edition_id && lowAskMap[r.edition_id] != null ? Number(lowAskMap[r.edition_id]) : null
+          }));
 
-            rows = normalizeRows(rows);
+          buildFilters(allRows);
+          applyFilters();
+          setStatus(`Loaded ${allRows.length} moments.`);
+        } catch (err) {
+          console.error(err);
+          setStatus("Error loading wallet.", true);
+        }
+      }
 
-            const editionIds = [
-              ...new Set(rows.map((r) => r.edition_id).filter((x) => x !== null && x !== undefined && x !== ""))
-            ];
-
-            let aspMap = {};
-            let lowAskMap = {};
-            try {
-              const priceMaps = await fetchPrices(editionIds);
-              aspMap = priceMaps.asp || {};
-              lowAskMap = priceMaps.lowAsk || {};
-            } catch (e) {
-              console.warn("Price fetch failed:", e);
-            }
-
-            rows = rows.map((r) => {
-              const aspVal = aspMap[r.edition_id];
-              const lowAskVal = lowAskMap[r.edition_id];
-              const aspNum = aspVal !== undefined && aspVal !== null ? Number(aspVal) : null;
-              const lowNum = lowAskVal !== undefined && lowAskVal !== null ? Number(lowAskVal) : null;
-
-              return {
-                ...r,
-                asp_90d: aspNum !== null && !Number.isNaN(aspNum) ? aspNum : null,
-                low_ask: lowNum !== null && !Number.isNaN(lowNum) ? lowNum : null,
-                asp_90d_display: aspNum !== null && !Number.isNaN(aspNum) ? formatMoney(aspNum) : "",
-                low_ask_display: lowNum !== null && !Number.isNaN(lowNum) ? formatMoney(lowNum) : ""
-              };
-            });
-
-            fullRows = rows;
-            sidebar.style.display = "flex";
-            buildSidebarFilters(fullRows);
-
-            setStatus(`Loaded ${rows.length} moments for wallet ${json.wallet || wallet}.`, "ok");
-            currentSortKey = "last_event_ts";
-            currentSortDir = "desc";
-            applyFiltersAndRender();
-          } catch (err) {
-            console.error(err);
-            setStatus("Error: " + (err && err.message ? err.message : String(err)), "error");
-          } finally {
-            loadBtn.disabled = false;
-          }
-        });
-
-        filterTextEl.addEventListener("input", () => applyFiltersAndRender());
-        filterPlayerEl.addEventListener("change", () => applyFiltersAndRender());
-        filterTeamEl.addEventListener("change", () => applyFiltersAndRender());
-        filterSeriesEl.addEventListener("change", () => applyFiltersAndRender());
-        filterSetEl.addEventListener("change", () => applyFiltersAndRender());
-        filterTierEl.addEventListener("change", () => applyFiltersAndRender());
-        filterPositionEl.addEventListener("change", () => applyFiltersAndRender());
-        filterPlaytypeEl.addEventListener("change", () => applyFiltersAndRender());
-
-        clearFiltersBtn.addEventListener("click", () => clearFilters());
-        downloadCsvBtn.addEventListener("click", () => downloadCsv());
-
-        document.querySelectorAll("th[data-sort-key]").forEach((th) => {
-          th.addEventListener("click", () => {
-            const key = th.getAttribute("data-sort-key");
-            if (currentSortKey === key) {
-              currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
-            } else {
-              currentSortKey = key;
-              currentSortDir = key === "last_event_ts" ? "desc" : "asc";
-            }
-            applyFiltersAndRender();
-          });
-        });
-
-        // Support ?wallet=0x... in URL
+      walletForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const wallet = walletInput.value.trim().toLowerCase();
+        if (!wallet) return;
         const params = new URLSearchParams(window.location.search);
-        const initialWallet = params.get("wallet");
-        if (initialWallet) {
-          walletInput.value = initialWallet;
-          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        params.set("wallet", wallet);
+        const newUrl = window.location.pathname + "?" + params.toString();
+        window.history.replaceState({}, "", newUrl);
+        fetchWallet(wallet);
+      });
+
+      resetFiltersBtn.addEventListener("click", () => {
+        resetFilters();
+      });
+
+      [filterTeam, filterPlayer, filterSeries, filterSet, filterTier, filterPosition, filterLocked].forEach((el) => {
+        el.addEventListener("change", applyFilters);
+      });
+
+      const sortableHeaders = document.querySelectorAll("th.sortable");
+      sortableHeaders.forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-sort-key");
+          if (!key) return;
+          if (currentSort.key === key) {
+            currentSort.dir = currentSort.dir === "asc" ? "desc" : "asc";
+          } else {
+            currentSort.key = key;
+            currentSort.dir = key === "date" ? "desc" : "asc";
+          }
+          renderTable(currentFilteredRows);
+        });
+      });
+
+      // Auto-load if wallet= is in URL
+      (function initFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const w = params.get("wallet");
+        if (w) {
+          walletInput.value = w;
+          fetchWallet(w.toLowerCase());
         }
       })();
     </script>
