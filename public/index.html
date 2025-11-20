@@ -2,17 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>NFL ALL DAY Wallet Viewer</title>
+    <title>Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
         color-scheme: dark;
-        --bg: #05060a;
-        --bg-alt: #0b0d14;
-        --panel: #111522;
-        --panel-alt: #181d2c;
-        --accent: #3b82f6;
-        --accent-soft: rgba(59, 130, 246, 0.14);
+
+        /* Core palette */
+        --primary-purple: #6f42c1;
+        --primary-blue: #007bff;
+        --accent-cyan: #00cccc;
+        --accent-sky: #0dcaf0;
+        --accent-teal: #17a2b8;
+
+        --bg: #050616;
+        --bg-alt: #07091a;
+        --panel: #0b0f25;
+        --panel-alt: #11152f;
+        --accent: var(--primary-purple);
+        --accent-alt: var(--primary-blue);
+        --accent-soft: rgba(111, 66, 193, 0.22);
+
         --text: #e5e7eb;
         --text-muted: #9ca3af;
         --border: #1f2937;
@@ -34,12 +44,12 @@
           BlinkMacSystemFont,
           "Segoe UI",
           sans-serif;
-        background: radial-gradient(circle at top, #020617 0, #020617 30%, #020617 60%, #020617 100%);
+        background: radial-gradient(circle at top, #020617 0, #020617 40%, #020617 100%);
         color: var(--text);
       }
 
       a {
-        color: var(--accent);
+        color: var(--accent-alt);
         text-decoration: none;
       }
 
@@ -53,10 +63,23 @@
         flex-direction: column;
       }
 
+      .page-inner {
+        margin: 0 10%;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      @media (max-width: 900px) {
+        .page-inner {
+          margin: 0 4%;
+        }
+      }
+
       header {
-        padding: 12px 20px;
+        padding: 12px 0;
         border-bottom: 1px solid var(--border);
-        background: linear-gradient(to right, #020617, #020617 40%, #020617 100%);
+        background: linear-gradient(90deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.98));
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -71,24 +94,17 @@
         color: #f9fafb;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
       }
 
-      .logo-pill {
-        width: 26px;
-        height: 26px;
-        border-radius: 999px;
+      .logo-img {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
         border: 2px solid var(--accent);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        color: var(--accent);
-      }
-
-      .header-right {
-        font-size: 12px;
-        color: var(--text-muted);
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.6);
+        object-fit: cover;
+        background: #020617;
       }
 
       main.layout {
@@ -158,7 +174,7 @@
       .filters-reset {
         margin-top: 4px;
         font-size: 11px;
-        color: var(--accent);
+        color: var(--accent-alt);
         cursor: pointer;
         border: none;
         background: transparent;
@@ -167,7 +183,7 @@
       }
 
       section.content {
-        padding: 16px 16px 20px;
+        padding: 16px 0 20px;
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -215,12 +231,13 @@
       }
 
       .btn-primary {
-        background: var(--accent);
+        background: linear-gradient(135deg, var(--primary-purple), var(--primary-blue));
         color: #f9fafb;
+        box-shadow: 0 10px 25px rgba(0, 123, 255, 0.35);
       }
 
       .btn-primary:hover {
-        background: #2563eb;
+        filter: brightness(1.08);
       }
 
       .status-bar {
@@ -240,11 +257,24 @@
       }
 
       .card {
-        background: var(--panel);
+        background: radial-gradient(circle at top left, rgba(111, 66, 193, 0.22), transparent), var(--panel);
         border-radius: 10px;
         padding: 8px 10px;
         border: 1px solid var(--border);
         font-size: 12px;
+      }
+
+      .card:nth-child(2) {
+        background: radial-gradient(circle at top left, rgba(0, 123, 255, 0.22), transparent), var(--panel);
+      }
+      .card:nth-child(3) {
+        background: radial-gradient(circle at top left, rgba(0, 204, 204, 0.22), transparent), var(--panel);
+      }
+      .card:nth-child(4) {
+        background: radial-gradient(circle at top left, rgba(13, 202, 240, 0.22), transparent), var(--panel);
+      }
+      .card:nth-child(5) {
+        background: radial-gradient(circle at top left, rgba(23, 162, 184, 0.22), transparent), var(--panel);
       }
 
       .card-title {
@@ -273,16 +303,81 @@
       .table-container {
         margin-top: 8px;
         border-radius: 12px;
-        overflow: hidden;
+        overflow-x: auto; /* allow horizontal scroll if truly needed */
+        overflow-y: hidden;
         border: 1px solid var(--border);
         background: var(--panel);
       }
 
+      /* fixed layout so widths are respected */
       table {
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
+        table-layout: fixed;
       }
+      
+      /* column widths – keep table fitting within viewport on desktop */
+thead th:nth-child(1),  /* Player */
+tbody td:nth-child(1) {
+  width: 16%;
+}
+
+thead th:nth-child(2),  /* Team */
+tbody td:nth-child(2) {
+  width: 10%;
+}
+
+thead th:nth-child(3),  /* Pos */
+tbody td:nth-child(3) {
+  width: 6%;
+}
+
+thead th:nth-child(4),  /* Tier */
+tbody td:nth-child(4) {
+  width: 7%;
+}
+
+thead th:nth-child(5),  /* Series */
+tbody td:nth-child(5) {
+  width: 10%;
+}
+
+thead th:nth-child(6),  /* Set */
+tbody td:nth-child(6) {
+  width: 14%;
+}
+
+thead th:nth-child(7),  /* Serial */
+tbody td:nth-child(7) {
+  width: 8%;
+}
+
+thead th:nth-child(8),  /* Low Ask */
+tbody td:nth-child(8) {
+  width: 8%;
+}
+
+thead th:nth-child(9),  /* ASP */
+tbody td:nth-child(9) {
+  width: 8%;
+}
+
+thead th:nth-child(10), /* Locked? */
+tbody td:nth-child(10) {
+  width: 7%;
+}
+
+thead th:nth-child(11), /* Last Event */
+tbody td:nth-child(11) {
+  width: 11%;
+}
+
+thead th:nth-child(12), /* Links */
+tbody td:nth-child(12) {
+  width: 10%;
+}
+
 
       thead {
         background: #020617;
@@ -294,6 +389,12 @@
         border-bottom: 1px solid #111827;
         white-space: nowrap;
       }
+      
+      /* allow links column to wrap so it doesn't get clipped */
+.link-cell {
+  white-space: normal;
+}
+
 
       th {
         text-align: left;
@@ -346,24 +447,50 @@
         font-weight: 500;
         align-items: center;
         justify-content: center;
+        border: 1px solid transparent;
       }
 
-      .badge-tier {
-        background: rgba(37, 99, 235, 0.15);
-        color: #bfdbfe;
-        border: 1px solid rgba(37, 99, 235, 0.5);
+      /* Tier badge styles matching NFLAD theme */
+      .badge-tier-common {
+        background: #111827;
+        border-color: #4b5563;
+        color: #e5e7eb;
+      }
+
+      .badge-tier-uncommon {
+        background: #111827;
+        border-color: #6b7280;
+        color: #e5e7eb;
+      }
+
+      .badge-tier-rare {
+        background: rgba(249, 115, 22, 0.15);
+        border-color: #f97316;
+        color: #fed7aa;
+      }
+
+      .badge-tier-legendary {
+        background: radial-gradient(circle at top, #facc15, #a16207);
+        border-color: #facc15;
+        color: #1f2937;
+      }
+
+      .badge-tier-ultimate {
+        background: linear-gradient(90deg, #f97316, #facc15, #22c55e, #0ea5e9, #a855f7);
+        border-color: rgba(248, 250, 252, 0.85);
+        color: #0b1120;
       }
 
       .badge-locked {
         background: var(--locked-soft);
         color: #fed7aa;
-        border: 1px solid rgba(249, 115, 22, 0.7);
+        border-color: rgba(249, 115, 22, 0.7);
       }
 
       .badge-unlocked {
         background: rgba(34, 197, 94, 0.12);
         color: #bbf7d0;
-        border: 1px solid rgba(34, 197, 94, 0.7);
+        border-color: rgba(34, 197, 94, 0.7);
       }
 
       .num {
@@ -384,130 +511,131 @@
   </head>
   <body>
     <div class="app">
-      <header>
-        <div class="logo">
-          <span class="logo-pill">AD</span>
-          ALL DAY Wallet Viewer
-        </div>
-        <div class="header-right">Neon-backed • Snowflake ETL • Dapper names</div>
-      </header>
-
-      <main class="layout">
-        <aside class="sidebar">
-          <div>
-            <h2>Filters</h2>
-            <div class="filter-group">
-              <label for="filterTeam">Team</label>
-              <select id="filterTeam">
-                <option value="">All teams</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterPlayer">Player</label>
-              <select id="filterPlayer">
-                <option value="">All players</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterSeries">Series</label>
-              <select id="filterSeries">
-                <option value="">All series</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterSet">Set</label>
-              <select id="filterSet">
-                <option value="">All sets</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterTier">Tier</label>
-              <select id="filterTier">
-                <option value="">All tiers</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterPosition">Position</label>
-              <select id="filterPosition">
-                <option value="">All positions</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label for="filterLocked">Locked status</label>
-              <select id="filterLocked">
-                <option value="">Locked + Unlocked</option>
-                <option value="locked">Locked only</option>
-                <option value="unlocked">Unlocked only</option>
-              </select>
-            </div>
-            <button type="button" class="filters-reset" id="resetFilters">Reset filters</button>
+      <div class="page-inner">
+        <header>
+          <div class="logo">
+            <img src="/img/chunky-cat.png" alt="Chunky cat logo" class="logo-img" />
+            <span>Chunky's NFLAD Viewer</span>
           </div>
-        </aside>
+        </header>
 
-        <section class="content">
-          <form id="walletForm">
-            <div class="wallet-form-row">
-              <input
-                id="walletInput"
-                class="wallet-input"
-                type="text"
-                placeholder="Paste Dapper wallet address (0x...)"
-                autocomplete="off" />
-              <button class="btn btn-primary" type="submit">Load wallet</button>
+        <main class="layout">
+          <aside class="sidebar">
+            <div>
+              <h2>Filters</h2>
+              <div class="filter-group">
+                <label for="filterTeam">Team</label>
+                <select id="filterTeam">
+                  <option value="">All teams</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterPlayer">Player</label>
+                <select id="filterPlayer">
+                  <option value="">All players</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterSeries">Series</label>
+                <select id="filterSeries">
+                  <option value="">All series</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterSet">Set</label>
+                <select id="filterSet">
+                  <option value="">All sets</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterTier">Tier</label>
+                <select id="filterTier">
+                  <option value="">All tiers</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterPosition">Position</label>
+                <select id="filterPosition">
+                  <option value="">All positions</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterLocked">Locked status</label>
+                <select id="filterLocked">
+                  <option value="">Locked + Unlocked</option>
+                  <option value="locked">Locked only</option>
+                  <option value="unlocked">Unlocked only</option>
+                </select>
+              </div>
+              <button type="button" class="filters-reset" id="resetFilters">Reset filters</button>
             </div>
-          </form>
+          </aside>
 
-          <div id="status" class="status-bar"></div>
-          <div id="walletHeader" class="wallet-header"></div>
+          <section class="content">
+            <form id="walletForm">
+              <div class="wallet-form-row">
+                <input
+                  id="walletInput"
+                  class="wallet-input"
+                  type="text"
+                  placeholder="Paste Dapper wallet address (0x...)"
+                  autocomplete="off" />
+                <button class="btn btn-primary" type="submit">Load wallet</button>
+              </div>
+            </form>
 
-          <div class="card-row" id="summaryRow" style="display: none">
-            <div class="card">
-              <div class="card-title">Total Moments</div>
-              <div class="card-value" id="summaryTotal">0</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Unlocked</div>
-              <div class="card-value" id="summaryUnlocked">0</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Locked</div>
-              <div class="card-value" id="summaryLocked">0</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Sum Low Ask</div>
-              <div class="card-value" id="summaryLowAsk">$0.00</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Sum ASP (90d)</div>
-              <div class="card-value" id="summaryAsp">$0.00</div>
-            </div>
-          </div>
+            <div id="status" class="status-bar"></div>
+            <div id="walletHeader" class="wallet-header"></div>
 
-          <div class="table-container" id="tableContainer" style="display: none">
-            <table>
-              <thead>
-                <tr>
-                  <th class="sortable" data-sort-key="player">Player<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="team">Team<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="position">Pos<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="tier">Tier<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="series">Series<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="set">Set<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="serial">Serial<span class="sort-indicator"></span></th>
-                  <th class="sortable num" data-sort-key="lowAsk">Low Ask<span class="sort-indicator"></span></th>
-                  <th class="sortable num" data-sort-key="asp">ASP 90d<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="locked">Locked?<span class="sort-indicator"></span></th>
-                  <th class="sortable" data-sort-key="date">Last Event<span class="sort-indicator"></span></th>
-                  <th>Links</th>
-                </tr>
-              </thead>
-              <tbody id="resultsBody"></tbody>
-            </table>
-          </div>
+            <div class="card-row" id="summaryRow" style="display: none">
+              <div class="card">
+                <div class="card-title">Total Moments</div>
+                <div class="card-value" id="summaryTotal">0</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Unlocked</div>
+                <div class="card-value" id="summaryUnlocked">0</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Locked</div>
+                <div class="card-value" id="summaryLocked">0</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Sum Low Ask</div>
+                <div class="card-value" id="summaryLowAsk">$0.00</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Sum ASP (90d)</div>
+                <div class="card-value" id="summaryAsp">$0.00</div>
+              </div>
+            </div>
 
-          <div id="emptyState" class="empty-state" style="display: none">No moments found for this wallet.</div>
-        </section>
-      </main>
+            <div class="table-container" id="tableContainer" style="display: none">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort-key="player">Player<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="team">Team<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="position">Pos<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="tier">Tier<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="series">Series<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="set">Set<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="serial">Serial<span class="sort-indicator"></span></th>
+                    <th class="sortable num" data-sort-key="lowAsk">Low Ask<span class="sort-indicator"></span></th>
+                    <th class="sortable num" data-sort-key="asp">ASP 90d<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="locked">Locked?<span class="sort-indicator"></span></th>
+                    <th class="sortable" data-sort-key="date">Last Event<span class="sort-indicator"></span></th>
+                    <th>Links</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+              </table>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none">No moments found for this wallet.</div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <script>
@@ -796,6 +924,22 @@
             const listingUrl =
               r.listing_url || (r.edition_id ? `https://nflallday.com/listing/moment/${r.edition_id}` : "");
 
+            const tierNorm = (tier || "").toLowerCase();
+            let tierClass = "badge";
+            if (tierNorm === "common") {
+              tierClass += " badge-tier-common";
+            } else if (tierNorm === "uncommon") {
+              tierClass += " badge-tier-uncommon";
+            } else if (tierNorm === "rare") {
+              tierClass += " badge-tier-rare";
+            } else if (tierNorm === "legendary") {
+              tierClass += " badge-tier-legendary";
+            } else if (tierNorm === "ultimate") {
+              tierClass += " badge-tier-ultimate";
+            } else {
+              tierClass += " badge-tier-common";
+            }
+
             return `
             <tr>
               <td>
@@ -806,7 +950,7 @@
               </td>
               <td>${team || "-"}</td>
               <td>${pos || "-"}</td>
-              <td><span class="badge badge-tier">${tier || "-"}</span></td>
+              <td><span class="${tierClass}">${tier || "-"}</span></td>
               <td>${series || "-"}</td>
               <td>${setName || "-"}</td>
               <td class="num">${serialStr}${maxStr}</td>
@@ -863,7 +1007,6 @@
             return;
           }
 
-          // prices
           const editionIds = rows.map((r) => r.edition_id).filter((x) => x != null);
           const priceData = await fetchPrices(editionIds);
 
@@ -919,7 +1062,6 @@
         });
       });
 
-      // Auto-load if wallet= is in URL
       (function initFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const w = params.get("wallet");
