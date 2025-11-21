@@ -111,41 +111,6 @@ app.get("/api/collection", async (req, res) => {
     });
   }
 });
-app.get("/api/top-wallets", async (req, res) => {
-  try {
-    const rawLimit = parseInt(req.query.limit, 10);
-    const limit = Number.isNaN(rawLimit) ? 50 : rawLimit;
-    const safeLimit = Math.min(Math.max(limit, 1), 200); // 1–200
-
-    const result = await pgQuery(
-      `
-      SELECT
-        h.wallet_address,
-        COALESCE(p.display_name, NULL) AS display_name,
-        COUNT(*)::int AS moments
-      FROM wallet_holdings h
-      LEFT JOIN wallet_profiles p
-        ON p.wallet_address = h.wallet_address
-      GROUP BY h.wallet_address, p.display_name
-      ORDER BY moments DESC
-      LIMIT $1;
-      `,
-      [safeLimit]
-    );
-
-    return res.json({
-      ok: true,
-      limit: safeLimit,
-      rows: result.rows
-    });
-  } catch (err) {
-    console.error("Error in /api/top-wallets:", err);
-    return res.status(500).json({
-      ok: false,
-      error: err.message || String(err)
-    });
-  }
-});
 app.get("/api/wallet-profile", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -639,8 +604,8 @@ app.get("/api/test-neon", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
-app.get('/api/profiles', async (req, res) => {
-  const query = (req.query.query || '').trim();
+app.get("/api/profiles", async (req, res) => {
+  const query = (req.query.query || "").trim();
 
   if (!query) {
     return res.json({ ok: true, profiles: [] });
@@ -665,14 +630,12 @@ app.get('/api/profiles', async (req, res) => {
           wp.wallet_address,
           wh.nft_id,
           wh.is_locked,
-          LOWER(COALESCE(ncm.tier, e.tier)) AS tier_norm
+          LOWER(ncm.tier) AS tier_norm
         FROM public.wallet_profiles AS wp
         LEFT JOIN public.wallet_holdings AS wh
           ON wh.wallet_address = wp.wallet_address
         LEFT JOIN public.nft_core_metadata AS ncm
           ON ncm.nft_id = wh.nft_id
-        LEFT JOIN public.editions AS e
-          ON e.edition_id = ncm.edition_id
         WHERE LOWER(wp.display_name) LIKE LOWER($1 || '%')
       ) AS s
       GROUP BY
@@ -684,23 +647,70 @@ app.get('/api/profiles', async (req, res) => {
       LIMIT 50;
     `;
 
-    const values = [query];
-
-    const { rows } = await pool.query(sql, values);
+    const { rows } = await pool.query(sql, [query]);
 
     return res.json({
       ok: true,
-      profiles: rows,
+      profiles: rows
     });
   } catch (err) {
-    console.error('GET /api/profiles error:', err);
+    console.error("GET /api/profiles error:", err);
     return res.status(500).json({
       ok: false,
-      error: 'Failed to load profiles',
+      error: "Failed to load profiles"
     });
   }
 });
+app.get("/api/top-wallets", async (req, res) => {
+  let limit = parseInt(req.query.limit, 10);
+  if (Number.isNaN(limit) || limit <= 0) limit = 50;
+  if (limit > 500) limit = 500;
 
+  try {
+    const sql = `
+      SELECT
+        COALESCE(wp.display_name, w.username, wh.wallet_address) AS display_name,
+        wh.wallet_address,
+        COUNT(*) AS total_moments,
+        COUNT(*) FILTER (WHERE wh.is_locked = FALSE) AS unlocked_moments,
+        COUNT(*) FILTER (WHERE wh.is_locked = TRUE) AS locked_moments,
+        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'common')    AS tier_common,
+        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'uncommon')  AS tier_uncommon,
+        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'rare')      AS tier_rare,
+        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'legendary') AS tier_legendary,
+        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'ultimate')  AS tier_ultimate
+      FROM public.wallet_holdings AS wh
+      LEFT JOIN public.wallet_profiles AS wp
+        ON wp.wallet_address = wh.wallet_address
+      LEFT JOIN public.wallets AS w
+        ON w.wallet_address = wh.wallet_address
+      LEFT JOIN public.nft_core_metadata AS ncm
+        ON ncm.nft_id = wh.nft_id
+      GROUP BY
+        COALESCE(wp.display_name, w.username, wh.wallet_address),
+        wh.wallet_address
+      HAVING COUNT(*) > 0
+      ORDER BY total_moments DESC, display_name ASC
+      LIMIT $1;
+    `;
+
+    const { rows } = await pool.query(sql, [limit]);
+
+    return res.json({
+      ok: true,
+      limit,
+      count: rows.length,
+      wallets: rows,
+      schemaVersion: 2 // debug flag so you can see you’re on the new route
+    });
+  } catch (err) {
+    console.error("GET /api/top-wallets error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load top wallets"
+    });
+  }
+});
 
 async function getASP(editionIds) {
   if (!editionIds.length) return {};
