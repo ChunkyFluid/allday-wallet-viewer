@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Chunky's NFLAD Viewer</title>
+    <title>Profiles – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       :root {
@@ -460,101 +460,122 @@
     </style>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-logo">🐱</div>
-          <div>
-            <div class="brand-title">Chunky's NFLAD Viewer</div>
-          </div>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">🐱</div>
+        <div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
         </div>
-        <nav class="main-nav">
-          <a href="/">Wallet</a>
+      </div>
+      <nav class="main-nav">
+        <a href="/">Wallet</a>
 <a href="/profiles.html">Profiles</a>
 <a href="/top-holders.html">Top holders</a>
 <a href="/explorer.html">Browse</a>
 <a href="/faq.html">FAQ</a>
 <a href="/contact.html">Contact</a>
-        </nav>
-        <form id="wallet-form" class="wallet-form">
-          <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
-          <button type="submit" class="btn-primary">View Wallet</button>
-        </form>
-      </header>
-      <section id="wallet-summary-card" class="wallet-summary-card"></section>
+      </nav>
+      <form id="wallet-form" class="wallet-form">
+        <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
+        <button type="submit" class="btn-primary">View Wallet</button>
+      </form>
+    </header>
 
-      <main class="content">
-        <aside class="filters-panel">
-          <h3>Filters</h3>
-
-          <div class="filter-group">
-            <label for="filter-team">Team</label>
-            <select id="filter-team" class="filter-select"></select>
+    <main class="app-main">
+      <section class="wallet-summary-card">
+        <div class="wallet-summary-header">
+          <div>
+            <div class="wallet-summary-title">Profile search</div>
+            <div class="wallet-summary-subtitle">Look up Dapper display names and jump straight to their wallet.</div>
           </div>
+        </div>
+        <div class="wallet-stats-row" style="margin-top: 1.25rem">
+          <form id="profile-search-form" class="wallet-form" style="width: 100%; max-width: 420px">
+            <input
+              id="profile-search-input"
+              type="text"
+              placeholder="Dapper name (e.g. ChunkyFluid)"
+              autocomplete="off" />
+            <button type="submit" class="btn-primary">Search</button>
+          </form>
+        </div>
+      </section>
 
-          <div class="filter-group">
-            <label for="filter-player">Player</label>
-            <select id="filter-player" class="filter-select"></select>
+      <section class="content-row" style="margin-top: 2rem">
+        <div class="card" style="flex: 1">
+          <div class="card-header">
+            <div class="card-title">Matching profiles</div>
           </div>
-
-          <div class="filter-group">
-            <label for="filter-series">Series</label>
-            <select id="filter-series" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-set">Set</label>
-            <select id="filter-set" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-tier">Tier</label>
-            <select id="filter-tier" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-position">Position</label>
-            <select id="filter-position" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-locked">Locked status</label>
-            <select id="filter-locked" class="filter-select"></select>
-          </div>
-
-          <button id="reset-filters" class="reset-filters">Reset filters</button>
-        </aside>
-
-        <section class="table-panel">
-          <div class="table-header">
-            <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn">Export CSV</button>
-          </div>
-
-          <div class="table-wrapper">
-            <table id="wallet-table">
+          <div class="card-body">
+            <div id="profiles-empty" class="empty-state">Enter a Dapper display name to see matching wallets.</div>
+            <table class="table" id="profiles-table" style="display: none">
               <thead>
                 <tr>
-                  <th class="sortable" data-sort-key="playerName">Player</th>
-                  <th class="sortable" data-sort-key="team_name">Team</th>
-                  <th class="sortable" data-sort-key="position">Pos</th>
-                  <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">Serial</th>
-                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
-                  <th class="sortable" data-sort-key="series_name">Series</th>
-                  <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="is_locked">Locked</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
-                  <th>Links</th>
+                  <th>Display name</th>
+                  <th>Wallet</th>
+                  <th>Open</th>
                 </tr>
               </thead>
-              <tbody id="wallet-tbody"></tbody>
+              <tbody id="profiles-tbody"></tbody>
             </table>
           </div>
-        </section>
-      </main>
-    </div>
+        </div>
+        <div class="card" style="flex: 1">
+          <div class="card-header">
+            <div class="card-title">Wallet snapshot</div>
+          </div>
+          <div class="card-body">
+            <div id="profile-summary-empty" class="empty-state">
+              Select a wallet to see total moments, locked vs unlocked, and tier breakdown.
+            </div>
+            <div id="profile-summary" style="display: none">
+              <div class="wallet-stats-row">
+                <div class="stat-pill">
+                  <span class="stat-label">Total</span>
+                  <span class="stat-value" id="ps-total">0</span>
+                </div>
+                <div class="stat-pill">
+                  <span class="stat-label">Locked</span>
+                  <span class="stat-value" id="ps-locked">0</span>
+                </div>
+                <div class="stat-pill">
+                  <span class="stat-label">Unlocked</span>
+                  <span class="stat-value" id="ps-unlocked">0</span>
+                </div>
+              </div>
+              <div class="wallet-stats-row" style="margin-top: 0.75rem">
+                <div class="stat-pill stat-pill-tier common">
+                  <span class="stat-label">Common</span>
+                  <span class="stat-value" id="ps-common">0</span>
+                </div>
+                <div class="stat-pill stat-pill-tier uncommon">
+                  <span class="stat-label">Uncommon</span>
+                  <span class="stat-value" id="ps-uncommon">0</span>
+                </div>
+                <div class="stat-pill stat-pill-tier rare">
+                  <span class="stat-label">Rare</span>
+                  <span class="stat-value" id="ps-rare">0</span>
+                </div>
+                <div class="stat-pill stat-pill-tier legendary">
+                  <span class="stat-label">Legendary</span>
+                  <span class="stat-value" id="ps-legendary">0</span>
+                </div>
+                <div class="stat-pill stat-pill-tier ultimate">
+                  <span class="stat-label">Ultimate</span>
+                  <span class="stat-value" id="ps-ultimate">0</span>
+                </div>
+              </div>
+              <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted)">
+                <span id="ps-display-name" style="font-weight: 600"></span>
+                <span id="ps-wallet" style="margin-left: 0.5rem; opacity: 0.8"></span>
+                <a id="ps-open-main" href="#" style="margin-left: 0.75rem">Open in wallet viewer →</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
 
-    <script src="app.js"></script>
+    <script src="/profiles.js"></script>
   </body>
 </html>

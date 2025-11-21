@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Chunky's NFLAD Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Explorer – Chunky's NFLAD Viewer</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <!-- COPY YOUR EXISTING <style> FROM index.html AND PASTE IT HERE INSTEAD OF THIS COMMENT -->
+        <style>
       :root {
         --bg-main: #050816;
         --bg-card: #101322;
@@ -458,103 +460,114 @@
         }
       }
     </style>
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-logo">🐱</div>
-          <div>
-            <div class="brand-title">Chunky's NFLAD Viewer</div>
-          </div>
-        </div>
-        <nav class="main-nav">
-          <a href="/">Wallet</a>
-<a href="/profiles.html">Profiles</a>
-<a href="/top-holders.html">Top holders</a>
-<a href="/explorer.html">Browse</a>
-<a href="/faq.html">FAQ</a>
-<a href="/contact.html">Contact</a>
-        </nav>
-        <form id="wallet-form" class="wallet-form">
-          <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
-          <button type="submit" class="btn-primary">View Wallet</button>
-        </form>
-      </header>
-      <section id="wallet-summary-card" class="wallet-summary-card"></section>
+    </head>
+    <body>
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo">🐱</div>
+                <div>
+                    <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
+                </div>
+            </div>
+            <nav class="main-nav">
+                <a href="/">Wallet</a>
+                <a href="/profiles.html">Profiles</a>
+                <a href="/top-holders.html">Top holders</a>
+                <a href="/explorer.html" class="active">Browse</a>
+                <a href="/faq.html">FAQ</a>
+                <a href="/contact.html">Contact</a>
+            </nav>
+            <form id="wallet-form" class="wallet-form" action="/" method="GET">
+                <input
+                    id="wallet-input"
+                    name="wallet"
+                    type="text"
+                    class="wallet-input"
+                    placeholder="0x… wallet address"
+                    autocomplete="off" />
+                <button type="submit" class="btn-primary">View Wallet</button>
+            </form>
+        </header>
 
-      <main class="content">
-        <aside class="filters-panel">
-          <h3>Filters</h3>
+        <main class="app-main">
+            <!-- FILTER CARD -->
+            <section class="wallet-summary-card">
+                <div class="wallet-summary-header">
+                    <div>
+                        <div class="wallet-summary-title">Moment explorer</div>
+                        <div class="wallet-summary-subtitle">
+                            Search NFL ALL DAY moments by player, team, tier, series and set.
+                        </div>
+                    </div>
+                </div>
 
-          <div class="filter-group">
-            <label for="filter-team">Team</label>
-            <select id="filter-team" class="filter-select"></select>
-          </div>
+                <div class="wallet-stats-row" style="margin-top: 1.25rem; gap: 0.75rem; flex-wrap: wrap">
+                    <input
+                        id="ex-player"
+                        type="text"
+                        class="filter-input"
+                        placeholder="Player (e.g. Nick Chubb)"
+                        style="flex: 2; min-width: 180px" />
+                    <input
+                        id="ex-team"
+                        type="text"
+                        class="filter-input"
+                        placeholder="Team (e.g. Browns)"
+                        style="flex: 1; min-width: 140px" />
+                    <select id="ex-tier" class="filter-input" style="flex: 0.8; min-width: 130px">
+                        <option value="">Tier (any)</option>
+                        <option value="Common">Common</option>
+                        <option value="Uncommon">Uncommon</option>
+                        <option value="Rare">Rare</option>
+                        <option value="Legendary">Legendary</option>
+                        <option value="Ultimate">Ultimate</option>
+                    </select>
+                    <input
+                        id="ex-series"
+                        type="text"
+                        class="filter-input"
+                        placeholder="Series (e.g. Series 1)"
+                        style="flex: 1; min-width: 150px" />
+                    <input
+                        id="ex-set"
+                        type="text"
+                        class="filter-input"
+                        placeholder="Set (e.g. Base)"
+                        style="flex: 1; min-width: 150px" />
+                    <button id="ex-search-btn" class="btn-primary" style="flex: 0 0 auto">Search</button>
+                </div>
+            </section>
 
-          <div class="filter-group">
-            <label for="filter-player">Player</label>
-            <select id="filter-player" class="filter-select"></select>
-          </div>
+            <!-- RESULTS TABLE -->
+            <section class="card" style="margin-top: 2rem">
+                <div class="card-header">
+                    <div class="card-title">Results</div>
+                    <div class="card-subtitle" id="ex-results-summary">Enter filters above and press Search.</div>
+                </div>
+                <div class="card-body">
+                    <div id="ex-empty" class="empty-state">No search yet.</div>
+                    <div class="table-container">
+                        <table class="table" id="ex-table" style="display: none">
+                            <thead>
+                                <tr>
+                                    <th>NFT ID</th>
+                                    <th>Player</th>
+                                    <th>Team</th>
+                                    <th>Pos</th>
+                                    <th>Tier</th>
+                                    <th>Serial / Max</th>
+                                    <th>Series</th>
+                                    <th>Set</th>
+                                    <th>Links</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ex-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
 
-          <div class="filter-group">
-            <label for="filter-series">Series</label>
-            <select id="filter-series" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-set">Set</label>
-            <select id="filter-set" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-tier">Tier</label>
-            <select id="filter-tier" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-position">Position</label>
-            <select id="filter-position" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-locked">Locked status</label>
-            <select id="filter-locked" class="filter-select"></select>
-          </div>
-
-          <button id="reset-filters" class="reset-filters">Reset filters</button>
-        </aside>
-
-        <section class="table-panel">
-          <div class="table-header">
-            <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn">Export CSV</button>
-          </div>
-
-          <div class="table-wrapper">
-            <table id="wallet-table">
-              <thead>
-                <tr>
-                  <th class="sortable" data-sort-key="playerName">Player</th>
-                  <th class="sortable" data-sort-key="team_name">Team</th>
-                  <th class="sortable" data-sort-key="position">Pos</th>
-                  <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">Serial</th>
-                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
-                  <th class="sortable" data-sort-key="series_name">Series</th>
-                  <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="is_locked">Locked</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
-                  <th>Links</th>
-                </tr>
-              </thead>
-              <tbody id="wallet-tbody"></tbody>
-            </table>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <script src="app.js"></script>
-  </body>
+        <script src="/explorer.js"></script>
+    </body>
 </html>

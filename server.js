@@ -156,6 +156,303 @@ app.get("/api/top-wallets", async (req, res) => {
   }
 });
 
+// GET /api/wallet-profile?wallet=0x...
+// Returns display_name (if any) from wallet_profiles in Neon
+app.get("/api/wallet-profile", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
+    }
+
+    const result = await pgQuery(
+      `
+      SELECT wallet_address, display_name
+      FROM wallet_profiles
+      WHERE wallet_address = $1
+      `,
+      [wallet]
+    );
+
+    const profile = result.rows[0] || null;
+
+    return res.json({
+      ok: true,
+      wallet,
+      profile
+    });
+  } catch (err) {
+    console.error("Error in /api/wallet-profile:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// GET /api/search-profiles?q=chunk
+// Simple lookup by Dapper display name in wallet_profiles.
+app.get("/api/search-profiles", async (req, res) => {
+  try {
+    const qRaw = (req.query.q || "").toString().trim();
+    if (!qRaw) {
+      return res.status(400).json({ ok: false, error: "Missing ?q= search term" });
+    }
+
+    const pattern = `%${qRaw}%`;
+    const result = await pgQuery(
+      `
+      SELECT wallet_address, display_name
+      FROM wallet_profiles
+      WHERE display_name ILIKE $1
+      ORDER BY display_name ASC, wallet_address ASC
+      LIMIT 50;
+      `,
+      [pattern]
+    );
+
+    return res.json({
+      ok: true,
+      query: qRaw,
+      count: result.rowCount,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/search-profiles:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// GET /api/top-holders?edition=1717
+// Returns wallets that hold a given edition_id, ordered by copies desc.
+app.get("/api/top-holders", async (req, res) => {
+  try {
+    const edition = (req.query.edition || "").toString().trim();
+    if (!edition) {
+      return res.status(400).json({ ok: false, error: "Missing ?edition=" });
+    }
+
+    const result = await pgQuery(
+      `
+      SELECT
+        m.edition_id,
+        h.wallet_address,
+        COALESCE(p.display_name, NULL) AS display_name,
+        COUNT(*)::int AS copies,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      WHERE m.edition_id = $1
+      GROUP BY m.edition_id, h.wallet_address, p.display_name
+      ORDER BY copies DESC, h.wallet_address ASC;
+      `,
+      [edition]
+    );
+
+    return res.json({
+      ok: true,
+      edition,
+      count: result.rowCount,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/top-holders:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// GET /api/search-moments
+// Search moments across nft_core_metadata by player, team, tier, series, set, etc.
+app.get("/api/search-moments", async (req, res) => {
+  try {
+    const playerRaw = (req.query.player || req.query.q || "").toString().trim();
+    const teamRaw   = (req.query.team   || "").toString().trim();
+    const tierRaw   = (req.query.tier   || "").toString().trim();
+    const seriesRaw = (req.query.series || "").toString().trim();
+    const setRaw    = (req.query.set    || "").toString().trim();
+    const limitRaw  = parseInt(req.query.limit, 10);
+
+    const safeLimit = Number.isNaN(limitRaw) ? 200 : Math.min(Math.max(limitRaw, 10), 500);
+
+    const filters = [];
+    const params = [];
+    let idx = 1;
+
+    if (playerRaw) {
+      // Match "first last" or last name alone
+      filters.push(
+        "(LOWER(COALESCE(m.first_name,'') || ' ' || COALESCE(m.last_name,'')) LIKE $" + idx + " OR " +
+        "LOWER(COALESCE(m.last_name,'')) LIKE $" + idx + ")"
+      );
+      params.push(`%${playerRaw.toLowerCase()}%`);
+      idx++;
+    }
+
+    if (teamRaw) {
+      filters.push("LOWER(m.team_name) LIKE $" + idx);
+      params.push(`%${teamRaw.toLowerCase()}%`);
+      idx++;
+    }
+
+    if (tierRaw) {
+      filters.push("UPPER(m.tier) = $" + idx);
+      params.push(tierRaw.toUpperCase());
+      idx++;
+    }
+
+    if (seriesRaw) {
+      filters.push("LOWER(m.series_name) LIKE $" + idx);
+      params.push(`%${seriesRaw.toLowerCase()}%`);
+      idx++;
+    }
+
+    if (setRaw) {
+      filters.push("LOWER(m.set_name) LIKE $" + idx);
+      params.push(`%${setRaw.toLowerCase()}%`);
+      idx++;
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    const sql = `
+      SELECT
+        m.nft_id,
+        m.edition_id,
+        m.play_id,
+        m.series_id,
+        m.set_id,
+        m.tier,
+        m.serial_number,
+        m.max_mint_size,
+        m.first_name,
+        m.last_name,
+        m.team_name,
+        m.position,
+        m.jersey_number,
+        m.series_name,
+        m.set_name
+      FROM nft_core_metadata m
+      ${whereClause}
+      ORDER BY m.nft_id::bigint
+      LIMIT $${idx};
+    `;
+
+    params.push(safeLimit);
+
+    const result = await pgQuery(sql, params);
+
+    return res.json({
+      ok: true,
+      count: result.rowCount,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/search-moments:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+
+// ---- Wallet summary: stats + Dapper display name ----
+app.get("/api/wallet-summary", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
+    }
+
+    // Basic format check (same as /api/query)
+    if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+    }
+
+    // 1) Get profile (Dapper display name) if we have it
+    const profileResult = await pgQuery(
+      `
+      SELECT wallet_address, display_name
+      FROM wallet_profiles
+      WHERE wallet_address = $1
+      LIMIT 1;
+      `,
+      [wallet]
+    );
+
+    const profileRow = profileResult.rows[0] || null;
+
+    // 2) Get counts and tier breakdown from Neon
+    //    IMPORTANT: use nft_core_metadata for tier (same as /api/query)
+    const statsResult = await pgQuery(
+      `
+      SELECT
+        h.wallet_address,
+        COUNT(*)::int AS moments_total,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1
+      GROUP BY h.wallet_address;
+      `,
+      [wallet]
+    );
+
+    const statsRow = statsResult.rows[0] || null;
+
+    const stats = statsRow
+      ? {
+          momentsTotal: statsRow.moments_total,
+          lockedCount: statsRow.locked_count,
+          unlockedCount: statsRow.unlocked_count,
+          byTier: {
+            Common: statsRow.common_count,
+            Uncommon: statsRow.uncommon_count,
+            Rare: statsRow.rare_count,
+            Legendary: statsRow.legendary_count,
+            Ultimate: statsRow.ultimate_count
+          }
+        }
+      : {
+          momentsTotal: 0,
+          lockedCount: 0,
+          unlockedCount: 0,
+          byTier: {
+            Common: 0,
+            Uncommon: 0,
+            Rare: 0,
+            Legendary: 0,
+            Ultimate: 0
+          }
+        };
+
+    return res.json({
+      ok: true,
+      wallet,
+      displayName: profileRow ? profileRow.display_name : null,
+      stats
+    });
+  } catch (err) {
+    console.error("Error in /api/wallet-summary:", err);
+    return res.status(500).json({ ok: false, error: err.message || String(err) });
+  }
+});
+
 // ---- ASP / low-ask helpers (still using Postgres + scrape) ----
 async function getASP(editionIds) {
   if (!editionIds.length) return {};
@@ -252,6 +549,7 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
+// ---- MAIN WALLET QUERY: rows for the table ----
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -264,7 +562,6 @@ app.get("/api/query", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // Pull from Neon: wallet_holdings + nft_core_metadata
     const result = await pgQuery(
       `
       SELECT
@@ -281,23 +578,15 @@ app.get("/api/query", async (req, res) => {
         m.max_mint_size,
         m.first_name,
         m.last_name,
-        m.first_name || ' ' || m.last_name AS player_name,
         m.team_name,
         m.position,
         m.jersey_number,
         m.series_name,
-        m.set_name,
-        'https://nflallday.com/moments/'  || m.nft_id     AS nfl_allday_url,
-        'https://nflallday.com/listing/moment/' || m.edition_id AS listing_url,
-        CASE WHEN h.is_locked THEN 'NFTLocked' ELSE 'Deposit' END AS event_type,
-        COUNT(*) OVER (
-          PARTITION BY m.edition_id, m.set_id, m.series_id, h.wallet_address
-        ) > 1 AS is_duplicate
+        m.set_name
       FROM wallet_holdings h
-      JOIN nft_core_metadata m
-        ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1
-      ORDER BY h.last_event_ts;
+      ORDER BY h.last_event_ts DESC;
       `,
       [wallet]
     );
@@ -306,17 +595,16 @@ app.get("/api/query", async (req, res) => {
       ok: true,
       wallet,
       count: result.rowCount,
-      rows: result.rows,
+      rows: result.rows
     });
   } catch (err) {
     console.error("Error in /api/query (Neon):", err);
     return res.status(500).json({
       ok: false,
-      error: err.message || String(err),
+      error: err.message || String(err)
     });
   }
 });
-
 
 // ---- Neon test route ----
 app.get("/api/test-neon", async (req, res) => {

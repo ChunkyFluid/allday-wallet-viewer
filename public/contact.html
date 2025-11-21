@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Chunky's NFLAD Viewer</title>
+    <title>Contact – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       :root {
@@ -460,101 +460,64 @@
     </style>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-logo">🐱</div>
-          <div>
-            <div class="brand-title">Chunky's NFLAD Viewer</div>
-          </div>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">🐱</div>
+        <div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
         </div>
-        <nav class="main-nav">
-          <a href="/">Wallet</a>
+      </div>
+      <nav class="main-nav">
+        <a href="/">Wallet</a>
 <a href="/profiles.html">Profiles</a>
 <a href="/top-holders.html">Top holders</a>
 <a href="/explorer.html">Browse</a>
 <a href="/faq.html">FAQ</a>
 <a href="/contact.html">Contact</a>
-        </nav>
-        <form id="wallet-form" class="wallet-form">
-          <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
-          <button type="submit" class="btn-primary">View Wallet</button>
-        </form>
-      </header>
-      <section id="wallet-summary-card" class="wallet-summary-card"></section>
+      </nav>
+      <form id="wallet-form" class="wallet-form">
+        <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
+        <button type="submit" class="btn-primary">View Wallet</button>
+      </form>
+    </header>
 
-      <main class="content">
-        <aside class="filters-panel">
-          <h3>Filters</h3>
-
-          <div class="filter-group">
-            <label for="filter-team">Team</label>
-            <select id="filter-team" class="filter-select"></select>
+    <main class="app-main">
+      <section class="wallet-summary-card">
+        <div class="wallet-summary-header">
+          <div>
+            <div class="wallet-summary-title">Contact</div>
+            <div class="wallet-summary-subtitle">Got feedback or feature ideas? Reach out.</div>
           </div>
-
-          <div class="filter-group">
-            <label for="filter-player">Player</label>
-            <select id="filter-player" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-series">Series</label>
-            <select id="filter-series" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-set">Set</label>
-            <select id="filter-set" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-tier">Tier</label>
-            <select id="filter-tier" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-position">Position</label>
-            <select id="filter-position" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-locked">Locked status</label>
-            <select id="filter-locked" class="filter-select"></select>
-          </div>
-
-          <button id="reset-filters" class="reset-filters">Reset filters</button>
-        </aside>
-
-        <section class="table-panel">
-          <div class="table-header">
-            <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn">Export CSV</button>
-          </div>
-
-          <div class="table-wrapper">
-            <table id="wallet-table">
-              <thead>
-                <tr>
-                  <th class="sortable" data-sort-key="playerName">Player</th>
-                  <th class="sortable" data-sort-key="team_name">Team</th>
-                  <th class="sortable" data-sort-key="position">Pos</th>
-                  <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">Serial</th>
-                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
-                  <th class="sortable" data-sort-key="series_name">Series</th>
-                  <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="is_locked">Locked</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
-                  <th>Links</th>
-                </tr>
-              </thead>
-              <tbody id="wallet-tbody"></tbody>
-            </table>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <script src="app.js"></script>
+        </div>
+      </section>
+      <section class="card" style="margin-top: 2rem">
+        <div class="card-body">
+          <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem">
+            This project is a work in progress. If you have suggestions, bug reports, or want to collaborate, drop a
+            note below or reach out on your preferred channel.
+          </p>
+          <form
+            class="wallet-form"
+            style="flex-direction: column; align-items: flex-start; gap: 0.75rem; width: 100%; max-width: 480px">
+            <input type="email" placeholder="you@example.com (not wired up yet)" />
+            <textarea
+              rows="4"
+              placeholder="Your message (not wired up yet)"
+              style="
+                width: 100%;
+                padding: 0.75rem;
+                border-radius: 0.75rem;
+                border: 1px solid var(--border-subtle);
+                background: #020617;
+                color: var(--text-main);
+                font-size: 0.9rem;
+              "></textarea>
+            <button type="button" class="btn-primary" style="opacity: 0.7; cursor: not-allowed">
+              Send (coming soon)
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
   </body>
 </html>
