@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Login – Chunky's NFLAD Viewer</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <style>
+            :root {
+                --bg: #050815;
+                --bg-elevated: #0b1020;
+                --bg-elevated-soft: #101526;
+                --border-soft: #1b2236;
+                --text: #f8f9ff;
+                --text-muted: #8c95b8;
+                --accent: #6f42c1;
+                --accent2: #007bff;
+                --accent-soft: rgba(111, 66, 193, 0.18);
+                --radius-lg: 16px;
+                --radius-md: 12px;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+                background: radial-gradient(circle at top, #101526 0, #050815 55%);
+                color: var(--text);
+            }
+
+            a {
+                color: var(--accent2);
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+
+            /* Header / nav */
+
+            header.app-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.75rem 2rem;
+                border-bottom: 1px solid var(--border-soft);
+                background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .brand-logo {
+                width: 32px;
+                height: 32px;
+                border-radius: 999px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #ffb64d, #ff5b81);
+                font-size: 20px;
+            }
+
+            .brand-title {
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                font-size: 0.9rem;
+            }
+
+            nav.main-nav {
+                display: flex;
+                gap: 1.25rem;
+                font-size: 0.9rem;
+            }
+
+            nav.main-nav a {
+                color: var(--text-muted);
+            }
+
+            nav.main-nav a.active {
+                color: var(--text);
+                font-weight: 600;
+            }
+
+            .wallet-form {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+            }
+
+            .wallet-input {
+                min-width: 260px;
+                background: rgba(12, 17, 32, 0.9);
+                border-radius: 999px;
+                border: 1px solid var(--border-soft);
+                padding: 0.45rem 0.9rem;
+                color: var(--text);
+                font-size: 0.85rem;
+                outline: none;
+            }
+
+            .wallet-input::placeholder {
+                color: #616887;
+            }
+
+            .btn-primary {
+                border-radius: 999px;
+                border: none;
+                padding: 0.45rem 1.1rem;
+                background: linear-gradient(135deg, var(--accent), var(--accent2));
+                color: #fff;
+                font-size: 0.85rem;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+
+            .btn-primary:hover {
+                filter: brightness(1.05);
+            }
+
+            .btn-secondary {
+                border-radius: 999px;
+                border: 1px solid var(--border-soft);
+                padding: 0.4rem 0.9rem;
+                background: transparent;
+                color: var(--text-muted);
+                font-size: 0.8rem;
+                cursor: pointer;
+            }
+
+            .btn-secondary:hover {
+                border-color: var(--accent);
+                color: var(--accent2);
+            }
+
+            /* Layout */
+
+            main.app-main {
+                max-width: 960px;
+                margin: 1.5rem auto 2.5rem;
+                padding: 0 1.5rem;
+            }
+
+            .page-title {
+                font-size: 1.15rem;
+                font-weight: 600;
+                margin-bottom: 0.25rem;
+            }
+
+            .page-subtitle {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                margin-bottom: 1.25rem;
+            }
+
+            .auth-card {
+                background: #050915;
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-soft);
+                padding: 1.4rem 1.6rem 1.6rem;
+                max-width: 520px;
+                margin: 0 auto;
+            }
+
+            .auth-tabs {
+                display: flex;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .auth-tab {
+                flex: 1 1 0;
+                text-align: center;
+                font-size: 0.82rem;
+                padding: 0.45rem 0.5rem;
+                border-radius: 999px;
+                border: 1px solid transparent;
+                cursor: pointer;
+                background: transparent;
+                color: var(--text-muted);
+            }
+
+            .auth-tab.active {
+                border-color: var(--accent2);
+                background: rgba(0, 123, 255, 0.18);
+                color: var(--text);
+                font-weight: 500;
+            }
+
+            .auth-form {
+                display: none;
+            }
+
+            .auth-form.active {
+                display: block;
+            }
+
+            .field-group {
+                margin-bottom: 0.9rem;
+            }
+
+            .field-label {
+                font-size: 0.78rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-muted);
+                margin-bottom: 0.28rem;
+            }
+
+            .field-input {
+                width: 100%;
+                background: #050a18;
+                border-radius: 999px;
+                border: 1px solid var(--border-soft);
+                padding: 0.42rem 0.75rem;
+                color: var(--text);
+                font-size: 0.85rem;
+                outline: none;
+            }
+
+            .field-input::placeholder {
+                color: #616887;
+            }
+
+            .auth-actions {
+                margin-top: 0.6rem;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
+
+            .auth-status {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                min-height: 1.2rem;
+            }
+
+            .auth-status.error {
+                color: #fecaca;
+            }
+
+            .auth-status.success {
+                color: #bbf7d0;
+            }
+
+            .auth-footer {
+                margin-top: 1.25rem;
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                text-align: center;
+            }
+
+            .auth-footer span.user-email {
+                color: var(--text);
+                font-weight: 500;
+            }
+
+            @media (max-width: 960px) {
+                header.app-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 0.75rem;
+                }
+
+                .wallet-form {
+                    width: 100%;
+                    justify-content: flex-start;
+                }
+
+                main.app-main {
+                    padding: 0 1rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo">🐱</div>
+                <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
+            </div>
+
+            <nav class="main-nav">
+                <a href="/">Wallet</a>
+                <a href="/profiles.html">Profiles</a>
+                <a href="/top-holders.html">Top holders</a>
+                <a href="/explorer.html">Browse</a>
+                <a href="/faq.html">FAQ</a>
+                <a href="/contact.html">Contact</a>
+                <a href="/login.html" id="nav-account-link">Login</a>
+            </nav>
+
+            <form id="wallet-form" class="wallet-form" action="/" method="GET">
+                <input
+                    id="wallet-input"
+                    name="wallet"
+                    type="text"
+                    class="wallet-input"
+                    placeholder="0x… wallet address"
+                    autocomplete="off" />
+                <button type="submit" class="btn-primary">View Wallet</button>
+            </form>
+        </header>
+
+        <main class="app-main">
+            <div class="page-title">Account</div>
+            <div class="page-subtitle">
+                Log in to save settings and, later, link your Dapper wallet for a personalized experience.
+            </div>
+
+            <section class="auth-card">
+                <div class="auth-tabs">
+                    <button type="button" class="auth-tab active" data-target="login-form">Log in</button>
+                    <button type="button" class="auth-tab" data-target="signup-form">Create account</button>
+                </div>
+
+                <!-- Login form -->
+                <form id="login-form" class="auth-form active">
+                    <div class="field-group">
+                        <div class="field-label">Email</div>
+                        <input
+                            type="email"
+                            id="login-email"
+                            class="field-input"
+                            placeholder="you@example.com"
+                            autocomplete="email"
+                            required />
+                    </div>
+
+                    <div class="field-group">
+                        <div class="field-label">Password</div>
+                        <input
+                            type="password"
+                            id="login-password"
+                            class="field-input"
+                            placeholder="••••••••"
+                            autocomplete="current-password"
+                            required />
+                    </div>
+
+                    <div class="auth-actions">
+                        <button type="submit" class="btn-primary">Log in</button>
+                        <div id="login-status" class="auth-status"></div>
+                    </div>
+                </form>
+
+                <!-- Signup form -->
+                <form id="signup-form" class="auth-form">
+                    <div class="field-group">
+                        <div class="field-label">Email</div>
+                        <input
+                            type="email"
+                            id="signup-email"
+                            class="field-input"
+                            placeholder="you@example.com"
+                            autocomplete="email"
+                            required />
+                    </div>
+
+                    <div class="field-group">
+                        <div class="field-label">Password</div>
+                        <input
+                            type="password"
+                            id="signup-password"
+                            class="field-input"
+                            placeholder="At least 8 characters"
+                            autocomplete="new-password"
+                            required />
+                    </div>
+
+                    <div class="auth-actions">
+                        <button type="submit" class="btn-primary">Create account</button>
+                        <div id="signup-status" class="auth-status"></div>
+                    </div>
+                </form>
+
+                <div class="auth-footer" id="auth-footer">Not logged in.</div>
+            </section>
+        </main>
+
+        <script>
+            (function () {
+                const tabs = document.querySelectorAll(".auth-tab");
+                const forms = document.querySelectorAll(".auth-form");
+                const loginForm = document.getElementById("login-form");
+                const signupForm = document.getElementById("signup-form");
+                const loginStatus = document.getElementById("login-status");
+                const signupStatus = document.getElementById("signup-status");
+                const authFooter = document.getElementById("auth-footer");
+
+                function setStatus(el, msg, type) {
+                    el.textContent = msg || "";
+                    el.classList.remove("error", "success");
+                    if (type) el.classList.add(type);
+                }
+
+                // Tabs toggle
+                tabs.forEach((tab) => {
+                    tab.addEventListener("click", () => {
+                        const targetId = tab.getAttribute("data-target");
+                        tabs.forEach((t) => t.classList.remove("active"));
+                        tab.classList.add("active");
+
+                        forms.forEach((f) => {
+                            if (f.id === targetId) {
+                                f.classList.add("active");
+                            } else {
+                                f.classList.remove("active");
+                            }
+                        });
+
+                        setStatus(loginStatus, "");
+                        setStatus(signupStatus, "");
+                    });
+                });
+
+                // Fetch /api/me to show current user
+                async function refreshMe() {
+                    try {
+                        const res = await fetch("/api/me");
+                        const data = await res.json();
+                        if (data && data.user) {
+                            authFooter.innerHTML =
+                                'Logged in as <span class="user-email">' +
+                                data.user.email +
+                                "</span>. " +
+                                '<button id="logout-btn" type="button" class="btn-secondary" style="margin-left:0.5rem;">Log out</button>';
+
+                            const logoutBtn = document.getElementById("logout-btn");
+                            if (logoutBtn) {
+                                logoutBtn.addEventListener("click", logout);
+                            }
+                        } else {
+                            authFooter.textContent = "Not logged in.";
+                        }
+                    } catch (err) {
+                        console.error("me error:", err);
+                        authFooter.textContent = "Not logged in.";
+                    }
+                }
+
+                async function logout() {
+                    try {
+                        await fetch("/api/logout", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" }
+                        });
+                    } catch (err) {
+                        console.error("logout error:", err);
+                    } finally {
+                        refreshMe();
+                    }
+                }
+
+                // Login submit
+                loginForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    setStatus(loginStatus, "Logging in…", "");
+
+                    const email = document.getElementById("login-email").value.trim();
+                    const password = document.getElementById("login-password").value.trim();
+
+                    if (!email || !password) {
+                        setStatus(loginStatus, "Email and password are required.", "error");
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch("/api/login", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email, password })
+                        });
+                        const data = await res.json();
+
+                        if (!res.ok || !data.ok) {
+                            setStatus(loginStatus, data.error || "Login failed.", "error");
+                            return;
+                        }
+
+                        setStatus(loginStatus, "Logged in successfully.", "success");
+                        refreshMe();
+                    } catch (err) {
+                        console.error("login error:", err);
+                        setStatus(loginStatus, "Something went wrong. Try again.", "error");
+                    }
+                });
+
+                // Signup submit
+                signupForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    setStatus(signupStatus, "Creating account…", "");
+
+                    const email = document.getElementById("signup-email").value.trim();
+                    const password = document.getElementById("signup-password").value.trim();
+
+                    if (!email || !password) {
+                        setStatus(signupStatus, "Email and password are required.", "error");
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch("/api/signup", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email, password })
+                        });
+                        const data = await res.json();
+
+                        if (!res.ok || !data.ok) {
+                            setStatus(signupStatus, data.error || "Sign up failed.", "error");
+                            return;
+                        }
+
+                        setStatus(signupStatus, "Account created and logged in.", "success");
+                        // switch to login tab view
+                        tabs.forEach((t) => t.classList.remove("active"));
+                        tabs[0].classList.add("active");
+                        forms.forEach((f) => f.classList.remove("active"));
+                        loginForm.classList.add("active");
+                        refreshMe();
+                    } catch (err) {
+                        console.error("signup error:", err);
+                        setStatus(signupStatus, "Something went wrong. Try again.", "error");
+                    }
+                });
+
+                // Initial session check
+                refreshMe();
+            })();
+        </script>
+        <script>
+  (function () {
+    async function updateNavAccount() {
+      const link = document.getElementById("nav-account-link");
+      if (!link) return;
+
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+
+        if (data && data.user) {
+          // Logged in: show email and point to login/account page
+          link.href = "/login.html";
+          link.textContent = data.user.email;
+        } else {
+          // Not logged in
+          link.href = "/login.html";
+          link.textContent = "Login";
+        }
+      } catch (err) {
+        console.error("updateNavAccount error:", err);
+      }
+    }
+
+    updateNavAccount();
+  })();
+</script>
+
+    </body>
+</html>

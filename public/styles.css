@@ -1,0 +1,284 @@
+:root {
+    --bg: #050815;
+    --bg-elevated: #0b1020;
+    --bg-elevated-soft: #101526;
+    --border-soft: #1b2236;
+    --text: #f8f9ff;
+    --text-muted: #8c95b8;
+    --accent: #6f42c1;
+    --accent2: #007bff;
+    --accent-soft: rgba(111, 66, 193, 0.18);
+    --radius-lg: 16px;
+    --radius-md: 12px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    background: radial-gradient(circle at top, #101526 0, #050815 55%);
+    color: var(--text);
+}
+
+a {
+    color: var(--accent2);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Header / nav */
+
+header.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid var(--border-soft);
+    background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffb64d, #ff5b81);
+    font-size: 20px;
+}
+
+.brand-title {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-size: 0.9rem;
+}
+
+nav.main-nav {
+    display: flex;
+    gap: 1.25rem;
+    font-size: 0.9rem;
+}
+
+nav.main-nav a {
+    color: var(--text-muted);
+}
+
+nav.main-nav a.active {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.wallet-form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.wallet-input {
+    min-width: 260px;
+    background: rgba(12, 17, 32, 0.9);
+    border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    padding: 0.45rem 0.9rem;
+    color: var(--text);
+    font-size: 0.85rem;
+    outline: none;
+}
+
+.wallet-input::placeholder {
+    color: #616887;
+}
+
+.btn-primary {
+    border-radius: 999px;
+    border: none;
+    padding: 0.45rem 1.1rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.05);
+}
+
+.btn-secondary {
+    border-radius: 999px;
+    border: 1px solid var(--border-soft);
+    padding: 0.4rem 0.9rem;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent2);
+}
+
+/* Layout */
+
+main.app-main {
+    max-width: 1320px;
+    margin: 1.5rem auto 2.5rem;
+    padding: 0 1.5rem;
+}
+
+.page-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.page-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+}
+
+/* Generic cards, tables, etc – shared across pages */
+
+.card {
+    background: #050915;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-soft);
+}
+
+.table-container {
+    max-height: 70vh;
+    overflow: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-soft);
+    background: #050815;
+}
+
+table.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+table.table th,
+table.table td {
+    padding: 0.4rem 0.6rem;
+    white-space: nowrap;
+}
+
+table.table thead {
+    position: sticky;
+    top: 0;
+    background: #0b1020;
+    z-index: 1;
+}
+
+table.table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+table.table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.01);
+}
+
+table.table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.01);
+}
+
+/* Pills */
+
+.pill-tier {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pill-tier-common {
+    background: #343a40;
+    color: #f8f9fa;
+}
+
+.pill-tier-uncommon {
+    background: #495057;
+    color: #f8f9fa;
+}
+
+.pill-tier-rare {
+    background: #ff8800;
+    color: #111;
+}
+
+.pill-tier-legendary {
+    background: linear-gradient(135deg, #ffd54f, #ffb300);
+    color: #111;
+}
+
+.pill-tier-ultimate {
+    background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff);
+    color: #111;
+}
+
+/* Utility */
+
+.addr {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.pill-unlocked {
+    color: #4ade80;
+}
+
+.pill-locked {
+    color: #fbbf24;
+}
+
+@media (max-width: 960px) {
+    header.app-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .wallet-form {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    main.app-main {
+        padding: 0 1rem;
+    }
+}

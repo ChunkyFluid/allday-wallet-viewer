@@ -1,14 +1,17 @@
 // server.js
-import express from "express";
 import cors from "cors";
 import * as dotenv from "dotenv";
 import snowflake from "snowflake-sdk";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { pgQuery } from "./db.js";
 import fetch from "node-fetch";
 import pool from "./db/pool.js";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { Pool } from "pg";
+import session from "express-session";
+import bcrypt from "bcrypt";
 
 dotenv.config();
 
@@ -19,6 +22,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use(express.json());
 
 // ---- Snowflake connection ----
 const connection = snowflake.createConnection({
@@ -85,6 +89,158 @@ function executeSql(sqlText) {
     });
   });
 }
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      secure: false // set to true when you’re behind HTTPS
+    }
+  })
+);
+
+// Helper: basic email check
+function isValidEmail(email) {
+  return typeof email === "string" && email.includes("@") && email.length <= 255;
+}
+
+// POST /api/signup  { email, password }
+app.post("/api/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ ok: false, error: "Invalid email address." });
+    }
+    if (!password || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({
+        ok: false,
+        error: "Password must be at least 8 characters."
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const insertSql = `
+      INSERT INTO public.users (email, password_hash)
+      VALUES ($1, $2)
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id, email, created_at;
+    `;
+    const { rows } = await pool.query(insertSql, [email.toLowerCase(), passwordHash]);
+
+    if (!rows.length) {
+      return res.status(409).json({ ok: false, error: "An account with that email already exists." });
+    }
+
+    const user = rows[0];
+
+    // create session
+    req.session.user = {
+      id: user.id,
+      email: user.email
+    };
+
+    return res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        created_at: user.created_at
+      }
+    });
+  } catch (err) {
+    console.error("POST /api/signup error:", err);
+    return res.status(500).json({ ok: false, error: "Failed to create account." });
+  }
+});
+
+// POST /api/login  { email, password }
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!isValidEmail(email) || !password) {
+      return res.status(400).json({ ok: false, error: "Email and password are required." });
+    }
+
+    const selectSql = `
+      SELECT id, email, password_hash
+      FROM public.users
+      WHERE email = $1
+      LIMIT 1;
+    `;
+    const { rows } = await pool.query(selectSql, [email.toLowerCase()]);
+
+    if (!rows.length) {
+      return res.status(401).json({ ok: false, error: "Invalid email or password." });
+    }
+
+    const user = rows[0];
+
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ ok: false, error: "Invalid email or password." });
+    }
+
+    // set session
+    req.session.user = {
+      id: user.id,
+      email: user.email
+    };
+
+    return res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error("POST /api/login error:", err);
+    return res.status(500).json({ ok: false, error: "Failed to log in." });
+  }
+});
+
+// POST /api/logout
+app.post("/api/logout", (req, res) => {
+  if (!req.session) {
+    return res.json({ ok: true });
+  }
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("POST /api/logout error:", err);
+      return res.status(500).json({ ok: false, error: "Failed to log out." });
+    }
+    res.clearCookie("connect.sid");
+    return res.json({ ok: true });
+  });
+});
+
+// GET /api/me  -> current logged in user, or null
+app.get("/api/me", (req, res) => {
+  if (req.session && req.session.user) {
+    return res.json({ ok: true, user: req.session.user });
+  }
+  return res.json({ ok: true, user: null });
+});
+
+// Optional: example of a protected route
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ ok: false, error: "Not authenticated." });
+  }
+  next();
+}
+
+// Example protected endpoint:
+// app.get('/api/favorites', requireAuth, async (req, res) => {
+//   // req.session.user.id is available
+// });
 
 app.get("/api/collection", async (req, res) => {
   try {

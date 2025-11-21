@@ -369,14 +369,16 @@
                 <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
             </div>
 
-            <nav class="main-nav">
-                <a href="/">Wallet</a>
-                <a href="/profiles.html">Profiles</a>
-                <a href="/top-holders.html">Top holders</a>
-                <a href="/explorer.html" class="active">Browse</a>
-                <a href="/faq.html">FAQ</a>
-                <a href="/contact.html">Contact</a>
-            </nav>
+<nav class="main-nav">
+  <a href="/">Wallet</a>
+  <a href="/profiles.html">Profiles</a>
+  <a href="/top-holders.html">Top holders</a>
+  <a href="/explorer.html">Browse</a>
+  <a href="/faq.html">FAQ</a>
+  <a href="/contact.html">Contact</a>
+  <a href="/login.html" id="nav-account-link">Login</a>
+</nav>
+
 
             <form id="wallet-form" class="wallet-form" action="/" method="GET">
                 <input
@@ -489,91 +491,87 @@
 
         <script>
             async function loadFilterOptions() {
-  const summary = document.getElementById("ex-results-summary");
-  try {
-    const res = await fetch("/api/explorer-filters");
-    const data = await res.json();
+                const summary = document.getElementById("ex-results-summary");
+                try {
+                    const res = await fetch("/api/explorer-filters");
+                    const data = await res.json();
 
-    if (!data.ok) {
-      console.error("explorer-filters error:", data.error);
-      summary.textContent =
-        "Filters failed to load: " + (data.error || "unknown error");
-      return;
-    }
+                    if (!data.ok) {
+                        console.error("explorer-filters error:", data.error);
+                        summary.textContent = "Filters failed to load: " + (data.error || "unknown error");
+                        return;
+                    }
 
-    // Helpers
-    const playerSelect = document.getElementById("ex-player");
-    const teamSelect = document.getElementById("ex-team");
-    const tierSelect = document.getElementById("ex-tier");
-    const seriesSelect = document.getElementById("ex-series");
-    const setSelect = document.getElementById("ex-set");
-    const posSelect = document.getElementById("ex-position");
+                    // Helpers
+                    const playerSelect = document.getElementById("ex-player");
+                    const teamSelect = document.getElementById("ex-team");
+                    const tierSelect = document.getElementById("ex-tier");
+                    const seriesSelect = document.getElementById("ex-series");
+                    const setSelect = document.getElementById("ex-set");
+                    const posSelect = document.getElementById("ex-position");
 
-    function addOptions(selectEl, items, makeLabel) {
-      items.forEach((item) => {
-        const label = makeLabel ? makeLabel(item) : item;
-        if (!label) return;
-        const opt = document.createElement("option");
-        opt.value = label;
-        opt.textContent = label;
-        selectEl.appendChild(opt);
-      });
-    }
+                    function addOptions(selectEl, items, makeLabel) {
+                        items.forEach((item) => {
+                            const label = makeLabel ? makeLabel(item) : item;
+                            if (!label) return;
+                            const opt = document.createElement("option");
+                            opt.value = label;
+                            opt.textContent = label;
+                            selectEl.appendChild(opt);
+                        });
+                    }
 
-    // Players
-    playerSelect.innerHTML = '<option value="">All players</option>';
-    addOptions(
-      playerSelect,
-      data.players || [],
-      (p) =>
-        [p.first_name, p.last_name].filter(Boolean).join(" ") || null
-    );
+                    // Players
+                    playerSelect.innerHTML = '<option value="">All players</option>';
+                    addOptions(
+                        playerSelect,
+                        data.players || [],
+                        (p) => [p.first_name, p.last_name].filter(Boolean).join(" ") || null
+                    );
 
-    // Teams
-    teamSelect.innerHTML = '<option value="">All teams</option>';
-    addOptions(teamSelect, data.teams || [], (t) => t);
+                    // Teams
+                    teamSelect.innerHTML = '<option value="">All teams</option>';
+                    addOptions(teamSelect, data.teams || [], (t) => t);
 
-    // Tiers – in nice order
-    const tierOrder = ["Common", "Uncommon", "Rare", "Legendary", "Ultimate"];
-    const tiersSet = new Set((data.tiers || []).map((t) => t));
-    tierSelect.innerHTML = '<option value="">All tiers</option>';
-    tierOrder.forEach((t) => {
-      if (tiersSet.has(t) || tiersSet.has(t.toUpperCase())) {
-        const opt = document.createElement("option");
-        opt.value = t;
-        opt.textContent = t;
-        tierSelect.appendChild(opt);
-      }
-    });
-    (data.tiers || []).forEach((t) => {
-      if (!tierOrder.includes(t)) {
-        const opt = document.createElement("option");
-        opt.value = t;
-        opt.textContent = t;
-        tierSelect.appendChild(opt);
-      }
-    });
+                    // Tiers – in nice order
+                    const tierOrder = ["Common", "Uncommon", "Rare", "Legendary", "Ultimate"];
+                    const tiersSet = new Set((data.tiers || []).map((t) => t));
+                    tierSelect.innerHTML = '<option value="">All tiers</option>';
+                    tierOrder.forEach((t) => {
+                        if (tiersSet.has(t) || tiersSet.has(t.toUpperCase())) {
+                            const opt = document.createElement("option");
+                            opt.value = t;
+                            opt.textContent = t;
+                            tierSelect.appendChild(opt);
+                        }
+                    });
+                    (data.tiers || []).forEach((t) => {
+                        if (!tierOrder.includes(t)) {
+                            const opt = document.createElement("option");
+                            opt.value = t;
+                            opt.textContent = t;
+                            tierSelect.appendChild(opt);
+                        }
+                    });
 
-    // Series
-    seriesSelect.innerHTML = '<option value="">All series</option>';
-    addOptions(seriesSelect, data.series || [], (s) => s);
+                    // Series
+                    seriesSelect.innerHTML = '<option value="">All series</option>';
+                    addOptions(seriesSelect, data.series || [], (s) => s);
 
-    // Sets
-    setSelect.innerHTML = '<option value="">All sets</option>';
-    addOptions(setSelect, data.sets || [], (s) => s);
+                    // Sets
+                    setSelect.innerHTML = '<option value="">All sets</option>';
+                    addOptions(setSelect, data.sets || [], (s) => s);
 
-    // Positions
-    posSelect.innerHTML = '<option value="">All positions</option>';
-    addOptions(posSelect, data.positions || [], (p) => p);
+                    // Positions
+                    posSelect.innerHTML = '<option value="">All positions</option>';
+                    addOptions(posSelect, data.positions || [], (p) => p);
 
-    summary.textContent = "Filters loaded. Pick some and hit Search.";
-  } catch (err) {
-    console.error("loadFilterOptions error:", err);
-    summary.textContent =
-      "Filters failed to load – open DevTools Console for details.";
-  }
-}
-
+                    summary.textContent = "Filters loaded. Pick some and hit Search.";
+                } catch (err) {
+                    console.error("loadFilterOptions error:", err);
+                    summary.textContent = "Filters failed to load – open DevTools Console for details.";
+                }
+            }
 
             async function runSearch() {
                 const player = document.getElementById("ex-player").value.trim();
@@ -695,5 +693,33 @@
 
             loadFilterOptions();
         </script>
+        <script>
+  (function () {
+    async function updateNavAccount() {
+      const link = document.getElementById("nav-account-link");
+      if (!link) return;
+
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+
+        if (data && data.user) {
+          // Logged in: show email and point to login/account page
+          link.href = "/login.html";
+          link.textContent = data.user.email;
+        } else {
+          // Not logged in
+          link.href = "/login.html";
+          link.textContent = "Login";
+        }
+      } catch (err) {
+        console.error("updateNavAccount error:", err);
+      }
+    }
+
+    updateNavAccount();
+  })();
+</script>
+
     </body>
 </html>

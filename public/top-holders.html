@@ -273,8 +273,7 @@
       }
 
       .addr {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         font-size: 0.72rem;
         color: var(--text-muted);
       }
@@ -347,14 +346,16 @@
         <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
       </div>
 
-      <nav class="main-nav">
-        <a href="/">Wallet</a>
-        <a href="/profiles.html">Profiles</a>
-        <a href="/top-holders.html" class="active">Top holders</a>
-        <a href="/explorer.html">Browse</a>
-        <a href="/faq.html">FAQ</a>
-        <a href="/contact.html">Contact</a>
-      </nav>
+<nav class="main-nav">
+  <a href="/">Wallet</a>
+  <a href="/profiles.html">Profiles</a>
+  <a href="/top-holders.html">Top holders</a>
+  <a href="/explorer.html">Browse</a>
+  <a href="/faq.html">FAQ</a>
+  <a href="/contact.html">Contact</a>
+  <a href="/login.html" id="nav-account-link">Login</a>
+</nav>
+
 
       <form id="wallet-form" class="wallet-form" action="/" method="GET">
         <input
@@ -363,8 +364,7 @@
           type="text"
           class="wallet-input"
           placeholder="0x… wallet address"
-          autocomplete="off"
-        />
+          autocomplete="off" />
         <button type="submit" class="btn-primary">View Wallet</button>
       </form>
     </header>
@@ -394,9 +394,7 @@
                 <option value="500">Top 500</option>
               </select>
             </div>
-            <button id="top-refresh" type="button" class="btn-secondary">
-              Refresh
-            </button>
+            <button id="top-refresh" type="button" class="btn-secondary">Refresh</button>
           </div>
         </div>
 
@@ -453,9 +451,7 @@
           tbodyEl.innerHTML = "";
 
           try {
-            const res = await fetch(
-              "/api/top-wallets?limit=" + encodeURIComponent(limit)
-            );
+            const res = await fetch("/api/top-wallets?limit=" + encodeURIComponent(limit));
             const data = await res.json();
 
             if (!res.ok || !data.ok) {
@@ -465,21 +461,16 @@
             const wallets = Array.isArray(data.wallets) ? data.wallets : [];
 
             if (!wallets.length) {
-              statusEl.textContent =
-                "No wallets found in the current snapshot.";
+              statusEl.textContent = "No wallets found in the current snapshot.";
               return;
             }
 
-            statusEl.textContent =
-              "Showing top " +
-              wallets.length +
-              " wallet(s) by total moments.";
+            statusEl.textContent = "Showing top " + wallets.length + " wallet(s) by total moments.";
 
             wallets.forEach((w, idx) => {
               const tr = document.createElement("tr");
 
-              const displayName =
-                w.display_name || w.wallet_address || "(unknown)";
+              const displayName = w.display_name || w.wallet_address || "(unknown)";
               const addr = w.wallet_address || "";
 
               const total = w.total_moments;
@@ -536,8 +527,7 @@
             tableEl.style.display = "table";
           } catch (err) {
             console.error("top-wallets error:", err);
-            statusEl.textContent =
-              "Failed to load leaderboard. Check console for details.";
+            statusEl.textContent = "Failed to load leaderboard. Check console for details.";
             tableEl.style.display = "none";
           }
         }
@@ -549,5 +539,33 @@
         loadTopWallets();
       })();
     </script>
+    <script>
+  (function () {
+    async function updateNavAccount() {
+      const link = document.getElementById("nav-account-link");
+      if (!link) return;
+
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+
+        if (data && data.user) {
+          // Logged in: show email and point to login/account page
+          link.href = "/login.html";
+          link.textContent = data.user.email;
+        } else {
+          // Not logged in
+          link.href = "/login.html";
+          link.textContent = "Login";
+        }
+      } catch (err) {
+        console.error("updateNavAccount error:", err);
+      }
+    }
+
+    updateNavAccount();
+  })();
+</script>
+
   </body>
 </html>

@@ -468,14 +468,16 @@
             <div class="brand-title">Chunky's NFLAD Viewer</div>
           </div>
         </div>
-        <nav class="main-nav">
-          <a href="/">Wallet</a>
-<a href="/profiles.html">Profiles</a>
-<a href="/top-holders.html">Top holders</a>
-<a href="/explorer.html">Browse</a>
-<a href="/faq.html">FAQ</a>
-<a href="/contact.html">Contact</a>
-        </nav>
+<nav class="main-nav">
+  <a href="/">Wallet</a>
+  <a href="/profiles.html">Profiles</a>
+  <a href="/top-holders.html">Top holders</a>
+  <a href="/explorer.html">Browse</a>
+  <a href="/faq.html">FAQ</a>
+  <a href="/contact.html">Contact</a>
+  <a href="/login.html" id="nav-account-link">Login</a>
+</nav>
+
         <form id="wallet-form" class="wallet-form">
           <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
           <button type="submit" class="btn-primary">View Wallet</button>
@@ -554,6 +556,33 @@
         </section>
       </main>
     </div>
+<script>
+  (function () {
+    async function updateNavAccount() {
+      const link = document.getElementById("nav-account-link");
+      if (!link) return;
+
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+
+        if (data && data.user) {
+          // Logged in: show email and point to login/account page
+          link.href = "/login.html";
+          link.textContent = data.user.email;
+        } else {
+          // Not logged in
+          link.href = "/login.html";
+          link.textContent = "Login";
+        }
+      } catch (err) {
+        console.error("updateNavAccount error:", err);
+      }
+    }
+
+    updateNavAccount();
+  })();
+</script>
 
     <script src="app.js"></script>
   </body>
