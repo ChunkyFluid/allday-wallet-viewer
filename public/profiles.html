@@ -4,20 +4,20 @@
     <meta charset="UTF-8" />
     <title>Profiles – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <style>
       :root {
-        --bg-main: #050816;
-        --bg-card: #101322;
-        --border-subtle: rgba(255, 255, 255, 0.06);
-        --text-main: #f9fafb;
-        --text-muted: #9ca3af;
-        --accent-purple: #6f42c1;
-        --accent-blue: #007bff;
-        --accent-cyan: #0dcaf0;
-        --accent-teal: #17a2b8;
-        --accent-alt: #00cccc;
-        --danger: #f97373;
-        --success: #22c55e;
+        --bg: #050815;
+        --bg-elevated: #0b1020;
+        --bg-elevated-soft: #101526;
+        --border-soft: #1b2236;
+        --text: #f8f9ff;
+        --text-muted: #8c95b8;
+        --accent: #6f42c1;
+        --accent2: #007bff;
+        --accent-soft: rgba(111, 66, 193, 0.18);
+        --radius-lg: 16px;
+        --radius-md: 12px;
       }
 
       * {
@@ -26,18 +26,19 @@
 
       body {
         margin: 0;
+        padding: 0;
         font-family:
           system-ui,
           -apple-system,
           BlinkMacSystemFont,
           "Segoe UI",
           sans-serif;
-        background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
-        color: var(--text-main);
+        background: radial-gradient(circle at top, #101526 0, #050815 55%);
+        color: var(--text);
       }
 
       a {
-        color: var(--accent-cyan);
+        color: var(--accent2);
         text-decoration: none;
       }
 
@@ -45,19 +46,15 @@
         text-decoration: underline;
       }
 
-      .app-shell {
-        max-width: 95%;
-        margin: 0 auto;
-        padding: 1.5rem 4%;
-        min-height: 100vh;
-      }
+      /* Header / nav */
 
-      .app-header {
+      header.app-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
+        padding: 0.75rem 2rem;
+        border-bottom: 1px solid var(--border-soft);
+        background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
       }
 
       .brand {
@@ -67,58 +64,65 @@
       }
 
       .brand-logo {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border-radius: 999px;
-        background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.4rem;
-      }
-
-      .brand-logo img {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
+        background: linear-gradient(135deg, #ffb64d, #ff5b81);
+        font-size: 20px;
       }
 
       .brand-title {
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        font-size: 0.9rem;
+      }
+
+      nav.main-nav {
+        display: flex;
+        gap: 1.25rem;
+        font-size: 0.9rem;
+      }
+
+      nav.main-nav a {
+        color: var(--text-muted);
+      }
+
+      nav.main-nav a.active {
+        color: var(--text);
+        font-weight: 600;
       }
 
       .wallet-form {
         display: flex;
-        align-items: center;
         gap: 0.5rem;
-        flex: 0 0 420px;
+        align-items: center;
       }
 
-      #wallet-input {
-        flex: 1;
+      .wallet-input {
+        min-width: 260px;
+        background: rgba(12, 17, 32, 0.9);
         border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.5rem 0.9rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        font-size: 0.9rem;
+        border: 1px solid var(--border-soft);
+        padding: 0.45rem 0.9rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        outline: none;
       }
 
-      #wallet-input::placeholder {
-        color: var(--text-muted);
+      .wallet-input::placeholder {
+        color: #616887;
       }
 
       .btn-primary {
         border-radius: 999px;
         border: none;
-        padding: 0.5rem 1.1rem;
-        background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-        color: white;
-        font-weight: 600;
-        font-size: 0.9rem;
+        padding: 0.45rem 1.1rem;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        font-size: 0.85rem;
         cursor: pointer;
         white-space: nowrap;
       }
@@ -127,334 +131,319 @@
         filter: brightness(1.05);
       }
 
-      .wallet-summary-card {
-        margin: 1.25rem auto;
-        max-width: 1100px;
-        padding: 1rem 1.25rem;
-        border-radius: 0.75rem;
-        background: rgba(15, 15, 30, 0.9);
-        border: 1px solid var(--border-subtle);
-        display: none;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      .wallet-summary-main {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-      }
-
-      .wallet-summary-label {
-        font-size: 0.75rem;
+      .btn-secondary {
+        border-radius: 999px;
+        border: 1px solid var(--border-soft);
+        padding: 0.4rem 0.9rem;
+        background: transparent;
         color: var(--text-muted);
+        font-size: 0.8rem;
+        cursor: pointer;
       }
 
-      .wallet-summary-address {
+      .btn-secondary:hover {
+        border-color: var(--accent);
+        color: var(--accent2);
+      }
+
+      /* Layout */
+
+      main.app-main {
+        max-width: 1320px;
+        margin: 1.5rem auto 2.5rem;
+        padding: 0 1.5rem;
+      }
+
+      .page-title {
+        font-size: 1.15rem;
         font-weight: 600;
-        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
       }
 
-      .wallet-summary-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-        font-size: 0.75rem;
+      .page-subtitle {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 1.25rem;
       }
 
-      .chip {
-        border-radius: 999px;
-        padding: 0.2rem 0.7rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(15, 23, 42, 0.9);
-      }
-
-      .chip-pill-tier {
-        border-radius: 999px;
-        padding: 0.15rem 0.6rem;
-        font-size: 0.7rem;
-        font-weight: 500;
-      }
-
-      .chip-common {
-        background: #4b5563;
-        color: #e5e7eb;
-      }
-
-      .chip-uncommon {
-        background: #6b7280;
-        color: #e5e7eb;
-      }
-
-      .chip-rare {
-        background: #f97316;
-        color: #111827;
-      }
-
-      .chip-legendary {
-        background: linear-gradient(135deg, #facc15, #f97316);
-        color: #111827;
-      }
-
-      .chip-ultimate {
-        background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
-        color: white;
-      }
-
-      .content {
+      .layout-two-column {
         display: grid;
-        grid-template-columns: minmax(110px, 260px) minmax(0, 1fr);
-        gap: 1.25rem;
+        grid-template-columns: 320px minmax(0, 1fr);
+        gap: 1.5rem;
         align-items: flex-start;
       }
 
-      .filters-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 1rem 1.25rem;
-        font-size: 0.85rem;
-      }
+      /* Profiles search + list */
 
-      .filters-panel h3 {
-        margin: 0 0 0.75rem;
-        font-size: 0.8rem;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
-
-      .filter-group {
-        margin-bottom: 0.65rem;
-      }
-
-      .filter-group label {
-        display: block;
-        font-size: 0.7rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        margin-bottom: 0.15rem;
-      }
-
-      .filter-select {
-        width: 100%;
-        border-radius: 0.5rem;
-        border: 1px solid var(--border-subtle);
-        background: #020617;
-        color: var(--text-main);
-        padding: 0.35rem 0.6rem;
-        font-size: 0.8rem;
-      }
-
-      .reset-filters {
-        margin-top: 0.4rem;
-        border: none;
-        background: none;
-        color: var(--accent-cyan);
-        font-size: 0.75rem;
-        cursor: pointer;
-        padding: 0;
-      }
-
-      .table-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 0.75rem 0.75rem 0.5rem;
+      .profiles-search-card {
+        background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-soft);
+        padding: 1.2rem;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
         display: flex;
         flex-direction: column;
-        min-width: 0;
+        gap: 0.75rem;
+        max-height: 70vh;
       }
 
-      .table-header {
+      .profiles-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+
+      .profiles-help {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+
+      .search-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.25rem;
+        color: var(--text-muted);
+      }
+
+      .search-input {
+        width: 100%;
+        background: #050a18;
+        border-radius: 999px;
+        border: 1px solid var(--border-soft);
+        padding: 0.4rem 0.75rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        outline: none;
+      }
+
+      .search-input::placeholder {
+        color: #616887;
+      }
+
+      .profiles-status {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+
+      .profiles-list {
+        margin-top: 0.25rem;
+        padding: 0;
+        list-style: none;
+        overflow: auto;
+        flex: 1 1 auto;
+      }
+
+      .profile-item-btn {
+        width: 100%;
+        text-align: left;
+        background: rgba(5, 10, 24, 0.7);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-soft);
+        padding: 0.5rem 0.6rem;
+        margin-bottom: 0.35rem;
+        cursor: pointer;
+        font-size: 0.78rem;
+        color: var(--text);
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 0.5rem;
-        margin-bottom: 0.35rem;
       }
 
-      #moments-title {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: var(--text-muted);
+      .profile-item-btn:hover {
+        border-color: var(--accent);
+        background: rgba(12, 18, 40, 0.9);
       }
 
-      .export-btn {
-        border-radius: 999px;
-        border: 1px solid var(--accent-teal);
-        background: transparent;
-        color: var(--accent-teal);
+      .profile-item-btn.active {
+        border-color: var(--accent2);
+        background: rgba(0, 123, 255, 0.18);
+      }
+
+      .profile-item-main {
+        min-width: 0;
+      }
+
+      .profile-item-name {
+        font-weight: 600;
         font-size: 0.8rem;
-        padding: 0.3rem 0.8rem;
-        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .export-btn:hover {
-        background: rgba(13, 148, 136, 0.1);
+      .profile-item-address {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .table-wrapper {
-        overflow-x: auto;
-        max-height: 80vh;
-        width: 100%;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.78rem;
-        table-layout: auto;
-      }
-
-      thead {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: #020617;
-      }
-
-      th,
-      td {
-        padding: 0.25rem 0.4rem;
-        text-align: left;
+      .profile-item-stats {
+        text-align: right;
+        font-size: 0.7rem;
         white-space: nowrap;
       }
 
-      th {
+      .profile-item-stats .unlocked {
+        color: #4ade80;
+      }
+
+      /* Snapshot card */
+
+      .snapshot-card {
+        background: #050915;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-soft);
+        padding: 1.1rem 1.2rem 1.3rem;
+        min-height: 260px;
+      }
+
+      .snapshot-header-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .snapshot-header-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+      }
+
+      .snapshot-empty {
+        font-size: 0.83rem;
+        color: var(--text-muted);
+        margin-top: 1rem;
+      }
+
+      .snapshot-section {
+        background: #050a18;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-soft);
+        padding: 0.8rem 0.9rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .snapshot-section-title {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 0.3rem;
+      }
+
+      .snapshot-displayname {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .snapshot-address {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        word-break: break-all;
+        margin-top: 0.25rem;
+      }
+
+      .snapshot-totals-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.6rem;
+        margin-top: 0.1rem;
+      }
+
+      .snapshot-total-card {
+        background: #050815;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-soft);
+        padding: 0.6rem;
+        text-align: center;
+      }
+
+      .snapshot-total-label {
         font-size: 0.72rem;
         color: var(--text-muted);
-        font-weight: 500;
-        border-bottom: 1px solid var(--border-subtle);
-        cursor: pointer;
+        margin-bottom: 0.1rem;
       }
 
-      th.sortable:hover {
-        color: var(--accent-cyan);
+      .snapshot-total-value {
+        font-size: 1rem;
+        font-weight: 600;
       }
 
-      th.sort-asc::after {
-        content: " ▲";
-        font-size: 0.65em;
+      .snapshot-total-value-unlocked {
+        color: #4ade80;
       }
 
-      th.sort-desc::after {
-        content: " ▼";
-        font-size: 0.65em;
+      .snapshot-total-value-locked {
+        color: #fbbf24;
       }
 
-      tbody tr:nth-child(2n) {
-        background: rgba(15, 23, 42, 0.7);
+      .tiers-list {
+        font-size: 0.78rem;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.25rem 1rem;
       }
 
-      tbody tr:nth-child(2n + 1) {
-        background: rgba(15, 23, 42, 0.4);
+      .tier-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
 
-      tbody tr:hover {
-        background: rgba(37, 99, 235, 0.25);
+      .tier-label {
+        color: var(--text-muted);
       }
 
-      .locked-pill {
+      .tier-value {
+        font-weight: 600;
+      }
+
+      .snapshot-actions {
+        margin-top: 0.75rem;
+      }
+
+      .snapshot-actions a {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.1rem 0.5rem;
         border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 500;
+        border: 1px solid var(--accent2);
+        padding: 0.4rem 1rem;
+        font-size: 0.78rem;
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        text-decoration: none;
       }
 
-      .locked-pill.locked {
-        background: rgba(236, 72, 153, 0.15);
-        color: #f472b6;
-        border: 1px solid rgba(236, 72, 153, 0.7);
-      }
-
-      .locked-pill.unlocked {
-        background: rgba(16, 185, 129, 0.15);
-        color: #6ee7b7;
-        border: 1px solid rgba(16, 185, 129, 0.7);
-      }
-
-      .link-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-        font-size: 0.72rem;
-      }
-
-      .link-group a {
-        color: var(--accent-cyan);
-      }
-
-      .link-group a:hover {
-        text-decoration: underline;
+      .snapshot-actions a:hover {
+        filter: brightness(1.05);
       }
 
       @media (max-width: 960px) {
-        .app-header {
+        header.app-header {
           flex-direction: column;
           align-items: flex-start;
-        }
-        .wallet-form {
-          width: 100%;
-          flex: unset;
-        }
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-      .main-nav {
-        display: flex;
-        gap: 0.75rem;
-        margin-left: 2rem;
-        font-size: 0.9rem;
-      }
-      .main-nav a {
-        color: var(--text-muted);
-        text-decoration: none;
-        padding: 0.35rem 0.9rem;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          border-color 0.15s ease;
-      }
-      .main-nav a:hover {
-        color: var(--text-main);
-        border-color: rgba(148, 163, 184, 0.6);
-        background: rgba(15, 23, 42, 0.8);
-      }
-      .main-nav a.active {
-        color: #fff;
-        border-color: var(--accent-blue);
-        background: rgba(37, 99, 235, 0.3);
-      }
-
-      @media (max-width: 1100px) {
-        .app-header {
-          flex-wrap: wrap;
-          justify-content: center;
           gap: 0.75rem;
         }
-        .brand {
-          margin-bottom: 0.5rem;
-        }
-        .main-nav {
-          order: 3;
-          width: 100%;
-          justify-content: center;
-          flex-wrap: wrap;
-          margin-left: 0;
-        }
+
         .wallet-form {
           width: 100%;
-          max-width: 480px;
+          justify-content: flex-start;
+        }
+
+        main.app-main {
+          padding: 0 1rem;
+        }
+
+        .layout-two-column {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .profiles-search-card {
+          max-height: none;
         }
       }
     </style>
@@ -463,119 +452,325 @@
     <header class="app-header">
       <div class="brand">
         <div class="brand-logo">🐱</div>
-        <div>
-          <div class="brand-title">Chunky's NFLAD Viewer</div>
-        </div>
+        <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
       </div>
+
       <nav class="main-nav">
         <a href="/">Wallet</a>
-<a href="/profiles.html">Profiles</a>
-<a href="/top-holders.html">Top holders</a>
-<a href="/explorer.html">Browse</a>
-<a href="/faq.html">FAQ</a>
-<a href="/contact.html">Contact</a>
+        <a href="/profiles.html" class="active">Profiles</a>
+        <a href="/top-holders.html">Top holders</a>
+        <a href="/explorer.html">Browse</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/contact.html">Contact</a>
       </nav>
-      <form id="wallet-form" class="wallet-form">
-        <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
+
+      <form id="wallet-form" class="wallet-form" action="/" method="GET">
+        <input
+          id="wallet-input"
+          name="wallet"
+          type="text"
+          class="wallet-input"
+          placeholder="0x… wallet address"
+          autocomplete="off"
+        />
         <button type="submit" class="btn-primary">View Wallet</button>
       </form>
     </header>
 
     <main class="app-main">
-      <section class="wallet-summary-card">
-        <div class="wallet-summary-header">
-          <div>
-            <div class="wallet-summary-title">Profile search</div>
-            <div class="wallet-summary-subtitle">Look up Dapper display names and jump straight to their wallet.</div>
-          </div>
-        </div>
-        <div class="wallet-stats-row" style="margin-top: 1.25rem">
-          <form id="profile-search-form" class="wallet-form" style="width: 100%; max-width: 420px">
-            <input
-              id="profile-search-input"
-              type="text"
-              placeholder="Dapper name (e.g. ChunkyFluid)"
-              autocomplete="off" />
-            <button type="submit" class="btn-primary">Search</button>
-          </form>
-        </div>
-      </section>
+      <div class="page-title">Matching profiles</div>
+      <div class="page-subtitle">
+        Enter a Dapper display name to see matching wallets, then inspect each wallet's snapshot.
+      </div>
 
-      <section class="content-row" style="margin-top: 2rem">
-        <div class="card" style="flex: 1">
-          <div class="card-header">
-            <div class="card-title">Matching profiles</div>
+      <div class="layout-two-column">
+        <!-- LEFT: SEARCH + LIST -->
+        <aside class="profiles-search-card">
+          <div class="profiles-title">Search profiles</div>
+          <div class="profiles-help">
+            Start typing a Dapper display name. We'll show wallets whose display name starts with your query.
           </div>
-          <div class="card-body">
-            <div id="profiles-empty" class="empty-state">Enter a Dapper display name to see matching wallets.</div>
-            <table class="table" id="profiles-table" style="display: none">
-              <thead>
-                <tr>
-                  <th>Display name</th>
-                  <th>Wallet</th>
-                  <th>Open</th>
-                </tr>
-              </thead>
-              <tbody id="profiles-tbody"></tbody>
-            </table>
+
+          <div>
+            <div class="search-label">Dapper display name</div>
+            <input
+              id="prof-search-input"
+              type="text"
+              class="search-input"
+              placeholder="e.g. Chunky, CoolUser, ..."
+              autocomplete="off"
+            />
           </div>
-        </div>
-        <div class="card" style="flex: 1">
-          <div class="card-header">
-            <div class="card-title">Wallet snapshot</div>
+
+          <div id="prof-status" class="profiles-status">
+            Start typing to search for profiles.
           </div>
-          <div class="card-body">
-            <div id="profile-summary-empty" class="empty-state">
-              Select a wallet to see total moments, locked vs unlocked, and tier breakdown.
-            </div>
-            <div id="profile-summary" style="display: none">
-              <div class="wallet-stats-row">
-                <div class="stat-pill">
-                  <span class="stat-label">Total</span>
-                  <span class="stat-value" id="ps-total">0</span>
-                </div>
-                <div class="stat-pill">
-                  <span class="stat-label">Locked</span>
-                  <span class="stat-value" id="ps-locked">0</span>
-                </div>
-                <div class="stat-pill">
-                  <span class="stat-label">Unlocked</span>
-                  <span class="stat-value" id="ps-unlocked">0</span>
-                </div>
-              </div>
-              <div class="wallet-stats-row" style="margin-top: 0.75rem">
-                <div class="stat-pill stat-pill-tier common">
-                  <span class="stat-label">Common</span>
-                  <span class="stat-value" id="ps-common">0</span>
-                </div>
-                <div class="stat-pill stat-pill-tier uncommon">
-                  <span class="stat-label">Uncommon</span>
-                  <span class="stat-value" id="ps-uncommon">0</span>
-                </div>
-                <div class="stat-pill stat-pill-tier rare">
-                  <span class="stat-label">Rare</span>
-                  <span class="stat-value" id="ps-rare">0</span>
-                </div>
-                <div class="stat-pill stat-pill-tier legendary">
-                  <span class="stat-label">Legendary</span>
-                  <span class="stat-value" id="ps-legendary">0</span>
-                </div>
-                <div class="stat-pill stat-pill-tier ultimate">
-                  <span class="stat-label">Ultimate</span>
-                  <span class="stat-value" id="ps-ultimate">0</span>
-                </div>
-              </div>
-              <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted)">
-                <span id="ps-display-name" style="font-weight: 600"></span>
-                <span id="ps-wallet" style="margin-left: 0.5rem; opacity: 0.8"></span>
-                <a id="ps-open-main" href="#" style="margin-left: 0.75rem">Open in wallet viewer →</a>
-              </div>
-            </div>
+
+          <ul id="prof-list" class="profiles-list"></ul>
+        </aside>
+
+        <!-- RIGHT: SNAPSHOT -->
+        <section class="snapshot-card">
+          <div class="snapshot-header-title">Wallet snapshot</div>
+          <div class="snapshot-header-subtitle">
+            Select a wallet from the list to see total moments, locked vs unlocked, and tier breakdown.
           </div>
-        </div>
-      </section>
+
+          <div id="prof-snapshot">
+            <div class="snapshot-empty">No wallet selected yet.</div>
+          </div>
+        </section>
+      </div>
     </main>
 
-    <script src="/profiles.js"></script>
+    <script>
+      (function () {
+        const searchInput = document.getElementById("prof-search-input");
+        const statusEl = document.getElementById("prof-status");
+        const listEl = document.getElementById("prof-list");
+        const snapshotEl = document.getElementById("prof-snapshot");
+
+        let currentProfiles = [];
+        let currentSelectedIndex = -1;
+        let searchTimeout = null;
+
+        function formatNumber(n) {
+          if (n == null) return "0";
+          return Number(n).toLocaleString();
+        }
+
+        function renderList() {
+          listEl.innerHTML = "";
+
+          if (!currentProfiles.length) {
+            const li = document.createElement("li");
+            li.className = "profiles-help";
+            li.textContent = "No profiles found for this search.";
+            listEl.appendChild(li);
+            return;
+          }
+
+          currentProfiles.forEach((p, idx) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "profile-item-btn" + (idx === currentSelectedIndex ? " active" : "");
+            btn.dataset.index = String(idx);
+
+            const mainDiv = document.createElement("div");
+            mainDiv.className = "profile-item-main";
+
+            const nameDiv = document.createElement("div");
+            nameDiv.className = "profile-item-name";
+            nameDiv.textContent = p.display_name || "(unknown)";
+
+            const addrDiv = document.createElement("div");
+            addrDiv.className = "profile-item-address";
+            addrDiv.textContent = p.wallet_address || "";
+
+            mainDiv.appendChild(nameDiv);
+            mainDiv.appendChild(addrDiv);
+
+            const statsDiv = document.createElement("div");
+            statsDiv.className = "profile-item-stats";
+            statsDiv.innerHTML =
+              '<div>' +
+              formatNumber(p.total_moments) +
+              " moments</div>" +
+              '<div class="unlocked">' +
+              formatNumber(p.unlocked_moments) +
+              " unlocked</div>";
+
+            btn.appendChild(mainDiv);
+            btn.appendChild(statsDiv);
+
+            btn.addEventListener("click", () => {
+              currentSelectedIndex = idx;
+              renderList();
+              renderSnapshot();
+            });
+
+            const li = document.createElement("li");
+            li.appendChild(btn);
+            listEl.appendChild(li);
+          });
+        }
+
+        function renderSnapshot() {
+          snapshotEl.innerHTML = "";
+
+          if (
+            currentSelectedIndex < 0 ||
+            currentSelectedIndex >= currentProfiles.length
+          ) {
+            snapshotEl.innerHTML =
+              '<div class="snapshot-empty">No wallet selected yet.</div>';
+            return;
+          }
+
+          const p = currentProfiles[currentSelectedIndex];
+
+          const total = Number(p.total_moments || 0);
+          const unlocked = Number(p.unlocked_moments || 0);
+          const locked = Number(p.locked_moments || 0);
+
+          const tierCommon = Number(p.tier_common || 0);
+          const tierUncommon = Number(p.tier_uncommon || 0);
+          const tierRare = Number(p.tier_rare || 0);
+          const tierLegendary = Number(p.tier_legendary || 0);
+          const tierUltimate = Number(p.tier_ultimate || 0);
+
+          const totalTiers =
+            tierCommon +
+            tierUncommon +
+            tierRare +
+            tierLegendary +
+            tierUltimate;
+
+          const container = document.createElement("div");
+
+          // Display name + address
+          const idSection = document.createElement("div");
+          idSection.className = "snapshot-section";
+          idSection.innerHTML =
+            '<div class="snapshot-section-title">Wallet</div>' +
+            '<div class="snapshot-displayname">' +
+            (p.display_name || "(unknown)") +
+            "</div>" +
+            '<div class="snapshot-address">' +
+            (p.wallet_address || "") +
+            "</div>";
+          container.appendChild(idSection);
+
+          // Totals
+          const totalsSection = document.createElement("div");
+          totalsSection.className = "snapshot-section";
+          totalsSection.innerHTML =
+            '<div class="snapshot-section-title">Totals</div>' +
+            '<div class="snapshot-totals-grid">' +
+            '<div class="snapshot-total-card">' +
+            '<div class="snapshot-total-label">Total</div>' +
+            '<div class="snapshot-total-value">' +
+            formatNumber(total) +
+            "</div>" +
+            "</div>" +
+            '<div class="snapshot-total-card">' +
+            '<div class="snapshot-total-label">Unlocked</div>' +
+            '<div class="snapshot-total-value snapshot-total-value-unlocked">' +
+            formatNumber(unlocked) +
+            "</div>" +
+            "</div>" +
+            '<div class="snapshot-total-card">' +
+            '<div class="snapshot-total-label">Locked</div>' +
+            '<div class="snapshot-total-value snapshot-total-value-locked">' +
+            formatNumber(locked) +
+            "</div>" +
+            "</div>" +
+            "</div>";
+          container.appendChild(totalsSection);
+
+          // Tiers
+          const tiersSection = document.createElement("div");
+          tiersSection.className = "snapshot-section";
+          tiersSection.innerHTML =
+            '<div class="snapshot-section-title">Tier breakdown (' +
+            formatNumber(totalTiers) +
+            " tracked)</div>";
+
+          const tiersList = document.createElement("div");
+          tiersList.className = "tiers-list";
+
+          function addTierRow(label, value) {
+            const row = document.createElement("div");
+            row.className = "tier-row";
+            const lbl = document.createElement("span");
+            lbl.className = "tier-label";
+            lbl.textContent = label;
+            const val = document.createElement("span");
+            val.className = "tier-value";
+            val.textContent = formatNumber(value);
+            row.appendChild(lbl);
+            row.appendChild(val);
+            tiersList.appendChild(row);
+          }
+
+          addTierRow("Common", tierCommon);
+          addTierRow("Uncommon", tierUncommon);
+          addTierRow("Rare", tierRare);
+          addTierRow("Legendary", tierLegendary);
+          addTierRow("Ultimate", tierUltimate);
+
+          tiersSection.appendChild(tiersList);
+          container.appendChild(tiersSection);
+
+          // CTA
+          const actions = document.createElement("div");
+          actions.className = "snapshot-actions";
+          const link = document.createElement("a");
+          link.href = "/?wallet=" + encodeURIComponent(p.wallet_address || "");
+          link.textContent = "View full wallet";
+          actions.appendChild(link);
+          container.appendChild(actions);
+
+          snapshotEl.appendChild(container);
+        }
+
+        async function runSearch(term) {
+          const trimmed = term.trim();
+
+          if (!trimmed) {
+            currentProfiles = [];
+            currentSelectedIndex = -1;
+            statusEl.textContent = "Start typing to search for profiles.";
+            listEl.innerHTML = "";
+            snapshotEl.innerHTML =
+              '<div class="snapshot-empty">No wallet selected yet.</div>';
+            return;
+          }
+
+          statusEl.textContent = "Searching…";
+
+          try {
+            const res = await fetch(
+              "/api/profiles?query=" + encodeURIComponent(trimmed)
+            );
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+              throw new Error(data.error || "Search failed");
+            }
+
+            currentProfiles = data.profiles || [];
+            currentSelectedIndex = currentProfiles.length ? 0 : -1;
+
+            if (!currentProfiles.length) {
+              statusEl.textContent = "No profiles found for \"" + trimmed + "\".";
+            } else {
+              statusEl.textContent =
+                "Found " +
+                currentProfiles.length +
+                " profile(s) for \"" +
+                trimmed +
+                "\".";
+            }
+
+            renderList();
+            renderSnapshot();
+          } catch (err) {
+            console.error("profiles search error:", err);
+            statusEl.textContent = "Search failed. Check console for details.";
+            currentProfiles = [];
+            currentSelectedIndex = -1;
+            renderList();
+            renderSnapshot();
+          }
+        }
+
+        searchInput.addEventListener("input", () => {
+          const value = searchInput.value;
+          if (searchTimeout) clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => runSearch(value), 300);
+        });
+      })();
+    </script>
   </body>
 </html>

@@ -30,7 +30,6 @@ const connection = snowflake.createConnection({
   schema: process.env.SNOWFLAKE_SCHEMA,
   role: process.env.SNOWFLAKE_ROLE
 });
-
 let snowflakeConnected = false;
 
 function ensureSnowflakeConnected() {
@@ -48,8 +47,6 @@ function ensureSnowflakeConnected() {
     });
   });
 }
-
-// simple alias so other code can call ensureConnected()
 function ensureConnected() {
   return ensureSnowflakeConnected();
 }
@@ -73,7 +70,6 @@ function buildSqlForWallet(wallet) {
 
   return updatedSql;
 }
-
 function executeSql(sqlText) {
   return new Promise((resolve, reject) => {
     connection.execute({
@@ -90,7 +86,6 @@ function executeSql(sqlText) {
   });
 }
 
-// ---- API route: /api/collection?wallet=0x... ----
 app.get("/api/collection", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim();
@@ -116,10 +111,6 @@ app.get("/api/collection", async (req, res) => {
     });
   }
 });
-
-// GET /api/top-wallets?limit=50
-// Returns top wallets by moment count from wallet_holdings,
-// with optional display_name from wallet_profiles.
 app.get("/api/top-wallets", async (req, res) => {
   try {
     const rawLimit = parseInt(req.query.limit, 10);
@@ -155,9 +146,6 @@ app.get("/api/top-wallets", async (req, res) => {
     });
   }
 });
-
-// GET /api/wallet-profile?wallet=0x...
-// Returns display_name (if any) from wallet_profiles in Neon
 app.get("/api/wallet-profile", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -189,9 +177,6 @@ app.get("/api/wallet-profile", async (req, res) => {
     });
   }
 });
-
-// GET /api/search-profiles?q=chunk
-// Simple lookup by Dapper display name in wallet_profiles.
 app.get("/api/search-profiles", async (req, res) => {
   try {
     const qRaw = (req.query.q || "").toString().trim();
@@ -225,9 +210,6 @@ app.get("/api/search-profiles", async (req, res) => {
     });
   }
 });
-
-// GET /api/top-holders?edition=1717
-// Returns wallets that hold a given edition_id, ordered by copies desc.
 app.get("/api/top-holders", async (req, res) => {
   try {
     const edition = (req.query.edition || "").toString().trim();
@@ -268,80 +250,67 @@ app.get("/api/top-holders", async (req, res) => {
     });
   }
 });
-
-// GET /api/search-moments
-// Search moments across nft_core_metadata by player, team, tier, series, set, etc.
 app.get("/api/search-moments", async (req, res) => {
   try {
-    const playerRaw = (req.query.player || req.query.q || "").toString().trim();
-    const teamRaw   = (req.query.team   || "").toString().trim();
-    const tierRaw   = (req.query.tier   || "").toString().trim();
-    const seriesRaw = (req.query.series || "").toString().trim();
-    const setRaw    = (req.query.set    || "").toString().trim();
-    const limitRaw  = parseInt(req.query.limit, 10);
+    const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
 
-    const safeLimit = Number.isNaN(limitRaw) ? 200 : Math.min(Math.max(limitRaw, 10), 500);
+    const rawLimit = parseInt(limit, 10);
+    const safeLimit = Math.min(Math.max(rawLimit || 200, 1), 1000);
 
-    const filters = [];
+    const conditions = [];
     const params = [];
     let idx = 1;
 
-    if (playerRaw) {
-      // Match "first last" or last name alone
-      filters.push(
-        "(LOWER(COALESCE(m.first_name,'') || ' ' || COALESCE(m.last_name,'')) LIKE $" + idx + " OR " +
-        "LOWER(COALESCE(m.last_name,'')) LIKE $" + idx + ")"
-      );
-      params.push(`%${playerRaw.toLowerCase()}%`);
-      idx++;
+    if (player) {
+      // Match "First Last" name (case-insensitive)
+      conditions.push(`LOWER(first_name || ' ' || last_name) LIKE LOWER($${idx++})`);
+      params.push(`%${player}%`);
     }
 
-    if (teamRaw) {
-      filters.push("LOWER(m.team_name) LIKE $" + idx);
-      params.push(`%${teamRaw.toLowerCase()}%`);
-      idx++;
+    if (team) {
+      conditions.push(`team_name = $${idx++}`);
+      params.push(team);
     }
 
-    if (tierRaw) {
-      filters.push("UPPER(m.tier) = $" + idx);
-      params.push(tierRaw.toUpperCase());
-      idx++;
+    if (tier) {
+      conditions.push(`tier = $${idx++}`);
+      params.push(tier);
     }
 
-    if (seriesRaw) {
-      filters.push("LOWER(m.series_name) LIKE $" + idx);
-      params.push(`%${seriesRaw.toLowerCase()}%`);
-      idx++;
+    if (series) {
+      conditions.push(`series_name = $${idx++}`);
+      params.push(series);
     }
 
-    if (setRaw) {
-      filters.push("LOWER(m.set_name) LIKE $" + idx);
-      params.push(`%${setRaw.toLowerCase()}%`);
-      idx++;
+    if (set) {
+      conditions.push(`set_name = $${idx++}`);
+      params.push(set);
     }
 
-    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    if (position) {
+      conditions.push(`position = $${idx++}`);
+      params.push(position);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const sql = `
       SELECT
-        m.nft_id,
-        m.edition_id,
-        m.play_id,
-        m.series_id,
-        m.set_id,
-        m.tier,
-        m.serial_number,
-        m.max_mint_size,
-        m.first_name,
-        m.last_name,
-        m.team_name,
-        m.position,
-        m.jersey_number,
-        m.series_name,
-        m.set_name
-      FROM nft_core_metadata m
+        nft_id,
+        edition_id,
+        play_id,
+        serial_number,
+        max_mint_size,
+        first_name,
+        last_name,
+        team_name,
+        position,
+        tier,
+        series_name,
+        set_name
+      FROM nft_core_metadata
       ${whereClause}
-      ORDER BY m.nft_id::bigint
+      ORDER BY last_name NULLS LAST, first_name NULLS LAST, nft_id
       LIMIT $${idx};
     `;
 
@@ -362,9 +331,106 @@ app.get("/api/search-moments", async (req, res) => {
     });
   }
 });
+app.get("/api/explorer-filters", async (req, res) => {
+  try {
+    console.log("GET /api/explorer-filters – loading distinct values from nft_core_metadata…");
 
+    const [playersRes, teamsRes, seriesRes, setsRes, positionsRes, tiersRes] = await Promise.all([
+      pgQuery(`
+        SELECT DISTINCT
+          COALESCE(first_name, '') AS first_name,
+          COALESCE(last_name, '')  AS last_name
+        FROM nft_core_metadata
+        WHERE first_name IS NOT NULL
+          AND first_name <> ''
+          AND last_name IS NOT NULL
+          AND last_name <> ''
+        ORDER BY last_name, first_name
+        LIMIT 5000;
+      `),
+      pgQuery(`
+        SELECT DISTINCT team_name
+        FROM nft_core_metadata
+        WHERE team_name IS NOT NULL
+          AND team_name <> ''
+        ORDER BY team_name
+        LIMIT 1000;
+      `),
+      pgQuery(`
+        SELECT DISTINCT series_name
+        FROM nft_core_metadata
+        WHERE series_name IS NOT NULL
+          AND series_name <> ''
+        ORDER BY series_name
+        LIMIT 1000;
+      `),
+      pgQuery(`
+        SELECT DISTINCT set_name
+        FROM nft_core_metadata
+        WHERE set_name IS NOT NULL
+          AND set_name <> ''
+        ORDER BY set_name
+        LIMIT 2000;
+      `),
+      pgQuery(`
+        SELECT DISTINCT position
+        FROM nft_core_metadata
+        WHERE position IS NOT NULL
+          AND position <> ''
+        ORDER BY position
+        LIMIT 100;
+      `),
+      pgQuery(`
+        SELECT DISTINCT tier
+        FROM nft_core_metadata
+        WHERE tier IS NOT NULL
+          AND tier <> ''
+        ORDER BY tier
+        LIMIT 20;
+      `)
+    ]);
 
-// ---- Wallet summary: stats + Dapper display name ----
+    console.log("Explorer filters row counts:", {
+      players: playersRes.rowCount,
+      teams: teamsRes.rowCount,
+      series: seriesRes.rowCount,
+      sets: setsRes.rowCount,
+      positions: positionsRes.rowCount,
+      tiers: tiersRes.rowCount
+    });
+
+    const totalCount =
+      playersRes.rowCount +
+      teamsRes.rowCount +
+      seriesRes.rowCount +
+      setsRes.rowCount +
+      positionsRes.rowCount +
+      tiersRes.rowCount;
+
+    if (totalCount === 0) {
+      return res.json({
+        ok: false,
+        error: "No filter values found in nft_core_metadata. Check that metadata is loaded into Neon."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      players: playersRes.rows, // [{ first_name, last_name }, ...]
+      teams: teamsRes.rows.map((r) => r.team_name),
+      series: seriesRes.rows.map((r) => r.series_name),
+      sets: setsRes.rows.map((r) => r.set_name),
+      positions: positionsRes.rows.map((r) => r.position),
+      tiers: tiersRes.rows.map((r) => r.tier)
+    });
+  } catch (err) {
+    console.error("Error in /api/explorer-filters:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -452,60 +518,6 @@ app.get("/api/wallet-summary", async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
-
-// ---- ASP / low-ask helpers (still using Postgres + scrape) ----
-async function getASP(editionIds) {
-  if (!editionIds.length) return {};
-
-  // Query local Postgres table filled by etl_edition_prices.js
-  const res = await pgQuery(
-    `
-    SELECT edition_id, asp_90d
-    FROM edition_price_stats
-    WHERE edition_id = ANY($1::text[])
-    `,
-    [editionIds]
-  );
-
-  const map = {};
-  for (const row of res.rows) {
-    if (row.asp_90d != null) {
-      map[row.edition_id] = Number(row.asp_90d);
-    }
-  }
-  return map;
-}
-
-async function getLowAsks(editionIds) {
-  if (!process.env.ENABLE_MARKET_SCRAPE) return {};
-  const map = {};
-
-  for (const id of editionIds) {
-    try {
-      const res = await fetch(`https://nflallday.com/listing/moment/${id}`, {
-        headers: { "user-agent": "Mozilla/5.0" }
-      });
-      const html = await res.text();
-
-      // try to find a dollar amount that looks like the lowest ask
-      const m =
-        html.match(/(?:lowestAsk|low(?:est)?\s*ask)[^0-9$]*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/) ||
-        html.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)/);
-
-      if (m) {
-        const num = Number(String(m[1]).replace(/[^0-9.]/g, ""));
-        if (!Number.isNaN(num)) {
-          map[id] = num;
-        }
-      }
-    } catch {
-      // ignore scrape errors for individual editions
-    }
-  }
-
-  return map;
-}
-
 app.get("/api/prices", async (req, res) => {
   try {
     const list = String(req.query.editions || "")
@@ -548,8 +560,6 @@ app.get("/api/prices", async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
-
-// ---- MAIN WALLET QUERY: rows for the table ----
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -605,8 +615,6 @@ app.get("/api/query", async (req, res) => {
     });
   }
 });
-
-// ---- Neon test route ----
 app.get("/api/test-neon", async (req, res) => {
   try {
     const client = await pool.connect();
@@ -631,6 +639,119 @@ app.get("/api/test-neon", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+app.get('/api/profiles', async (req, res) => {
+  const query = (req.query.query || '').trim();
+
+  if (!query) {
+    return res.json({ ok: true, profiles: [] });
+  }
+
+  try {
+    const sql = `
+      SELECT
+        s.display_name,
+        s.wallet_address,
+        COALESCE(COUNT(s.nft_id), 0) AS total_moments,
+        COALESCE(COUNT(*) FILTER (WHERE s.is_locked = FALSE), 0) AS unlocked_moments,
+        COALESCE(COUNT(*) FILTER (WHERE s.is_locked = TRUE), 0) AS locked_moments,
+        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'common'), 0)    AS tier_common,
+        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'uncommon'), 0)  AS tier_uncommon,
+        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'rare'), 0)      AS tier_rare,
+        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'legendary'), 0) AS tier_legendary,
+        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'ultimate'), 0)  AS tier_ultimate
+      FROM (
+        SELECT
+          wp.display_name,
+          wp.wallet_address,
+          wh.nft_id,
+          wh.is_locked,
+          LOWER(COALESCE(ncm.tier, e.tier)) AS tier_norm
+        FROM public.wallet_profiles AS wp
+        LEFT JOIN public.wallet_holdings AS wh
+          ON wh.wallet_address = wp.wallet_address
+        LEFT JOIN public.nft_core_metadata AS ncm
+          ON ncm.nft_id = wh.nft_id
+        LEFT JOIN public.editions AS e
+          ON e.edition_id = ncm.edition_id
+        WHERE LOWER(wp.display_name) LIKE LOWER($1 || '%')
+      ) AS s
+      GROUP BY
+        s.display_name,
+        s.wallet_address
+      ORDER BY
+        total_moments DESC,
+        s.display_name ASC
+      LIMIT 50;
+    `;
+
+    const values = [query];
+
+    const { rows } = await pool.query(sql, values);
+
+    return res.json({
+      ok: true,
+      profiles: rows,
+    });
+  } catch (err) {
+    console.error('GET /api/profiles error:', err);
+    return res.status(500).json({
+      ok: false,
+      error: 'Failed to load profiles',
+    });
+  }
+});
+
+
+async function getASP(editionIds) {
+  if (!editionIds.length) return {};
+
+  // Query local Postgres table filled by etl_edition_prices.js
+  const res = await pgQuery(
+    `
+    SELECT edition_id, asp_90d
+    FROM edition_price_stats
+    WHERE edition_id = ANY($1::text[])
+    `,
+    [editionIds]
+  );
+
+  const map = {};
+  for (const row of res.rows) {
+    if (row.asp_90d != null) {
+      map[row.edition_id] = Number(row.asp_90d);
+    }
+  }
+  return map;
+}
+async function getLowAsks(editionIds) {
+  if (!process.env.ENABLE_MARKET_SCRAPE) return {};
+  const map = {};
+
+  for (const id of editionIds) {
+    try {
+      const res = await fetch(`https://nflallday.com/listing/moment/${id}`, {
+        headers: { "user-agent": "Mozilla/5.0" }
+      });
+      const html = await res.text();
+
+      // try to find a dollar amount that looks like the lowest ask
+      const m =
+        html.match(/(?:lowestAsk|low(?:est)?\s*ask)[^0-9$]*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/) ||
+        html.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)/);
+
+      if (m) {
+        const num = Number(String(m[1]).replace(/[^0-9.]/g, ""));
+        if (!Number.isNaN(num)) {
+          map[id] = num;
+        }
+      }
+    } catch {
+      // ignore scrape errors for individual editions
+    }
+  }
+
+  return map;
+}
 
 // ---- Start server ----
 const port = process.env.PORT || 3000;

@@ -2,473 +2,373 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>Explorer – Chunky's NFLAD Viewer</title>
+        <title>Browse Moments – Chunky's NFLAD Viewer</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        <!-- COPY YOUR EXISTING <style> FROM index.html AND PASTE IT HERE INSTEAD OF THIS COMMENT -->
         <style>
-      :root {
-        --bg-main: #050816;
-        --bg-card: #101322;
-        --border-subtle: rgba(255, 255, 255, 0.06);
-        --text-main: #f9fafb;
-        --text-muted: #9ca3af;
-        --accent-purple: #6f42c1;
-        --accent-blue: #007bff;
-        --accent-cyan: #0dcaf0;
-        --accent-teal: #17a2b8;
-        --accent-alt: #00cccc;
-        --danger: #f97373;
-        --success: #22c55e;
-      }
+            :root {
+                --bg: #050815;
+                --bg-elevated: #0b1020;
+                --bg-elevated-soft: #101526;
+                --border-soft: #1b2236;
+                --text: #f8f9ff;
+                --text-muted: #8c95b8;
+                --accent: #6f42c1;
+                --accent2: #007bff;
+                --accent-soft: rgba(111, 66, 193, 0.18);
+                --radius-lg: 16px;
+                --radius-md: 12px;
+            }
 
-      * {
-        box-sizing: border-box;
-      }
+            * {
+                box-sizing: border-box;
+            }
 
-      body {
-        margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
-        color: var(--text-main);
-      }
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+                background: radial-gradient(circle at top, #101526 0, #050815 55%);
+                color: var(--text);
+            }
 
-      a {
-        color: var(--accent-cyan);
-        text-decoration: none;
-      }
+            a {
+                color: var(--accent2);
+                text-decoration: none;
+            }
 
-      a:hover {
-        text-decoration: underline;
-      }
+            a:hover {
+                text-decoration: underline;
+            }
 
-      .app-shell {
-        max-width: 95%;
-        margin: 0 auto;
-        padding: 1.5rem 4%;
-        min-height: 100vh;
-      }
+            /* Header / nav */
 
-      .app-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
+            header.app-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.75rem 2rem;
+                border-bottom: 1px solid var(--border-soft);
+                background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
+            }
 
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
 
-      .brand-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-      }
+            .brand-logo {
+                width: 32px;
+                height: 32px;
+                border-radius: 999px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #ffb64d, #ff5b81);
+                font-size: 20px;
+            }
 
-      .brand-logo img {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-      }
+            .brand-title {
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                font-size: 0.9rem;
+            }
 
-      .brand-title {
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
-      }
+            nav.main-nav {
+                display: flex;
+                gap: 1.25rem;
+                font-size: 0.9rem;
+            }
 
-      .wallet-form {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex: 0 0 420px;
-      }
+            nav.main-nav a {
+                color: var(--text-muted);
+            }
 
-      #wallet-input {
-        flex: 1;
-        border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.5rem 0.9rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        font-size: 0.9rem;
-      }
+            nav.main-nav a.active {
+                color: var(--text);
+                font-weight: 600;
+            }
 
-      #wallet-input::placeholder {
-        color: var(--text-muted);
-      }
+            .wallet-form {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+            }
 
-      .btn-primary {
-        border-radius: 999px;
-        border: none;
-        padding: 0.5rem 1.1rem;
-        background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-        color: white;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        white-space: nowrap;
-      }
+            .wallet-input {
+                min-width: 260px;
+                background: rgba(12, 17, 32, 0.9);
+                border-radius: 999px;
+                border: 1px solid var(--border-soft);
+                padding: 0.45rem 0.9rem;
+                color: var(--text);
+                font-size: 0.85rem;
+                outline: none;
+            }
 
-      .btn-primary:hover {
-        filter: brightness(1.05);
-      }
+            .wallet-input::placeholder {
+                color: #616887;
+            }
 
-      .wallet-summary-card {
-        margin: 1.25rem auto;
-        max-width: 1100px;
-        padding: 1rem 1.25rem;
-        border-radius: 0.75rem;
-        background: rgba(15, 15, 30, 0.9);
-        border: 1px solid var(--border-subtle);
-        display: none;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
+            .btn-primary {
+                border-radius: 999px;
+                border: none;
+                padding: 0.45rem 1.1rem;
+                background: linear-gradient(135deg, var(--accent), var(--accent2));
+                color: #fff;
+                font-size: 0.85rem;
+                cursor: pointer;
+                white-space: nowrap;
+            }
 
-      .wallet-summary-main {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-      }
+            .btn-primary:hover {
+                filter: brightness(1.05);
+            }
 
-      .wallet-summary-label {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-      }
+            /* Layout */
 
-      .wallet-summary-address {
-        font-weight: 600;
-        font-size: 0.9rem;
-      }
+            main.app-main {
+                max-width: 1320px;
+                margin: 1.5rem auto 2.5rem;
+                padding: 0 1.5rem;
+            }
 
-      .wallet-summary-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-        font-size: 0.75rem;
-      }
+            .page-title {
+                font-size: 1.15rem;
+                font-weight: 600;
+                margin-bottom: 0.25rem;
+            }
 
-      .chip {
-        border-radius: 999px;
-        padding: 0.2rem 0.7rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(15, 23, 42, 0.9);
-      }
+            .page-subtitle {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                margin-bottom: 1.25rem;
+            }
 
-      .chip-pill-tier {
-        border-radius: 999px;
-        padding: 0.15rem 0.6rem;
-        font-size: 0.7rem;
-        font-weight: 500;
-      }
+            .layout-two-column {
+                display: grid;
+                grid-template-columns: 260px minmax(0, 1fr);
+                gap: 1.5rem;
+                align-items: flex-start;
+            }
 
-      .chip-common {
-        background: #4b5563;
-        color: #e5e7eb;
-      }
+            /* Filters card */
 
-      .chip-uncommon {
-        background: #6b7280;
-        color: #e5e7eb;
-      }
+            .filters-card {
+                background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-soft);
+                padding: 1.2rem;
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+            }
 
-      .chip-rare {
-        background: #f97316;
-        color: #111827;
-      }
+            .filters-title {
+                font-size: 0.95rem;
+                font-weight: 600;
+                margin-bottom: 0.75rem;
+            }
 
-      .chip-legendary {
-        background: linear-gradient(135deg, #facc15, #f97316);
-        color: #111827;
-      }
+            .filters-help {
+                font-size: 0.78rem;
+                color: var(--text-muted);
+                margin-bottom: 0.9rem;
+            }
 
-      .chip-ultimate {
-        background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
-        color: white;
-      }
+            .filter-group {
+                margin-bottom: 0.7rem;
+            }
 
-      .content {
-        display: grid;
-        grid-template-columns: minmax(110px, 260px) minmax(0, 1fr);
-        gap: 1.25rem;
-        align-items: flex-start;
-      }
+            .filter-label {
+                font-size: 0.78rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.2rem;
+                color: var(--text-muted);
+            }
 
-      .filters-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 1rem 1.25rem;
-        font-size: 0.85rem;
-      }
+            .filter-select {
+                width: 100%;
+                background: #050a18;
+                border-radius: 10px;
+                border: 1px solid var(--border-soft);
+                padding: 0.4rem 0.65rem;
+                color: var(--text);
+                font-size: 0.85rem;
+                outline: none;
+            }
 
-      .filters-panel h3 {
-        margin: 0 0 0.75rem;
-        font-size: 0.8rem;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
+            .filters-actions {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 0.8rem;
+            }
 
-      .filter-group {
-        margin-bottom: 0.65rem;
-      }
+            .btn-secondary {
+                border-radius: 999px;
+                border: 1px solid var(--border-soft);
+                padding: 0.4rem 0.9rem;
+                background: transparent;
+                color: var(--text-muted);
+                font-size: 0.8rem;
+                cursor: pointer;
+            }
 
-      .filter-group label {
-        display: block;
-        font-size: 0.7rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        margin-bottom: 0.15rem;
-      }
+            .btn-secondary:hover {
+                border-color: var(--accent);
+                color: var(--accent2);
+            }
 
-      .filter-select {
-        width: 100%;
-        border-radius: 0.5rem;
-        border: 1px solid var(--border-subtle);
-        background: #020617;
-        color: var(--text-main);
-        padding: 0.35rem 0.6rem;
-        font-size: 0.8rem;
-      }
+            /* Results */
 
-      .reset-filters {
-        margin-top: 0.4rem;
-        border: none;
-        background: none;
-        color: var(--accent-cyan);
-        font-size: 0.75rem;
-        cursor: pointer;
-        padding: 0;
-      }
+            .results-card {
+                background: #050915;
+                border-radius: var(--radius-lg);
+                border: 1px solid var(--border-soft);
+                overflow: hidden;
+            }
 
-      .table-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 0.75rem 0.75rem 0.5rem;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
+            .results-header {
+                padding: 0.9rem 1.3rem;
+                border-bottom: 1px solid var(--border-soft);
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                gap: 0.75rem;
+            }
 
-      .table-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        margin-bottom: 0.35rem;
-      }
+            .results-title {
+                font-size: 0.95rem;
+                font-weight: 600;
+            }
 
-      #moments-title {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: var(--text-muted);
-      }
+            .results-subtitle {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+            }
 
-      .export-btn {
-        border-radius: 999px;
-        border: 1px solid var(--accent-teal);
-        background: transparent;
-        color: var(--accent-teal);
-        font-size: 0.8rem;
-        padding: 0.3rem 0.8rem;
-        cursor: pointer;
-      }
+            .results-body {
+                padding: 0.9rem 1.3rem 1.2rem;
+            }
 
-      .export-btn:hover {
-        background: rgba(13, 148, 136, 0.1);
-      }
+            .empty-state {
+                font-size: 0.83rem;
+                color: var(--text-muted);
+                margin-bottom: 0.6rem;
+            }
 
-      .table-wrapper {
-        overflow-x: auto;
-        max-height: 80vh;
-        width: 100%;
-      }
+            .table-container {
+                max-height: 70vh;
+                overflow: auto;
+                border-radius: var(--radius-md);
+                border: 1px solid var(--border-soft);
+                background: #050815;
+            }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.78rem;
-        table-layout: auto;
-      }
+            table.table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.78rem;
+            }
 
-      thead {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: #020617;
-      }
+            table.table th,
+            table.table td {
+                padding: 0.4rem 0.6rem;
+                white-space: nowrap;
+            }
 
-      th,
-      td {
-        padding: 0.25rem 0.4rem;
-        text-align: left;
-        white-space: nowrap;
-      }
+            table.table thead {
+                position: sticky;
+                top: 0;
+                background: #0b1020;
+                z-index: 1;
+            }
 
-      th {
-        font-size: 0.72rem;
-        color: var(--text-muted);
-        font-weight: 500;
-        border-bottom: 1px solid var(--border-subtle);
-        cursor: pointer;
-      }
+            table.table th {
+                text-align: left;
+                font-weight: 500;
+                color: var(--text-muted);
+                border-bottom: 1px solid var(--border-soft);
+            }
 
-      th.sortable:hover {
-        color: var(--accent-cyan);
-      }
+            table.table tbody tr:nth-child(even) {
+                background: rgba(255, 255, 255, 0.01);
+            }
 
-      th.sort-asc::after {
-        content: " ▲";
-        font-size: 0.65em;
-      }
+            table.table td {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.01);
+            }
 
-      th.sort-desc::after {
-        content: " ▼";
-        font-size: 0.65em;
-      }
+            .pill-tier {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0.1rem 0.55rem;
+                border-radius: 999px;
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
 
-      tbody tr:nth-child(2n) {
-        background: rgba(15, 23, 42, 0.7);
-      }
+            .pill-tier-common {
+                background: #343a40;
+                color: #f8f9fa;
+            }
 
-      tbody tr:nth-child(2n + 1) {
-        background: rgba(15, 23, 42, 0.4);
-      }
+            .pill-tier-uncommon {
+                background: #495057;
+                color: #f8f9fa;
+            }
 
-      tbody tr:hover {
-        background: rgba(37, 99, 235, 0.25);
-      }
+            .pill-tier-rare {
+                background: #ff8800;
+                color: #111;
+            }
 
-      .locked-pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.1rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 500;
-      }
+            .pill-tier-legendary {
+                background: linear-gradient(135deg, #ffd54f, #ffb300);
+                color: #111;
+            }
 
-      .locked-pill.locked {
-        background: rgba(236, 72, 153, 0.15);
-        color: #f472b6;
-        border: 1px solid rgba(236, 72, 153, 0.7);
-      }
+            .pill-tier-ultimate {
+                background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff);
+                color: #111;
+            }
 
-      .locked-pill.unlocked {
-        background: rgba(16, 185, 129, 0.15);
-        color: #6ee7b7;
-        border: 1px solid rgba(16, 185, 129, 0.7);
-      }
+            @media (max-width: 960px) {
+                header.app-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 0.75rem;
+                }
 
-      .link-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-        font-size: 0.72rem;
-      }
+                .wallet-form {
+                    width: 100%;
+                    justify-content: flex-start;
+                }
 
-      .link-group a {
-        color: var(--accent-cyan);
-      }
+                main.app-main {
+                    padding: 0 1rem;
+                }
 
-      .link-group a:hover {
-        text-decoration: underline;
-      }
-
-      @media (max-width: 960px) {
-        .app-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .wallet-form {
-          width: 100%;
-          flex: unset;
-        }
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-      .main-nav {
-        display: flex;
-        gap: 0.75rem;
-        margin-left: 2rem;
-        font-size: 0.9rem;
-      }
-      .main-nav a {
-        color: var(--text-muted);
-        text-decoration: none;
-        padding: 0.35rem 0.9rem;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          border-color 0.15s ease;
-      }
-      .main-nav a:hover {
-        color: var(--text-main);
-        border-color: rgba(148, 163, 184, 0.6);
-        background: rgba(15, 23, 42, 0.8);
-      }
-      .main-nav a.active {
-        color: #fff;
-        border-color: var(--accent-blue);
-        background: rgba(37, 99, 235, 0.3);
-      }
-
-      @media (max-width: 1100px) {
-        .app-header {
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 0.75rem;
-        }
-        .brand {
-          margin-bottom: 0.5rem;
-        }
-        .main-nav {
-          order: 3;
-          width: 100%;
-          justify-content: center;
-          flex-wrap: wrap;
-          margin-left: 0;
-        }
-        .wallet-form {
-          width: 100%;
-          max-width: 480px;
-        }
-      }
-    </style>
+                .layout-two-column {
+                    grid-template-columns: minmax(0, 1fr);
+                }
+            }
+        </style>
     </head>
     <body>
         <header class="app-header">
             <div class="brand">
                 <div class="brand-logo">🐱</div>
-                <div>
-                    <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
-                </div>
+                <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
             </div>
+
             <nav class="main-nav">
                 <a href="/">Wallet</a>
                 <a href="/profiles.html">Profiles</a>
@@ -477,6 +377,7 @@
                 <a href="/faq.html">FAQ</a>
                 <a href="/contact.html">Contact</a>
             </nav>
+
             <form id="wallet-form" class="wallet-form" action="/" method="GET">
                 <input
                     id="wallet-input"
@@ -490,84 +391,309 @@
         </header>
 
         <main class="app-main">
-            <!-- FILTER CARD -->
-            <section class="wallet-summary-card">
-                <div class="wallet-summary-header">
-                    <div>
-                        <div class="wallet-summary-title">Moment explorer</div>
-                        <div class="wallet-summary-subtitle">
-                            Search NFL ALL DAY moments by player, team, tier, series and set.
+            <div class="page-title">Moment explorer</div>
+            <div class="page-subtitle">
+                Search NFL ALL DAY moments by player, team, tier, series, set and position using your local Neon
+                database.
+            </div>
+
+            <div class="layout-two-column">
+                <!-- LEFT FILTERS -->
+                <aside class="filters-card">
+                    <div class="filters-title">Filters</div>
+                    <div class="filters-help">
+                        Pick a player or team from the dropdowns, then refine with tier, series, set, and position.
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Player</div>
+                        <select id="ex-player" class="filter-select">
+                            <option value="">All players</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Team</div>
+                        <select id="ex-team" class="filter-select">
+                            <option value="">All teams</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Tier</div>
+                        <select id="ex-tier" class="filter-select">
+                            <option value="">All tiers</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Series</div>
+                        <select id="ex-series" class="filter-select">
+                            <option value="">All series</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Set</div>
+                        <select id="ex-set" class="filter-select">
+                            <option value="">All sets</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <div class="filter-label">Position</div>
+                        <select id="ex-position" class="filter-select">
+                            <option value="">All positions</option>
+                        </select>
+                    </div>
+
+                    <div class="filters-actions">
+                        <button id="ex-search-btn" type="button" class="btn-primary">Search</button>
+                        <button id="ex-reset-btn" type="button" class="btn-secondary">Reset</button>
+                    </div>
+                </aside>
+
+                <!-- RIGHT RESULTS -->
+                <section class="results-card">
+                    <div class="results-header">
+                        <div class="results-title">Results</div>
+                        <div class="results-subtitle" id="ex-results-summary">
+                            Enter filters on the left and hit Search.
                         </div>
                     </div>
-                </div>
+                    <div class="results-body">
+                        <div id="ex-empty" class="empty-state">No search yet.</div>
 
-                <div class="wallet-stats-row" style="margin-top: 1.25rem; gap: 0.75rem; flex-wrap: wrap">
-                    <input
-                        id="ex-player"
-                        type="text"
-                        class="filter-input"
-                        placeholder="Player (e.g. Nick Chubb)"
-                        style="flex: 2; min-width: 180px" />
-                    <input
-                        id="ex-team"
-                        type="text"
-                        class="filter-input"
-                        placeholder="Team (e.g. Browns)"
-                        style="flex: 1; min-width: 140px" />
-                    <select id="ex-tier" class="filter-input" style="flex: 0.8; min-width: 130px">
-                        <option value="">Tier (any)</option>
-                        <option value="Common">Common</option>
-                        <option value="Uncommon">Uncommon</option>
-                        <option value="Rare">Rare</option>
-                        <option value="Legendary">Legendary</option>
-                        <option value="Ultimate">Ultimate</option>
-                    </select>
-                    <input
-                        id="ex-series"
-                        type="text"
-                        class="filter-input"
-                        placeholder="Series (e.g. Series 1)"
-                        style="flex: 1; min-width: 150px" />
-                    <input
-                        id="ex-set"
-                        type="text"
-                        class="filter-input"
-                        placeholder="Set (e.g. Base)"
-                        style="flex: 1; min-width: 150px" />
-                    <button id="ex-search-btn" class="btn-primary" style="flex: 0 0 auto">Search</button>
-                </div>
-            </section>
-
-            <!-- RESULTS TABLE -->
-            <section class="card" style="margin-top: 2rem">
-                <div class="card-header">
-                    <div class="card-title">Results</div>
-                    <div class="card-subtitle" id="ex-results-summary">Enter filters above and press Search.</div>
-                </div>
-                <div class="card-body">
-                    <div id="ex-empty" class="empty-state">No search yet.</div>
-                    <div class="table-container">
-                        <table class="table" id="ex-table" style="display: none">
-                            <thead>
-                                <tr>
-                                    <th>NFT ID</th>
-                                    <th>Player</th>
-                                    <th>Team</th>
-                                    <th>Pos</th>
-                                    <th>Tier</th>
-                                    <th>Serial / Max</th>
-                                    <th>Series</th>
-                                    <th>Set</th>
-                                    <th>Links</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ex-tbody"></tbody>
-                        </table>
+                        <div class="table-container">
+                            <table class="table" id="ex-table" style="display: none">
+                                <thead>
+                                    <tr>
+                                        <th>NFT ID</th>
+                                        <th>Player</th>
+                                        <th>Team</th>
+                                        <th>Pos</th>
+                                        <th>Tier</th>
+                                        <th>Serial / Max</th>
+                                        <th>Series</th>
+                                        <th>Set</th>
+                                        <th>Links</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ex-tbody"></tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
 
-        <script src="/explorer.js"></script>
+        <script>
+            async function loadFilterOptions() {
+  const summary = document.getElementById("ex-results-summary");
+  try {
+    const res = await fetch("/api/explorer-filters");
+    const data = await res.json();
+
+    if (!data.ok) {
+      console.error("explorer-filters error:", data.error);
+      summary.textContent =
+        "Filters failed to load: " + (data.error || "unknown error");
+      return;
+    }
+
+    // Helpers
+    const playerSelect = document.getElementById("ex-player");
+    const teamSelect = document.getElementById("ex-team");
+    const tierSelect = document.getElementById("ex-tier");
+    const seriesSelect = document.getElementById("ex-series");
+    const setSelect = document.getElementById("ex-set");
+    const posSelect = document.getElementById("ex-position");
+
+    function addOptions(selectEl, items, makeLabel) {
+      items.forEach((item) => {
+        const label = makeLabel ? makeLabel(item) : item;
+        if (!label) return;
+        const opt = document.createElement("option");
+        opt.value = label;
+        opt.textContent = label;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    // Players
+    playerSelect.innerHTML = '<option value="">All players</option>';
+    addOptions(
+      playerSelect,
+      data.players || [],
+      (p) =>
+        [p.first_name, p.last_name].filter(Boolean).join(" ") || null
+    );
+
+    // Teams
+    teamSelect.innerHTML = '<option value="">All teams</option>';
+    addOptions(teamSelect, data.teams || [], (t) => t);
+
+    // Tiers – in nice order
+    const tierOrder = ["Common", "Uncommon", "Rare", "Legendary", "Ultimate"];
+    const tiersSet = new Set((data.tiers || []).map((t) => t));
+    tierSelect.innerHTML = '<option value="">All tiers</option>';
+    tierOrder.forEach((t) => {
+      if (tiersSet.has(t) || tiersSet.has(t.toUpperCase())) {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        tierSelect.appendChild(opt);
+      }
+    });
+    (data.tiers || []).forEach((t) => {
+      if (!tierOrder.includes(t)) {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        tierSelect.appendChild(opt);
+      }
+    });
+
+    // Series
+    seriesSelect.innerHTML = '<option value="">All series</option>';
+    addOptions(seriesSelect, data.series || [], (s) => s);
+
+    // Sets
+    setSelect.innerHTML = '<option value="">All sets</option>';
+    addOptions(setSelect, data.sets || [], (s) => s);
+
+    // Positions
+    posSelect.innerHTML = '<option value="">All positions</option>';
+    addOptions(posSelect, data.positions || [], (p) => p);
+
+    summary.textContent = "Filters loaded. Pick some and hit Search.";
+  } catch (err) {
+    console.error("loadFilterOptions error:", err);
+    summary.textContent =
+      "Filters failed to load – open DevTools Console for details.";
+  }
+}
+
+
+            async function runSearch() {
+                const player = document.getElementById("ex-player").value.trim();
+                const team = document.getElementById("ex-team").value.trim();
+                const tier = document.getElementById("ex-tier").value.trim();
+                const series = document.getElementById("ex-series").value.trim();
+                const set = document.getElementById("ex-set").value.trim();
+                const position = document.getElementById("ex-position").value.trim();
+
+                const params = new URLSearchParams();
+                if (player) params.set("player", player);
+                if (team) params.set("team", team);
+                if (tier) params.set("tier", tier);
+                if (series) params.set("series", series);
+                if (set) params.set("set", set);
+                if (position) params.set("position", position);
+                params.set("limit", "200");
+
+                const summary = document.getElementById("ex-results-summary");
+                const empty = document.getElementById("ex-empty");
+                const table = document.getElementById("ex-table");
+                const tbody = document.getElementById("ex-tbody");
+
+                if (!params.toString()) {
+                    summary.textContent = "Choose at least one filter before searching.";
+                    table.style.display = "none";
+                    empty.style.display = "block";
+                    empty.textContent = "No search yet.";
+                    return;
+                }
+
+                summary.textContent = "Searching…";
+                empty.style.display = "block";
+                empty.textContent = "Loading…";
+                table.style.display = "none";
+
+                try {
+                    const res = await fetch("/api/search-moments?" + params.toString());
+                    const data = await res.json();
+                    if (!data.ok) throw new Error(data.error || "Search failed");
+
+                    summary.textContent = "Found " + data.count + " moment(s).";
+                    tbody.innerHTML = "";
+
+                    if (!data.rows || !data.rows.length) {
+                        empty.style.display = "block";
+                        empty.textContent = "No moments matched your filters.";
+                        table.style.display = "none";
+                        return;
+                    }
+
+                    empty.style.display = "none";
+                    table.style.display = "table";
+
+                    for (const r of data.rows) {
+                        const tr = document.createElement("tr");
+                        const playerName = [r.first_name, r.last_name].filter(Boolean).join(" ");
+                        const serial = r.serial_number ?? "";
+                        const max = r.max_mint_size ?? "";
+                        const serialText = serial || max ? `${serial || "–"} / ${max || "?"}` : "";
+
+                        const momentUrl = r.nft_id ? `https://nflallday.com/moments/${r.nft_id}` : "";
+                        const marketUrl = r.edition_id ? `https://nflallday.com/listing/moment/${r.edition_id}` : "";
+
+                        const tier = (r.tier || "").toLowerCase();
+                        let tierClass = "";
+                        if (tier === "common") tierClass = "pill-tier-common";
+                        else if (tier === "uncommon") tierClass = "pill-tier-uncommon";
+                        else if (tier === "rare") tierClass = "pill-tier-rare";
+                        else if (tier === "legendary") tierClass = "pill-tier-legendary";
+                        else if (tier === "ultimate") tierClass = "pill-tier-ultimate";
+
+                        tr.innerHTML = `
+              <td>${r.nft_id || ""}</td>
+              <td>${playerName || "(unknown)"}</td>
+              <td>${r.team_name || ""}</td>
+              <td>${r.position || ""}</td>
+              <td>
+                ${tierClass ? `<span class="pill-tier ${tierClass}">${r.tier || ""}</span>` : r.tier || ""}
+              </td>
+              <td>${serialText}</td>
+              <td>${r.series_name || ""}</td>
+              <td>${r.set_name || ""}</td>
+              <td>
+                ${momentUrl ? `<a href="${momentUrl}" target="_blank">Moment</a>` : ""}
+                ${marketUrl ? ` · <a href="${marketUrl}" target="_blank">Market</a>` : ""}
+              </td>
+            `;
+
+                        tbody.appendChild(tr);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    summary.textContent = "Search failed.";
+                    empty.style.display = "block";
+                    empty.textContent = "Something went wrong.";
+                    table.style.display = "none";
+                }
+            }
+
+            function resetFilters() {
+                document.getElementById("ex-player").value = "";
+                document.getElementById("ex-team").value = "";
+                document.getElementById("ex-tier").value = "";
+                document.getElementById("ex-series").value = "";
+                document.getElementById("ex-set").value = "";
+                document.getElementById("ex-position").value = "";
+
+                document.getElementById("ex-results-summary").textContent = "Enter filters on the left and hit Search.";
+                document.getElementById("ex-empty").style.display = "block";
+                document.getElementById("ex-empty").textContent = "No search yet.";
+                document.getElementById("ex-table").style.display = "none";
+                document.getElementById("ex-tbody").innerHTML = "";
+            }
+
+            // Wire up buttons and load filter options
+            document.getElementById("ex-search-btn").addEventListener("click", runSearch);
+            document.getElementById("ex-reset-btn").addEventListener("click", resetFilters);
+
+            loadFilterOptions();
+        </script>
     </body>
 </html>
