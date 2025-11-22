@@ -15,7 +15,6 @@
         --accent-blue: #007bff;
         --accent-cyan: #0dcaf0;
         --accent-teal: #17a2b8;
-        --accent-alt: #00cccc;
         --danger: #f97373;
         --success: #22c55e;
       }
@@ -40,7 +39,6 @@
         color: var(--accent-cyan);
         text-decoration: none;
       }
-
       a:hover {
         text-decoration: underline;
       }
@@ -75,12 +73,6 @@
         align-items: center;
         justify-content: center;
         font-size: 1.4rem;
-      }
-
-      .brand-logo img {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
       }
 
       .brand-title {
@@ -122,9 +114,26 @@
         cursor: pointer;
         white-space: nowrap;
       }
-
       .btn-primary:hover {
         filter: brightness(1.05);
+      }
+
+      .btn-secondary {
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        padding: 0.35rem 0.8rem;
+        background: #020617;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      .btn-secondary[disabled] {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .btn-secondary:not([disabled]):hover {
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
       }
 
       .wallet-summary-card {
@@ -177,27 +186,22 @@
         font-size: 0.7rem;
         font-weight: 500;
       }
-
       .chip-common {
         background: #4b5563;
         color: #e5e7eb;
       }
-
       .chip-uncommon {
         background: #6b7280;
         color: #e5e7eb;
       }
-
       .chip-rare {
         background: #f97316;
         color: #111827;
       }
-
       .chip-legendary {
         background: linear-gradient(135deg, #facc15, #f97316);
         color: #111827;
       }
-
       .chip-ultimate {
         background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
         color: white;
@@ -292,7 +296,6 @@
         padding: 0.3rem 0.8rem;
         cursor: pointer;
       }
-
       .export-btn:hover {
         background: rgba(13, 148, 136, 0.1);
       }
@@ -335,12 +338,10 @@
       th.sortable:hover {
         color: var(--accent-cyan);
       }
-
       th.sort-asc::after {
         content: " ▲";
         font-size: 0.65em;
       }
-
       th.sort-desc::after {
         content: " ▼";
         font-size: 0.65em;
@@ -349,11 +350,9 @@
       tbody tr:nth-child(2n) {
         background: rgba(15, 23, 42, 0.7);
       }
-
       tbody tr:nth-child(2n + 1) {
         background: rgba(15, 23, 42, 0.4);
       }
-
       tbody tr:hover {
         background: rgba(37, 99, 235, 0.25);
       }
@@ -367,13 +366,11 @@
         font-size: 0.7rem;
         font-weight: 500;
       }
-
       .locked-pill.locked {
         background: rgba(236, 72, 153, 0.15);
         color: #f472b6;
         border: 1px solid rgba(236, 72, 153, 0.7);
       }
-
       .locked-pill.unlocked {
         background: rgba(16, 185, 129, 0.15);
         color: #6ee7b7;
@@ -390,24 +387,10 @@
       .link-group a {
         color: var(--accent-cyan);
       }
-
       .link-group a:hover {
         text-decoration: underline;
       }
 
-      @media (max-width: 960px) {
-        .app-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .wallet-form {
-          width: 100%;
-          flex: unset;
-        }
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
       .main-nav {
         display: flex;
         gap: 0.75rem;
@@ -436,6 +419,15 @@
         background: rgba(37, 99, 235, 0.3);
       }
 
+      #wallet-pager {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        font-size: 0.8rem;
+        justify-content: flex-end;
+      }
+
       @media (max-width: 1100px) {
         .app-header {
           flex-wrap: wrap;
@@ -457,6 +449,20 @@
           max-width: 480px;
         }
       }
+
+      @media (max-width: 960px) {
+        .app-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .wallet-form {
+          width: 100%;
+          flex: unset;
+        }
+        .content {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
@@ -464,25 +470,25 @@
       <header class="app-header">
         <div class="brand">
           <div class="brand-logo">🐱</div>
-          <div>
-            <div class="brand-title">Chunky's NFLAD Viewer</div>
-          </div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
         </div>
-<nav class="main-nav">
-  <a href="/">Wallet</a>
-  <a href="/profiles.html">Profiles</a>
-  <a href="/top-holders.html">Top holders</a>
-  <a href="/explorer.html">Browse</a>
-  <a href="/faq.html">FAQ</a>
-  <a href="/contact.html">Contact</a>
-  <a href="/login.html" id="nav-account-link">Login</a>
-</nav>
+
+        <nav class="main-nav">
+          <a href="/" class="active">Wallet</a>
+          <a href="/profiles.html">Profiles</a>
+          <a href="/top-holders.html">Top holders</a>
+          <a href="/explorer.html">Browse</a>
+          <a href="/faq.html">FAQ</a>
+          <a href="/contact.html">Contact</a>
+          <a href="/login.html" id="nav-account-link">Login</a>
+        </nav>
 
         <form id="wallet-form" class="wallet-form">
           <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
           <button type="submit" class="btn-primary">View Wallet</button>
         </form>
       </header>
+
       <section id="wallet-summary-card" class="wallet-summary-card"></section>
 
       <main class="content">
@@ -524,13 +530,13 @@
             <select id="filter-locked" class="filter-select"></select>
           </div>
 
-          <button id="reset-filters" class="reset-filters">Reset filters</button>
+          <button id="reset-filters" class="reset-filters" type="button">Reset filters</button>
         </aside>
 
         <section class="table-panel">
           <div class="table-header">
             <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn">Export CSV</button>
+            <button id="export-csv" class="export-btn" type="button">Export CSV</button>
           </div>
 
           <div class="table-wrapper">
@@ -553,36 +559,79 @@
               <tbody id="wallet-tbody"></tbody>
             </table>
           </div>
+
+          <div id="wallet-pager">
+            <button id="wallet-page-prev" class="btn-secondary" type="button">Prev</button>
+            <button id="wallet-page-next" class="btn-secondary" type="button">Next</button>
+            <span id="wallet-page-info"></span>
+          </div>
         </section>
       </main>
     </div>
-<script>
-  (function () {
-    async function updateNavAccount() {
-      const link = document.getElementById("nav-account-link");
-      if (!link) return;
 
-      try {
-        const res = await fetch("/api/me");
-        const data = await res.json();
+    <!-- Keep existing nav-account logic -->
+    <script>
+      (function () {
+        async function updateNavAccount() {
+          const link = document.getElementById("nav-account-link");
+          if (!link) return;
 
-        if (data && data.user) {
-          // Logged in: show email and point to login/account page
-          link.href = "/login.html";
-          link.textContent = data.user.email;
-        } else {
-          // Not logged in
-          link.href = "/login.html";
-          link.textContent = "Login";
+          try {
+            const res = await fetch("/api/me", { credentials: "include" });
+            const data = await res.json();
+
+            if (data && data.user) {
+              link.href = "/login.html";
+              link.textContent = data.user.email;
+            } else {
+              link.href = "/login.html";
+              link.textContent = "Login";
+            }
+          } catch (err) {
+            console.error("updateNavAccount error:", err);
+          }
         }
-      } catch (err) {
-        console.error("updateNavAccount error:", err);
-      }
-    }
 
-    updateNavAccount();
-  })();
-</script>
+        updateNavAccount();
+      })();
+    </script>
+
+    <!-- Auto-load default wallet if logged in and URL has no ?wallet -->
+    <script>
+      async function maybeLoadDefaultWallet() {
+        const walletInput = document.getElementById("wallet-input");
+        if (!walletInput) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const walletFromUrl = (params.get("wallet") || "").trim();
+        if (walletFromUrl) {
+          walletInput.value = walletFromUrl;
+          if (typeof window.runQuery === "function") {
+            window.runQuery(walletFromUrl);
+          }
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/me", { credentials: "include" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data.ok || !data.user || !data.user.default_wallet_address) return;
+
+          const wallet = (data.user.default_wallet_address || "").trim();
+          if (!wallet) return;
+
+          walletInput.value = wallet;
+          if (typeof window.runQuery === "function") {
+            window.runQuery(wallet);
+          }
+        } catch (err) {
+          console.error("Failed to auto-load default wallet:", err);
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", maybeLoadDefaultWallet);
+    </script>
 
     <script src="app.js"></script>
   </body>

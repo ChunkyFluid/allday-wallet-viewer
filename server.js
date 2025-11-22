@@ -9,7 +9,7 @@ import pool from "./db/pool.js";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Pool } from "pg";
+import { Pool } from "pg"; // (still imported; fine even if unused)
 import session from "express-session";
 import bcrypt from "bcrypt";
 
@@ -19,12 +19,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Basic middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.json());
 
-// ---- Snowflake connection ----
+// Static files
+app.use(express.static(path.join(__dirname, "public")));
+
+// Sessions (must be before routes)
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      secure: false // set to true when behind HTTPS + proxy
+    }
+  })
+);
+
+// ------------------ Snowflake connection ------------------
+
 const connection = snowflake.createConnection({
   account: process.env.SNOWFLAKE_ACCOUNT,
   username: process.env.SNOWFLAKE_USERNAME,
@@ -34,6 +52,7 @@ const connection = snowflake.createConnection({
   schema: process.env.SNOWFLAKE_SCHEMA,
   role: process.env.SNOWFLAKE_ROLE
 });
+
 let snowflakeConnected = false;
 
 function ensureSnowflakeConnected() {
@@ -51,11 +70,13 @@ function ensureSnowflakeConnected() {
     });
   });
 }
+
 function ensureConnected() {
   return ensureSnowflakeConnected();
 }
 
-// ---- Load base SQL (with your original wallet baked in) ----
+// ------------------ Wallet SQL (Snowflake base query) ------------------
+
 const sqlPath = path.join(__dirname, "NFLAllDayWalletGrab.sql");
 const baseSql = fs.readFileSync(sqlPath, "utf8");
 
@@ -74,6 +95,7 @@ function buildSqlForWallet(wallet) {
 
   return updatedSql;
 }
+
 function executeSql(sqlText) {
   return new Promise((resolve, reject) => {
     connection.execute({
@@ -90,23 +112,13 @@ function executeSql(sqlText) {
   });
 }
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "dev-secret-change-me",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-      secure: false // set to true when you’re behind HTTPS
-    }
-  })
-);
+// ------------------ Auth helpers ------------------
 
-// Helper: basic email check
 function isValidEmail(email) {
   return typeof email === "string" && email.includes("@") && email.length <= 255;
 }
+
+// ------------------ Auth routes ------------------
 
 // POST /api/signup  { email, password }
 app.post("/api/signup", async (req, res) => {
@@ -139,7 +151,7 @@ app.post("/api/signup", async (req, res) => {
 
     const user = rows[0];
 
-    // create session
+    // Create session
     req.session.user = {
       id: user.id,
       email: user.email
@@ -169,7 +181,7 @@ app.post("/api/login", async (req, res) => {
     }
 
     const selectSql = `
-      SELECT id, email, password_hash
+      SELECT id, email, password_hash, default_wallet_address
       FROM public.users
       WHERE email = $1
       LIMIT 1;
@@ -187,7 +199,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ ok: false, error: "Invalid email or password." });
     }
 
-    // set session
+    // Set session
     req.session.user = {
       id: user.id,
       email: user.email
@@ -197,7 +209,8 @@ app.post("/api/login", async (req, res) => {
       ok: true,
       user: {
         id: user.id,
-        email: user.email
+        email: user.email,
+        default_wallet_address: user.default_wallet_address || null
       }
     });
   } catch (err) {
@@ -221,27 +234,105 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
-// GET /api/me  -> current logged in user, or null
-app.get("/api/me", (req, res) => {
-  if (req.session && req.session.user) {
-    return res.json({ ok: true, user: req.session.user });
+// GET /api/me  -> current logged-in user
+app.get("/api/me", async (req, res) => {
+  try {
+    const sessUser = req.session?.user;
+    if (!sessUser || !sessUser.id) {
+      return res.json({ ok: false, user: null });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT id, email, default_wallet_address
+      FROM public.users
+      WHERE id = $1
+      LIMIT 1;
+      `,
+      [sessUser.id]
+    );
+
+    if (!rows.length) {
+      return res.json({ ok: false, user: null });
+    }
+
+    const u = rows[0];
+
+    return res.json({
+      ok: true,
+      user: {
+        id: u.id,
+        email: u.email,
+        default_wallet_address: u.default_wallet_address || null
+      }
+    });
+  } catch (err) {
+    console.error("GET /api/me error:", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
-  return res.json({ ok: true, user: null });
 });
 
-// Optional: example of a protected route
-function requireAuth(req, res, next) {
-  if (!req.session || !req.session.user) {
-    return res.status(401).json({ ok: false, error: "Not authenticated." });
+// POST /api/me/wallet  { wallet_address }
+app.post("/api/me/wallet", async (req, res) => {
+  try {
+    const sessUser = req.session?.user;
+    if (!sessUser || !sessUser.id) {
+      console.log("POST /api/me/wallet: no session user", req.session);
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    let { wallet_address } = req.body || {};
+
+    if (wallet_address && typeof wallet_address === "string") {
+      wallet_address = wallet_address.trim();
+      if (wallet_address && !wallet_address.startsWith("0x")) {
+        wallet_address = "0x" + wallet_address;
+      }
+      wallet_address = wallet_address.toLowerCase();
+      // simple sanity check (optional)
+      if (!/^0x[0-9a-f]{4,64}$/.test(wallet_address)) {
+        return res.status(400).json({ ok: false, error: "Invalid wallet format." });
+      }
+    } else {
+      // Treat empty/undefined as "clear default"
+      wallet_address = null;
+    }
+
+    const { rows } = await pool.query(
+      `
+      UPDATE public.users
+      SET default_wallet_address = $1
+      WHERE id = $2
+      RETURNING id, email, default_wallet_address;
+      `,
+      [wallet_address, sessUser.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ ok: false, error: "User not found" });
+    }
+
+    const u = rows[0];
+
+    // Optionally update session (purely cosmetic)
+    req.session.user = {
+      id: u.id,
+      email: u.email
+    };
+
+    return res.json({
+      ok: true,
+      default_wallet_address: u.default_wallet_address
+    });
+  } catch (err) {
+    console.error("POST /api/me/wallet error", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
   }
-  next();
-}
+});
 
-// Example protected endpoint:
-// app.get('/api/favorites', requireAuth, async (req, res) => {
-//   // req.session.user.id is available
-// });
+// ------------------ Existing API routes ------------------
 
+// Snowflake collection endpoint
 app.get("/api/collection", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim();
@@ -267,6 +358,8 @@ app.get("/api/collection", async (req, res) => {
     });
   }
 });
+
+// Wallet profile
 app.get("/api/wallet-profile", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -298,6 +391,8 @@ app.get("/api/wallet-profile", async (req, res) => {
     });
   }
 });
+
+// Search profiles by display name prefix
 app.get("/api/search-profiles", async (req, res) => {
   try {
     const qRaw = (req.query.q || "").toString().trim();
@@ -331,6 +426,8 @@ app.get("/api/search-profiles", async (req, res) => {
     });
   }
 });
+
+// Top holders for a specific edition
 app.get("/api/top-holders", async (req, res) => {
   try {
     const edition = (req.query.edition || "").toString().trim();
@@ -371,6 +468,8 @@ app.get("/api/top-holders", async (req, res) => {
     });
   }
 });
+
+// Moment search (explorer)
 app.get("/api/search-moments", async (req, res) => {
   try {
     const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
@@ -383,7 +482,6 @@ app.get("/api/search-moments", async (req, res) => {
     let idx = 1;
 
     if (player) {
-      // Match "First Last" name (case-insensitive)
       conditions.push(`LOWER(first_name || ' ' || last_name) LIKE LOWER($${idx++})`);
       params.push(`%${player}%`);
     }
@@ -452,6 +550,8 @@ app.get("/api/search-moments", async (req, res) => {
     });
   }
 });
+
+// Explorer filters
 app.get("/api/explorer-filters", async (req, res) => {
   try {
     console.log("GET /api/explorer-filters – loading distinct values from nft_core_metadata…");
@@ -537,7 +637,7 @@ app.get("/api/explorer-filters", async (req, res) => {
 
     return res.json({
       ok: true,
-      players: playersRes.rows, // [{ first_name, last_name }, ...]
+      players: playersRes.rows,
       teams: teamsRes.rows.map((r) => r.team_name),
       series: seriesRes.rows.map((r) => r.series_name),
       sets: setsRes.rows.map((r) => r.set_name),
@@ -552,6 +652,8 @@ app.get("/api/explorer-filters", async (req, res) => {
     });
   }
 });
+
+// Wallet summary
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -560,12 +662,10 @@ app.get("/api/wallet-summary", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
-    // Basic format check (same as /api/query)
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // 1) Get profile (Dapper display name) if we have it
     const profileResult = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -578,8 +678,6 @@ app.get("/api/wallet-summary", async (req, res) => {
 
     const profileRow = profileResult.rows[0] || null;
 
-    // 2) Get counts and tier breakdown from Neon
-    //    IMPORTANT: use nft_core_metadata for tier (same as /api/query)
     const statsResult = await pgQuery(
       `
       SELECT
@@ -639,6 +737,8 @@ app.get("/api/wallet-summary", async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
+
+// Edition prices
 app.get("/api/prices", async (req, res) => {
   try {
     const list = String(req.query.editions || "")
@@ -681,6 +781,8 @@ app.get("/api/prices", async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
+
+// Full wallet query
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
@@ -688,7 +790,6 @@ app.get("/api/query", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
-    // Basic Flow/Dapper-style address check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
@@ -736,6 +837,8 @@ app.get("/api/query", async (req, res) => {
     });
   }
 });
+
+// Test Neon
 app.get("/api/test-neon", async (req, res) => {
   try {
     const client = await pool.connect();
@@ -760,6 +863,8 @@ app.get("/api/test-neon", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// Profiles aggregate search for profiles page
 app.get("/api/profiles", async (req, res) => {
   const query = (req.query.query || "").trim();
 
@@ -817,6 +922,8 @@ app.get("/api/profiles", async (req, res) => {
     });
   }
 });
+
+// Top wallets page
 app.get("/api/top-wallets", async (req, res) => {
   let limit = parseInt(req.query.limit, 10);
   if (Number.isNaN(limit) || limit <= 0) limit = 50;
@@ -857,7 +964,7 @@ app.get("/api/top-wallets", async (req, res) => {
       limit,
       count: rows.length,
       wallets: rows,
-      schemaVersion: 2 // debug flag so you can see you’re on the new route
+      schemaVersion: 2 // debug flag
     });
   } catch (err) {
     console.error("GET /api/top-wallets error:", err);
@@ -868,58 +975,85 @@ app.get("/api/top-wallets", async (req, res) => {
   }
 });
 
-async function getASP(editionIds) {
-  if (!editionIds.length) return {};
-
-  // Query local Postgres table filled by etl_edition_prices.js
-  const res = await pgQuery(
-    `
-    SELECT edition_id, asp_90d
-    FROM edition_price_stats
-    WHERE edition_id = ANY($1::text[])
-    `,
-    [editionIds]
-  );
-
-  const map = {};
-  for (const row of res.rows) {
-    if (row.asp_90d != null) {
-      map[row.edition_id] = Number(row.asp_90d);
+// Paged wallet query: /api/query-paged?wallet=0x...&page=1&pageSize=200
+app.get("/api/query-paged", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    if (!wallet) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Missing ?wallet=0x..." });
     }
-  }
-  return map;
-}
-async function getLowAsks(editionIds) {
-  if (!process.env.ENABLE_MARKET_SCRAPE) return {};
-  const map = {};
 
-  for (const id of editionIds) {
-    try {
-      const res = await fetch(`https://nflallday.com/listing/moment/${id}`, {
-        headers: { "user-agent": "Mozilla/5.0" }
-      });
-      const html = await res.text();
-
-      // try to find a dollar amount that looks like the lowest ask
-      const m =
-        html.match(/(?:lowestAsk|low(?:est)?\s*ask)[^0-9$]*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/) ||
-        html.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)/);
-
-      if (m) {
-        const num = Number(String(m[1]).replace(/[^0-9.]/g, ""));
-        if (!Number.isNaN(num)) {
-          map[id] = num;
-        }
-      }
-    } catch {
-      // ignore scrape errors for individual editions
+    if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Invalid wallet format" });
     }
+
+    // Paging params
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const pageSizeRaw = parseInt(req.query.pageSize, 10) || 200;
+    const pageSize = Math.min(Math.max(pageSizeRaw, 10), 500); // 10–500
+    const offset = (page - 1) * pageSize;
+
+    const result = await pgQuery(
+      `
+      SELECT
+        h.wallet_address,
+        h.is_locked,
+        h.last_event_ts,
+        m.nft_id,
+        m.edition_id,
+        m.play_id,
+        m.series_id,
+        m.set_id,
+        m.tier,
+        m.serial_number,
+        m.max_mint_size,
+        m.first_name,
+        m.last_name,
+        m.team_name,
+        m.position,
+        m.jersey_number,
+        m.series_name,
+        m.set_name,
+        COUNT(*) OVER ()::int AS total_count
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1
+      ORDER BY h.last_event_ts DESC
+      LIMIT $2 OFFSET $3;
+      `,
+      [wallet, pageSize, offset]
+    );
+
+    const rows = result.rows || [];
+    const total = rows.length ? rows[0].total_count : 0;
+
+    // Strip the window column before returning
+    const cleanedRows = rows.map(({ total_count, ...rest }) => rest);
+
+    return res.json({
+      ok: true,
+      wallet,
+      page,
+      pageSize,
+      total,
+      rows: cleanedRows,
+    });
+  } catch (err) {
+    console.error("Error in /api/query-paged (Neon):", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err),
+    });
   }
+});
 
-  return map;
-}
 
-// ---- Start server ----
+// ------------------ Start server ------------------
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`NFL ALL DAY collection viewer running on http://localhost:${port}`);

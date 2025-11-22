@@ -1,45 +1,44 @@
 // public/app.js
 
-const state = {
-  wallet: null,
-  allRows: [],
-  filteredRows: [],
-  sort: { key: "last_event_ts", dir: "desc" },
-  filters: {
-    team: "ALL",
-    player: "ALL",
-    series: "ALL",
-    set: "ALL",
-    tier: "ALL",
-    position: "ALL",
-    locked: "ALL", // ALL | LOCKED | UNLOCKED
-  },
-};
+const PAGE_SIZE = 200;
 
-const sortColumns = {
-  playerName: { type: "string" },
-  team_name: { type: "string" },
-  position: { type: "string" },
-  tier: { type: "string" },
-  serial_number: { type: "number" },
-  max_mint_size: { type: "number" },
-  series_name: { type: "string" },
-  set_name: { type: "string" },
-  is_locked: { type: "boolean" },
-  last_event_ts: { type: "date" },
-};
+let allMoments = [];
+let filteredMoments = [];
+let currentSortKey = "last_event_ts";
+let currentSortDir = "desc";
+let currentPage = 1;
 
-function $(id) {
-  return document.getElementById(id);
+function getEls() {
+  return {
+    form: document.getElementById("wallet-form"),
+    walletInput: document.getElementById("wallet-input"),
+    tbody: document.getElementById("wallet-tbody"),
+    title: document.getElementById("moments-title"),
+    exportBtn: document.getElementById("export-csv"),
+    pagerPrev: document.getElementById("wallet-page-prev"),
+    pagerNext: document.getElementById("wallet-page-next"),
+    pagerInfo: document.getElementById("wallet-page-info"),
+    summaryCard: document.getElementById("wallet-summary-card"),
+    filterTeam: document.getElementById("filter-team"),
+    filterPlayer: document.getElementById("filter-player"),
+    filterSeries: document.getElementById("filter-series"),
+    filterSet: document.getElementById("filter-set"),
+    filterTier: document.getElementById("filter-tier"),
+    filterPosition: document.getElementById("filter-position"),
+    filterLocked: document.getElementById("filter-locked"),
+    resetFilters: document.getElementById("reset-filters"),
+    table: document.getElementById("wallet-table")
+  };
 }
 
-function escapeCsv(val) {
-  if (val == null) return "";
-  const s = String(val);
-  if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
+function tierToClass(tier) {
+  const t = (tier || "").toLowerCase();
+  if (t === "common") return "chip-common";
+  if (t === "uncommon") return "chip-uncommon";
+  if (t === "rare") return "chip-rare";
+  if (t === "legendary") return "chip-legendary";
+  if (t === "ultimate") return "chip-ultimate";
+  return "";
 }
 
 function formatDate(ts) {
@@ -49,434 +48,464 @@ function formatDate(ts) {
   return d.toLocaleString();
 }
 
-function buildPlayerName(row) {
-  const first = row.first_name || "";
-  const last = row.last_name || "";
-  const combined = `${first} ${last}`.trim();
-  if (combined) return combined;
-  return row.playerName || ""; // fallback if already set
-}
-
-async function fetchJson(url) {
-  const res = await fetch(url);
-  return res.json();
-}
-
-// -------- Wallet summary card --------
-
-async function refreshWalletSummary(wallet) {
-  const card = $("wallet-summary-card");
-  if (!card) return;
-
-  try {
-    const data = await fetchJson(
-      "/api/wallet-summary?wallet=" + encodeURIComponent(wallet)
-    );
-
-    if (!data.ok) {
-      console.error("wallet-summary error:", data.error);
-      card.style.display = "none";
-      return;
-    }
-
-    const s = data.stats || {};
-    const byTier = s.byTier || {};
-
-    const title = data.displayName || wallet;
-    const short = wallet.slice(0, 6) + "…" + wallet.slice(-4);
-
-    card.innerHTML = `
-      <div class="wallet-summary-main">
-        <div class="wallet-summary-label">${short}</div>
-        <div class="wallet-summary-address">${title}</div>
-      </div>
-      <div class="wallet-summary-chips">
-        <span class="chip">Total: ${s.momentsTotal ?? 0}</span>
-        <span class="chip">Unlocked: ${s.unlockedCount ?? 0}</span>
-        <span class="chip">Locked: ${s.lockedCount ?? 0}</span>
-        <span class="chip chip-pill-tier chip-common">Common: ${
-          byTier.Common ?? 0
-        }</span>
-        <span class="chip chip-pill-tier chip-uncommon">Uncommon: ${
-          byTier.Uncommon ?? 0
-        }</span>
-        <span class="chip chip-pill-tier chip-rare">Rare: ${
-          byTier.Rare ?? 0
-        }</span>
-        <span class="chip chip-pill-tier chip-legendary">Legendary: ${
-          byTier.Legendary ?? 0
-        }</span>
-        <span class="chip chip-pill-tier chip-ultimate">Ultimate: ${
-          byTier.Ultimate ?? 0
-        }</span>
-      </div>
-    `;
-
-    card.style.display = "flex";
-  } catch (err) {
-    console.error("wallet-summary fetch failed:", err);
-    card.style.display = "none";
-  }
-}
-
-// -------- Filters ----------
-
-function initFilterSelect(select, label, values) {
-  select.innerHTML = "";
-
-  const firstOption = document.createElement("option");
-  firstOption.value = "ALL";
-  firstOption.textContent = label;
-  select.appendChild(firstOption);
-
-  values.forEach((v) => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    select.appendChild(opt);
-  });
-}
-
-function populateFilters(rows) {
+function buildFilterOptions() {
+  const els = getEls();
   const teams = new Set();
   const players = new Set();
   const series = new Set();
   const sets = new Set();
-  const tiers = new Set();
   const positions = new Set();
+  const tiers = new Set();
 
-  rows.forEach((r) => {
+  for (const r of allMoments) {
     if (r.team_name) teams.add(r.team_name);
-    const p = buildPlayerName(r);
-    if (p) players.add(p);
+    const playerName = [r.first_name, r.last_name].filter(Boolean).join(" ");
+    if (playerName) players.add(playerName);
     if (r.series_name) series.add(r.series_name);
     if (r.set_name) sets.add(r.set_name);
-    if (r.tier) tiers.add(r.tier);
     if (r.position) positions.add(r.position);
-  });
-
-  initFilterSelect($("filter-team"), "All teams", Array.from(teams).sort());
-  initFilterSelect(
-    $("filter-player"),
-    "All players",
-    Array.from(players).sort()
-  );
-  initFilterSelect(
-    $("filter-series"),
-    "All series",
-    Array.from(series).sort()
-  );
-  initFilterSelect($("filter-set"), "All sets", Array.from(sets).sort());
-  initFilterSelect($("filter-tier"), "All tiers", Array.from(tiers).sort());
-  initFilterSelect(
-    $("filter-position"),
-    "All positions",
-    Array.from(positions).sort()
-  );
-
-  const lockedSelect = $("filter-locked");
-  lockedSelect.innerHTML = "";
-  [
-    { value: "ALL", label: "Locked + Unlocked" },
-    { value: "LOCKED", label: "Locked only" },
-    { value: "UNLOCKED", label: "Unlocked only" },
-  ].forEach((optDef) => {
-    const opt = document.createElement("option");
-    opt.value = optDef.value;
-    opt.textContent = optDef.label;
-    lockedSelect.appendChild(opt);
-  });
-}
-
-function readFiltersFromUI() {
-  state.filters.team = $("filter-team").value;
-  state.filters.player = $("filter-player").value;
-  state.filters.series = $("filter-series").value;
-  state.filters.set = $("filter-set").value;
-  state.filters.tier = $("filter-tier").value;
-  state.filters.position = $("filter-position").value;
-  state.filters.locked = $("filter-locked").value;
-}
-
-function resetFilters() {
-  $("filter-team").value = "ALL";
-  $("filter-player").value = "ALL";
-  $("filter-series").value = "ALL";
-  $("filter-set").value = "ALL";
-  $("filter-tier").value = "ALL";
-  $("filter-position").value = "ALL";
-  $("filter-locked").value = "ALL";
-
-  readFiltersFromUI();
-  applyFiltersSortRender();
-}
-
-// -------- Sorting ----------
-
-function setSort(key) {
-  if (state.sort.key === key) {
-    state.sort.dir = state.sort.dir === "asc" ? "desc" : "asc";
-  } else {
-    state.sort.key = key;
-    state.sort.dir = key === "last_event_ts" ? "desc" : "asc";
+    if (r.tier) tiers.add(r.tier);
   }
 
-  // update header indicators
-  const ths = document.querySelectorAll(
-    "#wallet-table thead th.sortable"
-  );
-  ths.forEach((th) => {
-    th.classList.remove("sort-asc", "sort-desc");
-    if (th.dataset.sortKey === state.sort.key) {
-      th.classList.add(
-        state.sort.dir === "asc" ? "sort-asc" : "sort-desc"
-      );
+  function fillSelect(select, values, { includeAllLabel = "All" } = {}) {
+    if (!select) return;
+    select.innerHTML = "";
+    const optAll = document.createElement("option");
+    optAll.value = "";
+    optAll.textContent = includeAllLabel;
+    select.appendChild(optAll);
+
+    [...values]
+      .sort((a, b) => String(a).localeCompare(String(b)))
+      .forEach((v) => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      });
+  }
+
+  fillSelect(els.filterTeam, teams, { includeAllLabel: "All teams" });
+  fillSelect(els.filterPlayer, players, { includeAllLabel: "All players" });
+  fillSelect(els.filterSeries, series, { includeAllLabel: "All series" });
+  fillSelect(els.filterSet, sets, { includeAllLabel: "All sets" });
+  fillSelect(els.filterTier, tiers, { includeAllLabel: "All tiers" });
+  fillSelect(els.filterPosition, positions, { includeAllLabel: "All positions" });
+
+  if (els.filterLocked) {
+    els.filterLocked.innerHTML = "";
+    const optAll = document.createElement("option");
+    optAll.value = "";
+    optAll.textContent = "All";
+    els.filterLocked.appendChild(optAll);
+
+    const optUnlocked = document.createElement("option");
+    optUnlocked.value = "unlocked";
+    optUnlocked.textContent = "Unlocked only";
+    els.filterLocked.appendChild(optUnlocked);
+
+    const optLocked = document.createElement("option");
+    optLocked.value = "locked";
+    optLocked.textContent = "Locked only";
+    els.filterLocked.appendChild(optLocked);
+  }
+}
+
+function applyFilters() {
+  const els = getEls();
+  const team = els.filterTeam?.value || "";
+  const player = els.filterPlayer?.value || "";
+  const series = els.filterSeries?.value || "";
+  const setName = els.filterSet?.value || "";
+  const tier = els.filterTier?.value || "";
+  const position = els.filterPosition?.value || "";
+  const lockedVal = els.filterLocked?.value || "";
+
+  filteredMoments = allMoments.filter((r) => {
+    if (team && r.team_name !== team) return false;
+
+    if (player) {
+      const name = [r.first_name, r.last_name].filter(Boolean).join(" ");
+      if (name !== player) return false;
     }
-  });
 
-  applyFiltersSortRender();
-}
+    if (series && r.series_name !== series) return false;
+    if (setName && r.set_name !== setName) return false;
+    if (tier && r.tier !== tier) return false;
+    if (position && r.position !== position) return false;
 
-function compareValues(a, b, cfg, dir) {
-  const direction = dir === "asc" ? 1 : -1;
+    if (lockedVal === "locked" && !r.is_locked) return false;
+    if (lockedVal === "unlocked" && r.is_locked) return false;
 
-  if (a == null && b == null) return 0;
-  if (a == null) return 1 * direction;
-  if (b == null) return -1 * direction;
-
-  switch (cfg.type) {
-    case "number":
-      return (Number(a) - Number(b)) * direction;
-    case "boolean":
-      return (Boolean(a) === Boolean(b) ? 0 : Boolean(a) ? -1 : 1) * direction;
-    case "date":
-      return (new Date(a) - new Date(b)) * direction;
-    default:
-      return String(a).localeCompare(String(b)) * direction;
-  }
-}
-
-// -------- Rendering ----------
-
-function applyFiltersSortRender() {
-  readFiltersFromUI();
-
-  // filter
-  const f = state.filters;
-  let rows = state.allRows.filter((r) => {
-    if (f.team !== "ALL" && r.team_name !== f.team) return false;
-    const pName = buildPlayerName(r);
-    if (f.player !== "ALL" && pName !== f.player) return false;
-    if (f.series !== "ALL" && r.series_name !== f.series) return false;
-    if (f.set !== "ALL" && r.set_name !== f.set) return false;
-    if (f.tier !== "ALL" && r.tier !== f.tier) return false;
-    if (f.position !== "ALL" && r.position !== f.position) return false;
-    if (f.locked === "LOCKED" && !r.is_locked) return false;
-    if (f.locked === "UNLOCKED" && r.is_locked) return false;
     return true;
   });
-
-  // sort
-  const sortKey = state.sort.key;
-  const cfg = sortColumns[sortKey] || { type: "string" };
-
-  rows.sort((a, b) =>
-    compareValues(a[sortKey], b[sortKey], cfg, state.sort.dir)
-  );
-
-  state.filteredRows = rows;
-  renderTable();
 }
 
-function renderTable() {
-  const tbody = $("wallet-tbody");
-  tbody.innerHTML = "";
+function applySort() {
+  const key = currentSortKey;
+  const dir = currentSortDir;
 
-  const rows = state.filteredRows;
-  $("moments-title").textContent = `Moments (${rows.length} moments)`;
+  const getValue = (row) => {
+    if (key === "playerName") {
+      return [row.first_name, row.last_name].filter(Boolean).join(" ");
+    }
+    return row[key];
+  };
 
-  for (const r of rows) {
+  filteredMoments.sort((a, b) => {
+    let va = getValue(a);
+    let vb = getValue(b);
+
+    // handle nulls
+    if (va == null && vb == null) return 0;
+    if (va == null) return dir === "asc" ? 1 : -1;
+    if (vb == null) return dir === "asc" ? -1 : 1;
+
+    // type-aware
+    if (key === "serial_number" || key === "max_mint_size") {
+      va = Number(va) || 0;
+      vb = Number(vb) || 0;
+    } else if (key === "is_locked") {
+      va = !!va;
+      vb = !!vb;
+      if (va === vb) return 0;
+      return dir === "asc" ? (va ? 1 : -1) : va ? -1 : 1;
+    } else if (key === "last_event_ts") {
+      va = new Date(va).getTime() || 0;
+      vb = new Date(vb).getTime() || 0;
+    } else {
+      va = String(va).toLowerCase();
+      vb = String(vb).toLowerCase();
+    }
+
+    if (va < vb) return dir === "asc" ? -1 : 1;
+    if (va > vb) return dir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function renderPage(page) {
+  const els = getEls();
+  if (!els.tbody) return;
+
+  const total = filteredMoments.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  currentPage = Math.max(1, Math.min(page, totalPages));
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, total);
+  const slice = filteredMoments.slice(start, end);
+
+  els.tbody.innerHTML = "";
+
+  for (const r of slice) {
     const tr = document.createElement("tr");
+    const playerName = [r.first_name, r.last_name].filter(Boolean).join(" ");
+    const tierClass = tierToClass(r.tier);
+    const tierHtml = r.tier
+      ? `<span class="chip-pill-tier ${tierClass}">${r.tier}</span>`
+      : "";
 
-    const playerName = buildPlayerName(r) || "—";
-    const team = r.team_name || "";
-    const pos = r.position || "";
-    const tier = r.tier || "";
     const serial = r.serial_number ?? "";
-    const maxMint = r.max_mint_size ?? "";
-    const series = r.series_name || "";
-    const set = r.set_name || "";
-    const locked = r.is_locked;
-    const lastEvent = formatDate(r.last_event_ts);
-
-    const momentUrl = `https://nflallday.com/moments/${r.nft_id}`;
-    const listingUrl = r.edition_id
+    const max = r.max_mint_size ?? "";
+    const momentUrl = r.nft_id ? `https://nflallday.com/moments/${r.nft_id}` : "";
+    const marketUrl = r.edition_id
       ? `https://nflallday.com/listing/moment/${r.edition_id}`
-      : null;
+      : "";
 
     tr.innerHTML = `
-      <td>${playerName}</td>
-      <td>${team}</td>
-      <td>${pos}</td>
-      <td>${tier}</td>
+      <td>${playerName || "(unknown)"}</td>
+      <td>${r.team_name || ""}</td>
+      <td>${r.position || ""}</td>
+      <td>${tierHtml}</td>
       <td>${serial}</td>
-      <td>${maxMint}</td>
-      <td>${series}</td>
-      <td>${set}</td>
+      <td>${max}</td>
+      <td>${r.series_name || ""}</td>
+      <td>${r.set_name || ""}</td>
       <td>
-        <span class="locked-pill ${
-          locked ? "locked" : "unlocked"
-        }">${locked ? "Locked" : "Unlocked"}</span>
+        <span class="locked-pill ${r.is_locked ? "locked" : "unlocked"}">
+          ${r.is_locked ? "Locked" : "Unlocked"}
+        </span>
       </td>
-      <td>${lastEvent}</td>
+      <td>${formatDate(r.last_event_ts)}</td>
       <td>
         <div class="link-group">
-          <a href="${momentUrl}" target="_blank" rel="noopener noreferrer">Moment</a>
           ${
-            listingUrl
-              ? `<a href="${listingUrl}" target="_blank" rel="noopener noreferrer">Listing</a>`
+            momentUrl
+              ? `<a href="${momentUrl}" target="_blank" rel="noopener">Moment</a>`
+              : ""
+          }
+          ${
+            marketUrl
+              ? `<a href="${marketUrl}" target="_blank" rel="noopener">Market</a>`
               : ""
           }
         </div>
       </td>
     `;
+    els.tbody.appendChild(tr);
+  }
 
-    tbody.appendChild(tr);
+  // Title + pager text
+  if (els.title) {
+    els.title.textContent = `Moments – ${total.toLocaleString()} total`;
+  }
+  if (els.pagerInfo) {
+    const from = total ? start + 1 : 0;
+    const to = end;
+    els.pagerInfo.textContent = `Page ${currentPage} of ${totalPages} • showing ${from}-${to} of ${total}`;
+  }
+  if (els.pagerPrev) {
+    els.pagerPrev.disabled = currentPage <= 1;
+  }
+  if (els.pagerNext) {
+    els.pagerNext.disabled = currentPage >= totalPages;
+  }
+
+  updateSortHeaderClasses();
+}
+
+function updateSortHeaderClasses() {
+  const els = getEls();
+  if (!els.table) return;
+  const ths = els.table.querySelectorAll("th.sortable");
+  ths.forEach((th) => {
+    th.classList.remove("sort-asc", "sort-desc");
+    const key = th.getAttribute("data-sort-key");
+    if (key === currentSortKey) {
+      th.classList.add(currentSortDir === "asc" ? "sort-asc" : "sort-desc");
+    }
+  });
+}
+
+async function fetchWalletSummary(wallet) {
+  const els = getEls();
+  if (!els.summaryCard) return;
+
+  els.summaryCard.style.display = "none";
+  els.summaryCard.innerHTML = "";
+
+  try {
+    const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`);
+    const data = await res.json();
+    if (!data.ok) return;
+
+    const stats = data.stats || {};
+    const byTier = stats.byTier || {};
+
+    const addressLabel = data.displayName
+      ? `${data.displayName} · ${data.wallet}`
+      : data.wallet;
+
+    els.summaryCard.innerHTML = `
+      <div class="wallet-summary-main">
+        <div class="wallet-summary-label">Wallet overview</div>
+        <div class="wallet-summary-address">${addressLabel}</div>
+        <div class="wallet-summary-chips">
+          <span class="chip">Total: ${stats.momentsTotal ?? 0}</span>
+          <span class="chip">Unlocked: ${stats.unlockedCount ?? 0}</span>
+          <span class="chip">Locked: ${stats.lockedCount ?? 0}</span>
+        </div>
+      </div>
+      <div class="wallet-summary-chips">
+        <span class="chip-pill-tier chip-common">Common: ${byTier.Common ?? 0}</span>
+        <span class="chip-pill-tier chip-uncommon">Uncommon: ${byTier.Uncommon ?? 0}</span>
+        <span class="chip-pill-tier chip-rare">Rare: ${byTier.Rare ?? 0}</span>
+        <span class="chip-pill-tier chip-legendary">Legendary: ${
+          byTier.Legendary ?? 0
+        }</span>
+        <span class="chip-pill-tier chip-ultimate">Ultimate: ${
+          byTier.Ultimate ?? 0
+        }</span>
+      </div>
+    `;
+    els.summaryCard.style.display = "flex";
+  } catch (err) {
+    console.error("fetchWalletSummary error", err);
   }
 }
 
-// -------- CSV Export ----------
+async function fetchWalletMoments(wallet) {
+  const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
+  const data = await res.json();
+  if (!data.ok) {
+    throw new Error(data.error || "Failed to load wallet");
+  }
+  return data.rows || [];
+}
+
+function wireEvents() {
+  const els = getEls();
+  if (!els.form || !els.walletInput) return;
+
+  // Form submit
+  els.form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const wallet = (els.walletInput.value || "").trim();
+    if (!wallet) return;
+    window.runQuery(wallet);
+  });
+
+  // Filters
+  const filterEls = [
+    els.filterTeam,
+    els.filterPlayer,
+    els.filterSeries,
+    els.filterSet,
+    els.filterTier,
+    els.filterPosition,
+    els.filterLocked
+  ].filter(Boolean);
+
+  filterEls.forEach((sel) => {
+    sel.addEventListener("change", () => {
+      applyFilters();
+      applySort();
+      renderPage(1);
+    });
+  });
+
+  if (els.resetFilters) {
+    els.resetFilters.addEventListener("click", () => {
+      filterEls.forEach((sel) => {
+        sel.value = "";
+      });
+      applyFilters();
+      applySort();
+      renderPage(1);
+    });
+  }
+
+  // Sorting
+  if (els.table) {
+    const ths = els.table.querySelectorAll("th.sortable");
+    ths.forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.getAttribute("data-sort-key");
+        if (!key) return;
+        if (currentSortKey === key) {
+          currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+        } else {
+          currentSortKey = key;
+          currentSortDir = "asc";
+        }
+        applySort();
+        renderPage(1);
+      });
+    });
+  }
+
+  // Pager buttons
+  if (els.pagerPrev) {
+    els.pagerPrev.addEventListener("click", () => {
+      renderPage(currentPage - 1);
+    });
+  }
+  if (els.pagerNext) {
+    els.pagerNext.addEventListener("click", () => {
+      renderPage(currentPage + 1);
+    });
+  }
+
+  // Export CSV (uses current filtered list, not just current page)
+  if (els.exportBtn) {
+    els.exportBtn.addEventListener("click", () => {
+      exportCsv();
+    });
+  }
+}
 
 function exportCsv() {
-  const rows = state.filteredRows;
+  const rows = filteredMoments;
   if (!rows.length) return;
 
-  const header = [
+  const headers = [
     "wallet_address",
     "nft_id",
     "edition_id",
-    "player",
-    "team",
-    "position",
+    "play_id",
+    "series_id",
+    "set_id",
     "tier",
     "serial_number",
     "max_mint_size",
+    "first_name",
+    "last_name",
+    "team_name",
+    "position",
+    "jersey_number",
     "series_name",
     "set_name",
     "is_locked",
-    "last_event_ts",
+    "last_event_ts"
   ];
 
   const lines = [];
-  lines.push(header.join(","));
+  lines.push(headers.join(","));
 
-  rows.forEach((r) => {
-    const line = [
-      escapeCsv(r.wallet_address),
-      escapeCsv(r.nft_id),
-      escapeCsv(r.edition_id),
-      escapeCsv(buildPlayerName(r)),
-      escapeCsv(r.team_name),
-      escapeCsv(r.position),
-      escapeCsv(r.tier),
-      escapeCsv(r.serial_number),
-      escapeCsv(r.max_mint_size),
-      escapeCsv(r.series_name),
-      escapeCsv(r.set_name),
-      escapeCsv(r.is_locked ? "Locked" : "Unlocked"),
-      escapeCsv(r.last_event_ts),
-    ].join(",");
+  for (const r of rows) {
+    const line = headers
+      .map((h) => {
+        let v = r[h];
+        if (v == null) v = "";
+        // simple CSV escaping
+        const s = String(v).replace(/"/g, '""');
+        if (s.search(/[",\n]/) >= 0) {
+          return `"${s}"`;
+        }
+        return s;
+      })
+      .join(",");
     lines.push(line);
-  });
+  }
 
-  const blob = new Blob([lines.join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
+  const csv = lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${state.wallet || "wallet"}_moments.csv`;
+  a.download = "wallet-moments.csv";
   document.body.appendChild(a);
   a.click();
-  a.remove();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// -------- Load wallet ----------
-
-async function loadWallet(wallet) {
+// This is what the HTML calls (manual form + default-wallet loader)
+window.runQuery = async function runQuery(walletRaw) {
+  const els = getEls();
+  const wallet = (walletRaw || "").trim().toLowerCase();
   if (!wallet) return;
 
-  state.wallet = wallet.toLowerCase();
-  $("wallet-input").value = wallet;
-
-  const url = new URL(window.location.href);
-  url.searchParams.set("wallet", wallet);
-  window.history.replaceState({}, "", url.toString());
-
-  const data = await fetchJson(
-    "/api/query?wallet=" + encodeURIComponent(wallet)
-  );
-  if (!data.ok) {
-    alert(data.error || "Error loading wallet");
-    return;
+  if (els.title) {
+    els.title.textContent = "Loading wallet…";
+  }
+  if (els.tbody) {
+    els.tbody.innerHTML = "";
+  }
+  if (els.pagerInfo) {
+    els.pagerInfo.textContent = "";
   }
 
-  // normalise rows
-  const rows = data.rows.map((r) => ({
-    ...r,
-    playerName: buildPlayerName(r),
-  }));
+  try {
+    await fetchWalletSummary(wallet);
+    allMoments = await fetchWalletMoments(wallet);
 
-  state.allRows = rows;
-  populateFilters(rows);
-  resetFilters(); // also renders table
-  await refreshWalletSummary(wallet);
-}
-
-// -------- Event wiring ----------
-
-function init() {
-  const form = $("wallet-form");
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const wallet = $("wallet-input").value.trim();
-    if (!wallet) return;
-    loadWallet(wallet);
-  });
-
-  $("reset-filters").addEventListener("click", (e) => {
-    e.preventDefault();
-    resetFilters();
-  });
-
-  $("export-csv").addEventListener("click", exportCsv);
-
-  document
-    .querySelectorAll("#wallet-table thead th.sortable")
-    .forEach((th) => {
-      th.addEventListener("click", () => {
-        const key = th.dataset.sortKey;
-        setSort(key);
-      });
-    });
-
-  // when any filter changes, re-apply
-  document
-    .querySelectorAll(".filters-panel select")
-    .forEach((sel) => {
-      sel.addEventListener("change", () => {
-        applyFiltersSortRender();
-      });
-    });
-
-  // initial wallet from URL
-  const params = new URLSearchParams(window.location.search);
-  const walletParam = params.get("wallet");
-  if (walletParam) {
-    $("wallet-input").value = walletParam;
-    loadWallet(walletParam);
+    buildFilterOptions();
+    applyFilters();
+    applySort();
+    renderPage(1);
+  } catch (err) {
+    console.error("runQuery error", err);
+    if (els.title) {
+      els.title.textContent = `Failed to load wallet: ${err.message || err}`;
+    }
   }
-}
+};
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  wireEvents();
+  updateSortHeaderClasses();
+});
