@@ -554,9 +554,54 @@ app.get("/api/search-moments", async (req, res) => {
 // Explorer filters
 app.get("/api/explorer-filters", async (req, res) => {
   try {
-    console.log("GET /api/explorer-filters – loading distinct values from nft_core_metadata…");
+    console.log("GET /api/explorer-filters – trying snapshot…");
 
-    const [playersRes, teamsRes, seriesRes, setsRes, positionsRes, tiersRes] = await Promise.all([
+    // 1) Fast path: snapshot table
+    const snapRes = await pgQuery(
+      `
+      SELECT
+        players,
+        teams,
+        series,
+        sets,
+        positions,
+        tiers,
+        updated_at
+      FROM explorer_filters_snapshot
+      WHERE id = 1
+      LIMIT 1;
+      `
+    );
+
+    if (snapRes.rowCount > 0) {
+      const row = snapRes.rows[0];
+
+      return res.json({
+        ok: true,
+        players: row.players || [],
+        teams: row.teams || [],
+        series: row.series || [],
+        sets: row.sets || [],
+        positions: row.positions || [],
+        tiers: row.tiers || [],
+        updatedAt: row.updated_at,
+        fromSnapshot: true
+      });
+    }
+
+    // 2) Fallback: live distincts (only if snapshot missing)
+    console.log(
+      "explorer_filters_snapshot empty – falling back to live DISTINCT queries."
+    );
+
+    const [
+      playersRes,
+      teamsRes,
+      seriesRes,
+      setsRes,
+      positionsRes,
+      tiersRes
+    ] = await Promise.all([
       pgQuery(`
         SELECT DISTINCT
           COALESCE(first_name, '') AS first_name,
@@ -611,7 +656,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `)
     ]);
 
-    console.log("Explorer filters row counts:", {
+    console.log("Explorer filters row counts (live):", {
       players: playersRes.rowCount,
       teams: teamsRes.rowCount,
       series: seriesRes.rowCount,
@@ -620,29 +665,40 @@ app.get("/api/explorer-filters", async (req, res) => {
       tiers: tiersRes.rowCount
     });
 
-    const totalCount =
-      playersRes.rowCount +
-      teamsRes.rowCount +
-      seriesRes.rowCount +
-      setsRes.rowCount +
-      positionsRes.rowCount +
-      tiersRes.rowCount;
+    const players = playersRes.rows.map((r) => ({
+      first_name: r.first_name || "",
+      last_name: r.last_name || ""
+    }));
 
-    if (totalCount === 0) {
-      return res.json({
-        ok: false,
-        error: "No filter values found in nft_core_metadata. Check that metadata is loaded into Neon."
-      });
-    }
+    const teams = teamsRes.rows
+      .map((r) => r.team_name)
+      .filter(Boolean);
+
+    const series = seriesRes.rows
+      .map((r) => r.series_name)
+      .filter(Boolean);
+
+    const sets = setsRes.rows
+      .map((r) => r.set_name)
+      .filter(Boolean);
+
+    const positions = positionsRes.rows
+      .map((r) => r.position)
+      .filter(Boolean);
+
+    const tiers = tiersRes.rows
+      .map((r) => r.tier)
+      .filter(Boolean);
 
     return res.json({
       ok: true,
-      players: playersRes.rows,
-      teams: teamsRes.rows.map((r) => r.team_name),
-      series: seriesRes.rows.map((r) => r.series_name),
-      sets: setsRes.rows.map((r) => r.set_name),
-      positions: positionsRes.rows.map((r) => r.position),
-      tiers: tiersRes.rows.map((r) => r.tier)
+      players,
+      teams,
+      series,
+      sets,
+      positions,
+      tiers,
+      fromSnapshot: false
     });
   } catch (err) {
     console.error("Error in /api/explorer-filters:", err);
@@ -653,21 +709,18 @@ app.get("/api/explorer-filters", async (req, res) => {
   }
 });
 
+
 // Wallet summary
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
 
     if (!wallet) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Missing ?wallet=0x..." });
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Invalid wallet format" });
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
     // 1) Get profile (Dapper display name) if we have it
@@ -786,12 +839,9 @@ app.get("/api/wallet-summary", async (req, res) => {
     });
   } catch (err) {
     console.error("Error in /api/wallet-summary:", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: err.message || String(err) });
+    return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
-
 
 // Edition prices
 app.get("/api/prices", async (req, res) => {
