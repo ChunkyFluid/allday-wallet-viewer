@@ -659,13 +659,18 @@ app.get("/api/wallet-summary", async (req, res) => {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
 
     if (!wallet) {
-      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Invalid wallet format" });
     }
 
+    // 1) Get profile (Dapper display name) if we have it
     const profileResult = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -678,65 +683,115 @@ app.get("/api/wallet-summary", async (req, res) => {
 
     const profileRow = profileResult.rows[0] || null;
 
-    const statsResult = await pgQuery(
+    // 2) Try fast path: snapshot table
+    const snapshotRes = await pgQuery(
       `
       SELECT
-        h.wallet_address,
-        COUNT(*)::int AS moments_total,
-        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
-        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count
-      FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
-      WHERE h.wallet_address = $1
-      GROUP BY h.wallet_address;
+        wallet_address,
+        moments_total,
+        locked_count,
+        unlocked_count,
+        common_count,
+        uncommon_count,
+        rare_count,
+        legendary_count,
+        ultimate_count,
+        updated_at
+      FROM wallet_summary_snapshot
+      WHERE wallet_address = $1
+      LIMIT 1;
       `,
       [wallet]
     );
 
-    const statsRow = statsResult.rows[0] || null;
+    let stats;
+    let snapshotUpdatedAt = null;
 
-    const stats = statsRow
-      ? {
-          momentsTotal: statsRow.moments_total,
-          lockedCount: statsRow.locked_count,
-          unlockedCount: statsRow.unlocked_count,
-          byTier: {
-            Common: statsRow.common_count,
-            Uncommon: statsRow.uncommon_count,
-            Rare: statsRow.rare_count,
-            Legendary: statsRow.legendary_count,
-            Ultimate: statsRow.ultimate_count
+    if (snapshotRes.rowCount > 0) {
+      const row = snapshotRes.rows[0];
+      snapshotUpdatedAt = row.updated_at;
+
+      stats = {
+        momentsTotal: row.moments_total,
+        lockedCount: row.locked_count,
+        unlockedCount: row.unlocked_count,
+        byTier: {
+          Common: row.common_count,
+          Uncommon: row.uncommon_count,
+          Rare: row.rare_count,
+          Legendary: row.legendary_count,
+          Ultimate: row.ultimate_count
+        },
+        fromSnapshot: true
+      };
+    } else {
+      // 3) Fallback: live query (same as before)
+      const statsResult = await pgQuery(
+        `
+        SELECT
+          h.wallet_address,
+          COUNT(*)::int AS moments_total,
+          COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+          COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count
+        FROM wallet_holdings h
+        JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+        WHERE h.wallet_address = $1
+        GROUP BY h.wallet_address;
+        `,
+        [wallet]
+      );
+
+      const statsRow = statsResult.rows[0] || null;
+
+      stats = statsRow
+        ? {
+            momentsTotal: statsRow.moments_total,
+            lockedCount: statsRow.locked_count,
+            unlockedCount: statsRow.unlocked_count,
+            byTier: {
+              Common: statsRow.common_count,
+              Uncommon: statsRow.uncommon_count,
+              Rare: statsRow.rare_count,
+              Legendary: statsRow.legendary_count,
+              Ultimate: statsRow.ultimate_count
+            },
+            fromSnapshot: false
           }
-        }
-      : {
-          momentsTotal: 0,
-          lockedCount: 0,
-          unlockedCount: 0,
-          byTier: {
-            Common: 0,
-            Uncommon: 0,
-            Rare: 0,
-            Legendary: 0,
-            Ultimate: 0
-          }
-        };
+        : {
+            momentsTotal: 0,
+            lockedCount: 0,
+            unlockedCount: 0,
+            byTier: {
+              Common: 0,
+              Uncommon: 0,
+              Rare: 0,
+              Legendary: 0,
+              Ultimate: 0
+            },
+            fromSnapshot: false
+          };
+    }
 
     return res.json({
       ok: true,
       wallet,
       displayName: profileRow ? profileRow.display_name : null,
-      stats
+      stats,
+      snapshotUpdatedAt
     });
   } catch (err) {
     console.error("Error in /api/wallet-summary:", err);
-    return res.status(500).json({ ok: false, error: err.message || String(err) });
+    return res
+      .status(500)
+      .json({ ok: false, error: err.message || String(err) });
   }
 });
+
 
 // Edition prices
 app.get("/api/prices", async (req, res) => {
@@ -930,47 +985,40 @@ app.get("/api/top-wallets", async (req, res) => {
   if (limit > 500) limit = 500;
 
   try {
-    const sql = `
+    const { rows } = await pool.query(
+      `
       SELECT
-        COALESCE(wp.display_name, w.username, wh.wallet_address) AS display_name,
-        wh.wallet_address,
-        COUNT(*) AS total_moments,
-        COUNT(*) FILTER (WHERE wh.is_locked = FALSE) AS unlocked_moments,
-        COUNT(*) FILTER (WHERE wh.is_locked = TRUE) AS locked_moments,
-        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'common')    AS tier_common,
-        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'uncommon')  AS tier_uncommon,
-        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'rare')      AS tier_rare,
-        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'legendary') AS tier_legendary,
-        COUNT(*) FILTER (WHERE LOWER(ncm.tier) = 'ultimate')  AS tier_ultimate
-      FROM public.wallet_holdings AS wh
-      LEFT JOIN public.wallet_profiles AS wp
-        ON wp.wallet_address = wh.wallet_address
-      LEFT JOIN public.wallets AS w
-        ON w.wallet_address = wh.wallet_address
-      LEFT JOIN public.nft_core_metadata AS ncm
-        ON ncm.nft_id = wh.nft_id
-      GROUP BY
-        COALESCE(wp.display_name, w.username, wh.wallet_address),
-        wh.wallet_address
-      HAVING COUNT(*) > 0
+        wallet_address,
+        display_name,
+        total_moments,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        updated_at
+      FROM top_wallets_snapshot
       ORDER BY total_moments DESC, display_name ASC
       LIMIT $1;
-    `;
-
-    const { rows } = await pool.query(sql, [limit]);
+      `,
+      [limit]
+    );
 
     return res.json({
       ok: true,
       limit,
       count: rows.length,
       wallets: rows,
-      schemaVersion: 2 // debug flag
+      snapshotUpdatedAt: rows[0] ? rows[0].updated_at : null,
+      schemaVersion: 3
     });
   } catch (err) {
-    console.error("GET /api/top-wallets error:", err);
+    console.error("GET /api/top-wallets snapshot error:", err);
     return res.status(500).json({
       ok: false,
-      error: "Failed to load top wallets"
+      error: "Failed to load top wallets snapshot"
     });
   }
 });
@@ -980,15 +1028,11 @@ app.get("/api/query-paged", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     if (!wallet) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Missing ?wallet=0x..." });
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "Invalid wallet format" });
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
     // Paging params
@@ -1040,17 +1084,79 @@ app.get("/api/query-paged", async (req, res) => {
       page,
       pageSize,
       total,
-      rows: cleanedRows,
+      rows: cleanedRows
     });
   } catch (err) {
     console.error("Error in /api/query-paged (Neon):", err);
     return res.status(500).json({
       ok: false,
-      error: err.message || String(err),
+      error: err.message || String(err)
     });
   }
 });
 
+// GET /api/me – return current session user (used by nav + wallet auto-load)
+app.get("/api/me", (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.json({ ok: false, user: null });
+  }
+
+  return res.json({
+    ok: true,
+    user: req.session.user
+  });
+});
+
+// POST /api/login-dapper  { wallet_address }
+app.post("/api/login-dapper", async (req, res) => {
+  try {
+    let { wallet_address } = req.body || {};
+
+    if (!wallet_address || typeof wallet_address !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing wallet_address" });
+    }
+
+    wallet_address = wallet_address.trim().toLowerCase();
+    if (!wallet_address.startsWith("0x")) {
+      wallet_address = "0x" + wallet_address;
+    }
+
+    // Basic sanity check – Flow/Dapper-style address
+    if (!/^0x[0-9a-f]{8,64}$/.test(wallet_address)) {
+      return res.status(400).json({ ok: false, error: "Invalid wallet address format" });
+    }
+
+    // Use a synthetic email so we can reuse the existing users table
+    const syntheticEmail = `dapper:${wallet_address}`;
+
+    const upsertSql = `
+      INSERT INTO public.users (email, password_hash, default_wallet_address)
+      VALUES ($1, NULL, $2)
+      ON CONFLICT (email)
+      DO UPDATE SET
+        default_wallet_address = EXCLUDED.default_wallet_address
+      RETURNING id, email, default_wallet_address;
+    `;
+
+    const { rows } = await pool.query(upsertSql, [syntheticEmail, wallet_address]);
+    const user = rows[0];
+
+    // Put essential stuff in the session
+    req.session.user = {
+      id: user.id,
+      email: user.email, // will look like "dapper:0x..."
+      default_wallet_address: user.default_wallet_address
+    };
+
+    return res.json({
+      ok: true,
+      user: req.session.user
+    });
+  } catch (err) {
+    console.error("POST /api/login-dapper error:", err);
+    return res.status(500).json({ ok: false, error: "Failed to log in with Dapper" });
+  }
+});
 
 // ------------------ Start server ------------------
 
