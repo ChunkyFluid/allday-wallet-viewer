@@ -130,16 +130,16 @@
       .btn-secondary {
         border-radius: 999px;
         border: 1px solid var(--border-subtle);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        font-size: 0.8rem;
-        padding: 0.25rem 0.75rem;
+        padding: 0.3rem 0.8rem;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 0.78rem;
         cursor: pointer;
       }
 
-      .btn-secondary:disabled {
-        opacity: 0.4;
-        cursor: default;
+      .btn-secondary:hover {
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
       }
 
       .wallet-summary-card {
@@ -473,14 +473,6 @@
           max-width: 480px;
         }
       }
-
-      #wallet-pager {
-        margin-top: 0.75rem;
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        font-size: 0.8rem;
-      }
     </style>
   </head>
   <body>
@@ -493,7 +485,7 @@
           </div>
         </div>
         <nav class="main-nav">
-          <a href="/">Wallet</a>
+          <a href="/" class="active">Wallet</a>
           <a href="/profiles.html">Profiles</a>
           <a href="/top-holders.html">Top holders</a>
           <a href="/explorer.html">Browse</a>
@@ -555,43 +547,44 @@
         <section class="table-panel">
           <div class="table-header">
             <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn" type="button">Export CSV</button>
+            <button id="export-csv" class="export-btn">Export CSV</button>
           </div>
 
           <div class="table-wrapper">
             <table id="wallet-table">
               <thead>
-  <tr>
-    <th class="sortable" data-sort-key="playerName">Player</th>
-    <th class="sortable" data-sort-key="team_name">Team</th>
-    <th class="sortable" data-sort-key="position">Pos</th>
-    <th class="sortable" data-sort-key="tier">Tier</th>
-    <th class="sortable" data-sort-key="serial_number">Serial</th>
-    <th class="sortable" data-sort-key="max_mint_size">Max</th>
-    <th class="sortable" data-sort-key="series_name">Series</th>
-    <th class="sortable" data-sort-key="set_name">Set</th>
-    <th class="sortable" data-sort-key="asp_90d">ASP 90d</th>
-    <th class="sortable" data-sort-key="low_ask">Low ask</th>
-    <th class="sortable" data-sort-key="is_locked">Locked</th>
-    <th class="sortable" data-sort-key="last_event_ts">Last event</th>
-    <th>Links</th>
-  </tr>
-</thead>
-
+                <tr>
+                  <th class="sortable" data-sort-key="playerName">Player</th>
+                  <th class="sortable" data-sort-key="team_name">Team</th>
+                  <th class="sortable" data-sort-key="position">Pos</th>
+                  <th class="sortable" data-sort-key="tier">Tier</th>
+                  <th class="sortable" data-sort-key="serial_number">Serial</th>
+                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
+                  <th class="sortable" data-sort-key="series_name">Series</th>
+                  <th class="sortable" data-sort-key="set_name">Set</th>
+                  <th class="sortable" data-sort-key="low_ask_usd">Low Ask</th>
+                  <th class="sortable" data-sort-key="avg_sale_usd">Avg Sale</th>
+                  <th class="sortable" data-sort-key="top_sale_usd">Top Sale</th>
+                  <th class="sortable" data-sort-key="is_locked">Locked</th>
+                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
+                  <th>Links</th>
+                </tr>
+              </thead>
               <tbody id="wallet-tbody"></tbody>
             </table>
-          </div>
 
-          <div id="wallet-pager">
-            <button id="wallet-page-prev" class="btn-secondary" type="button">Prev</button>
-            <button id="wallet-page-next" class="btn-secondary" type="button">Next</button>
-            <span id="wallet-page-info"></span>
+            <div
+              id="wallet-pager"
+              style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem">
+              <button id="wallet-page-prev" class="btn-secondary" type="button">Prev</button>
+              <button id="wallet-page-next" class="btn-secondary" type="button">Next</button>
+              <span id="wallet-page-info"></span>
+            </div>
           </div>
         </section>
       </main>
     </div>
 
-    <!-- Update nav "Login" text based on /api/me -->
     <script>
       (function () {
         async function updateNavAccount() {
@@ -599,7 +592,7 @@
           if (!link) return;
 
           try {
-            const res = await fetch("/api/me", { credentials: "include" });
+            const res = await fetch("/api/me");
             const data = await res.json();
 
             if (data && data.user) {
@@ -618,7 +611,6 @@
       })();
     </script>
 
-    <!-- Auto-load default wallet if logged in and no ?wallet= in URL -->
     <script>
       async function maybeLoadDefaultWallet() {
         const walletInput = document.getElementById("wallet-input");

@@ -704,17 +704,17 @@ app.get("/api/explorer-filters", async (req, res) => {
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
-    const fresh = req.query.fresh === "1"; // ?fresh=1 forces live recompute
 
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
+    // Basic format check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // 1) Profile (Dapper display name) – cheap, always do it
+    // 1) Get profile (Dapper display name) if we have it
     const profileResult = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -724,79 +724,47 @@ app.get("/api/wallet-summary", async (req, res) => {
       `,
       [wallet]
     );
+
     const profileRow = profileResult.rows[0] || null;
 
-    let stats = null;
-    let snapshotUpdatedAt = null;
+    // 2) Get counts, tier breakdown, and value from Neon
+    //
+    // - wallet_holdings = which nft_ids the wallet owns (and locked/unlocked)
+    // - nft_core_metadata = maps nft_id -> edition_id + tier + series/set/etc
+    // - edition_price_stats = one row per edition_id with low_ask / asp_90d / top_sale
+    //
+    // We sum low_ask and asp_90d per *copy*, so owning 3 of the same edition multiplies its floor.
+    const statsResult = await pgQuery(
+      `
+      SELECT
+        h.wallet_address,
+        COUNT(*)::int AS moments_total,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
+        -- floor value: sum of low_ask across all copies
+        SUM(COALESCE(eps.low_ask, 0))::numeric AS floor_value,
+        -- ASP value: sum of asp_90d across all copies
+        SUM(COALESCE(eps.asp_90d, 0))::numeric AS asp_value
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m
+        ON m.nft_id = h.nft_id
+      LEFT JOIN edition_price_stats eps
+        ON eps.edition_id = m.edition_id
+      WHERE h.wallet_address = $1
+      GROUP BY h.wallet_address;
+      `,
+      [wallet]
+    );
 
-    // 2) Fast snapshot path – only if NOT forcing live
-    if (!fresh) {
-      const snapshotRes = await pgQuery(
-        `
-        SELECT
-          wallet_address,
-          moments_total,
-          locked_count,
-          unlocked_count,
-          common_count,
-          uncommon_count,
-          rare_count,
-          legendary_count,
-          ultimate_count,
-          updated_at
-        FROM wallet_summary_snapshot
-        WHERE wallet_address = $1
-        LIMIT 1;
-        `,
-        [wallet]
-      );
+    const statsRow = statsResult.rows[0] || null;
 
-      if (snapshotRes.rowCount > 0) {
-        const row = snapshotRes.rows[0];
-        snapshotUpdatedAt = row.updated_at;
-
-        stats = {
-          momentsTotal: row.moments_total,
-          lockedCount: row.locked_count,
-          unlockedCount: row.unlocked_count,
-          byTier: {
-            Common: row.common_count,
-            Uncommon: row.uncommon_count,
-            Rare: row.rare_count,
-            Legendary: row.legendary_count,
-            Ultimate: row.ultimate_count
-          },
-          fromSnapshot: true
-        };
-      }
-    }
-
-    // 3) If we don't have stats yet OR ?fresh=1 → live recompute
-    if (!stats || fresh) {
-      const statsResult = await pgQuery(
-        `
-        SELECT
-          h.wallet_address,
-          COUNT(*)::int AS moments_total,
-          COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
-          COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count
-        FROM wallet_holdings h
-        JOIN nft_core_metadata m ON m.nft_id = h.nft_id
-        WHERE h.wallet_address = $1
-        GROUP BY h.wallet_address;
-        `,
-        [wallet]
-      );
-
-      const statsRow = statsResult.rows[0] || null;
-
-      if (statsRow) {
-        stats = {
+    const stats = statsRow
+      ? {
           momentsTotal: statsRow.moments_total,
           lockedCount: statsRow.locked_count,
           unlockedCount: statsRow.unlocked_count,
@@ -807,53 +775,11 @@ app.get("/api/wallet-summary", async (req, res) => {
             Legendary: statsRow.legendary_count,
             Ultimate: statsRow.ultimate_count
           },
-          fromSnapshot: false
-        };
-
-        // Upsert into snapshot so next fast call is cheap
-        await pgQuery(
-          `
-          INSERT INTO wallet_summary_snapshot (
-            wallet_address,
-            moments_total,
-            locked_count,
-            unlocked_count,
-            common_count,
-            uncommon_count,
-            rare_count,
-            legendary_count,
-            ultimate_count,
-            updated_at
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
-          ON CONFLICT (wallet_address) DO UPDATE SET
-            moments_total   = EXCLUDED.moments_total,
-            locked_count    = EXCLUDED.locked_count,
-            unlocked_count  = EXCLUDED.unlocked_count,
-            common_count    = EXCLUDED.common_count,
-            uncommon_count  = EXCLUDED.uncommon_count,
-            rare_count      = EXCLUDED.rare_count,
-            legendary_count = EXCLUDED.legendary_count,
-            ultimate_count  = EXCLUDED.ultimate_count,
-            updated_at      = now();
-          `,
-          [
-            wallet,
-            statsRow.moments_total,
-            statsRow.locked_count,
-            statsRow.unlocked_count,
-            statsRow.common_count,
-            statsRow.uncommon_count,
-            statsRow.rare_count,
-            statsRow.legendary_count,
-            statsRow.ultimate_count
-          ]
-        );
-
-        snapshotUpdatedAt = new Date();
-      } else {
-        // Wallet has no holdings at all
-        stats = {
+          // Turn Postgres numerics into JS numbers
+          floorValue: Number(statsRow.floor_value || 0),
+          aspValue: Number(statsRow.asp_value || 0)
+        }
+      : {
           momentsTotal: 0,
           lockedCount: 0,
           unlockedCount: 0,
@@ -864,23 +790,22 @@ app.get("/api/wallet-summary", async (req, res) => {
             Legendary: 0,
             Ultimate: 0
           },
-          fromSnapshot: fresh ? false : !!stats
+          floorValue: 0,
+          aspValue: 0
         };
-      }
-    }
 
     return res.json({
       ok: true,
       wallet,
       displayName: profileRow ? profileRow.display_name : null,
-      stats,
-      snapshotUpdatedAt
+      stats
     });
   } catch (err) {
     console.error("Error in /api/wallet-summary:", err);
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
+
 
 // Edition prices
 app.get("/api/prices", async (req, res) => {
@@ -934,7 +859,6 @@ app.get("/api/prices", async (req, res) => {
     });
   }
 });
-
 
 // Full wallet query
 app.get("/api/query", async (req, res) => {
