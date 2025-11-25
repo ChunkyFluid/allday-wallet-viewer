@@ -447,9 +447,19 @@ app.get("/api/top-holders", async (req, res) => {
       FROM wallet_holdings h
       JOIN nft_core_metadata m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
-      WHERE m.edition_id = $1
-      GROUP BY m.edition_id, h.wallet_address, p.display_name
-      ORDER BY copies DESC, h.wallet_address ASC;
+      WHERE
+        m.edition_id = $1
+        AND h.wallet_address NOT IN (
+          '0xe4cf4bdc1751c65d', -- NFL All Day contract
+          '0xb6f2481eba4df97b'  -- huge custodial/system wallet
+        )
+      GROUP BY
+        m.edition_id,
+        h.wallet_address,
+        p.display_name
+      ORDER BY
+        copies DESC,
+        h.wallet_address ASC;
       `,
       [edition]
     );
@@ -590,18 +600,9 @@ app.get("/api/explorer-filters", async (req, res) => {
     }
 
     // 2) Fallback: live distincts (only if snapshot missing)
-    console.log(
-      "explorer_filters_snapshot empty – falling back to live DISTINCT queries."
-    );
+    console.log("explorer_filters_snapshot empty – falling back to live DISTINCT queries.");
 
-    const [
-      playersRes,
-      teamsRes,
-      seriesRes,
-      setsRes,
-      positionsRes,
-      tiersRes
-    ] = await Promise.all([
+    const [playersRes, teamsRes, seriesRes, setsRes, positionsRes, tiersRes] = await Promise.all([
       pgQuery(`
         SELECT DISTINCT
           COALESCE(first_name, '') AS first_name,
@@ -670,25 +671,15 @@ app.get("/api/explorer-filters", async (req, res) => {
       last_name: r.last_name || ""
     }));
 
-    const teams = teamsRes.rows
-      .map((r) => r.team_name)
-      .filter(Boolean);
+    const teams = teamsRes.rows.map((r) => r.team_name).filter(Boolean);
 
-    const series = seriesRes.rows
-      .map((r) => r.series_name)
-      .filter(Boolean);
+    const series = seriesRes.rows.map((r) => r.series_name).filter(Boolean);
 
-    const sets = setsRes.rows
-      .map((r) => r.set_name)
-      .filter(Boolean);
+    const sets = setsRes.rows.map((r) => r.set_name).filter(Boolean);
 
-    const positions = positionsRes.rows
-      .map((r) => r.position)
-      .filter(Boolean);
+    const positions = positionsRes.rows.map((r) => r.position).filter(Boolean);
 
-    const tiers = tiersRes.rows
-      .map((r) => r.tier)
-      .filter(Boolean);
+    const tiers = tiersRes.rows.map((r) => r.tier).filter(Boolean);
 
     return res.json({
       ok: true,
@@ -709,11 +700,11 @@ app.get("/api/explorer-filters", async (req, res) => {
   }
 });
 
-
 // Wallet summary
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    const fresh = req.query.fresh === "1"; // ?fresh=1 forces live recompute
 
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
@@ -723,7 +714,7 @@ app.get("/api/wallet-summary", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // 1) Get profile (Dapper display name) if we have it
+    // 1) Profile (Dapper display name) – cheap, always do it
     const profileResult = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -733,52 +724,55 @@ app.get("/api/wallet-summary", async (req, res) => {
       `,
       [wallet]
     );
-
     const profileRow = profileResult.rows[0] || null;
 
-    // 2) Try fast path: snapshot table
-    const snapshotRes = await pgQuery(
-      `
-      SELECT
-        wallet_address,
-        moments_total,
-        locked_count,
-        unlocked_count,
-        common_count,
-        uncommon_count,
-        rare_count,
-        legendary_count,
-        ultimate_count,
-        updated_at
-      FROM wallet_summary_snapshot
-      WHERE wallet_address = $1
-      LIMIT 1;
-      `,
-      [wallet]
-    );
-
-    let stats;
+    let stats = null;
     let snapshotUpdatedAt = null;
 
-    if (snapshotRes.rowCount > 0) {
-      const row = snapshotRes.rows[0];
-      snapshotUpdatedAt = row.updated_at;
+    // 2) Fast snapshot path – only if NOT forcing live
+    if (!fresh) {
+      const snapshotRes = await pgQuery(
+        `
+        SELECT
+          wallet_address,
+          moments_total,
+          locked_count,
+          unlocked_count,
+          common_count,
+          uncommon_count,
+          rare_count,
+          legendary_count,
+          ultimate_count,
+          updated_at
+        FROM wallet_summary_snapshot
+        WHERE wallet_address = $1
+        LIMIT 1;
+        `,
+        [wallet]
+      );
 
-      stats = {
-        momentsTotal: row.moments_total,
-        lockedCount: row.locked_count,
-        unlockedCount: row.unlocked_count,
-        byTier: {
-          Common: row.common_count,
-          Uncommon: row.uncommon_count,
-          Rare: row.rare_count,
-          Legendary: row.legendary_count,
-          Ultimate: row.ultimate_count
-        },
-        fromSnapshot: true
-      };
-    } else {
-      // 3) Fallback: live query (same as before)
+      if (snapshotRes.rowCount > 0) {
+        const row = snapshotRes.rows[0];
+        snapshotUpdatedAt = row.updated_at;
+
+        stats = {
+          momentsTotal: row.moments_total,
+          lockedCount: row.locked_count,
+          unlockedCount: row.unlocked_count,
+          byTier: {
+            Common: row.common_count,
+            Uncommon: row.uncommon_count,
+            Rare: row.rare_count,
+            Legendary: row.legendary_count,
+            Ultimate: row.ultimate_count
+          },
+          fromSnapshot: true
+        };
+      }
+    }
+
+    // 3) If we don't have stats yet OR ?fresh=1 → live recompute
+    if (!stats || fresh) {
       const statsResult = await pgQuery(
         `
         SELECT
@@ -801,33 +795,78 @@ app.get("/api/wallet-summary", async (req, res) => {
 
       const statsRow = statsResult.rows[0] || null;
 
-      stats = statsRow
-        ? {
-            momentsTotal: statsRow.moments_total,
-            lockedCount: statsRow.locked_count,
-            unlockedCount: statsRow.unlocked_count,
-            byTier: {
-              Common: statsRow.common_count,
-              Uncommon: statsRow.uncommon_count,
-              Rare: statsRow.rare_count,
-              Legendary: statsRow.legendary_count,
-              Ultimate: statsRow.ultimate_count
-            },
-            fromSnapshot: false
-          }
-        : {
-            momentsTotal: 0,
-            lockedCount: 0,
-            unlockedCount: 0,
-            byTier: {
-              Common: 0,
-              Uncommon: 0,
-              Rare: 0,
-              Legendary: 0,
-              Ultimate: 0
-            },
-            fromSnapshot: false
-          };
+      if (statsRow) {
+        stats = {
+          momentsTotal: statsRow.moments_total,
+          lockedCount: statsRow.locked_count,
+          unlockedCount: statsRow.unlocked_count,
+          byTier: {
+            Common: statsRow.common_count,
+            Uncommon: statsRow.uncommon_count,
+            Rare: statsRow.rare_count,
+            Legendary: statsRow.legendary_count,
+            Ultimate: statsRow.ultimate_count
+          },
+          fromSnapshot: false
+        };
+
+        // Upsert into snapshot so next fast call is cheap
+        await pgQuery(
+          `
+          INSERT INTO wallet_summary_snapshot (
+            wallet_address,
+            moments_total,
+            locked_count,
+            unlocked_count,
+            common_count,
+            uncommon_count,
+            rare_count,
+            legendary_count,
+            ultimate_count,
+            updated_at
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+          ON CONFLICT (wallet_address) DO UPDATE SET
+            moments_total   = EXCLUDED.moments_total,
+            locked_count    = EXCLUDED.locked_count,
+            unlocked_count  = EXCLUDED.unlocked_count,
+            common_count    = EXCLUDED.common_count,
+            uncommon_count  = EXCLUDED.uncommon_count,
+            rare_count      = EXCLUDED.rare_count,
+            legendary_count = EXCLUDED.legendary_count,
+            ultimate_count  = EXCLUDED.ultimate_count,
+            updated_at      = now();
+          `,
+          [
+            wallet,
+            statsRow.moments_total,
+            statsRow.locked_count,
+            statsRow.unlocked_count,
+            statsRow.common_count,
+            statsRow.uncommon_count,
+            statsRow.rare_count,
+            statsRow.legendary_count,
+            statsRow.ultimate_count
+          ]
+        );
+
+        snapshotUpdatedAt = new Date();
+      } else {
+        // Wallet has no holdings at all
+        stats = {
+          momentsTotal: 0,
+          lockedCount: 0,
+          unlockedCount: 0,
+          byTier: {
+            Common: 0,
+            Uncommon: 0,
+            Rare: 0,
+            Legendary: 0,
+            Ultimate: 0
+          },
+          fromSnapshot: fresh ? false : !!stats
+        };
+      }
     }
 
     return res.json({
@@ -853,16 +892,17 @@ app.get("/api/prices", async (req, res) => {
 
     const unique = [...new Set(list)];
     if (!unique.length) {
-      return res.json({ ok: true, asp: {}, lowAsk: {} });
+      return res.json({ ok: true, asp: {}, lowAsk: {}, topSale: {} });
     }
 
     const result = await pgQuery(
       `
       SELECT
         edition_id,
-        asp_90d,
-        low_ask
-      FROM edition_price_stats
+        lowest_ask_usd,
+        avg_sale_usd,
+        top_sale_usd
+      FROM public.edition_price_scrape
       WHERE edition_id = ANY($1::text[])
       `,
       [unique]
@@ -870,22 +910,31 @@ app.get("/api/prices", async (req, res) => {
 
     const asp = {};
     const lowAsk = {};
+    const topSale = {};
 
     for (const row of result.rows) {
-      if (row.asp_90d != null) {
-        asp[row.edition_id] = Number(row.asp_90d);
+      const id = row.edition_id;
+      if (row.avg_sale_usd != null) {
+        asp[id] = Number(row.avg_sale_usd);
       }
-      if (row.low_ask != null) {
-        lowAsk[row.edition_id] = Number(row.low_ask);
+      if (row.lowest_ask_usd != null) {
+        lowAsk[id] = Number(row.lowest_ask_usd);
+      }
+      if (row.top_sale_usd != null) {
+        topSale[id] = Number(row.top_sale_usd);
       }
     }
 
-    return res.json({ ok: true, asp, lowAsk });
+    return res.json({ ok: true, asp, lowAsk, topSale });
   } catch (err) {
     console.error("Error in /api/prices:", err);
-    return res.status(500).json({ ok: false, error: err.message || String(err) });
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
   }
 });
+
 
 // Full wallet query
 app.get("/api/query", async (req, res) => {
@@ -1050,6 +1099,10 @@ app.get("/api/top-wallets", async (req, res) => {
         tier_ultimate,
         updated_at
       FROM top_wallets_snapshot
+      WHERE wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d', -- AllDay contract
+        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
+      )
       ORDER BY total_moments DESC, display_name ASC
       LIMIT $1;
       `,
@@ -1061,14 +1114,13 @@ app.get("/api/top-wallets", async (req, res) => {
       limit,
       count: rows.length,
       wallets: rows,
-      snapshotUpdatedAt: rows[0] ? rows[0].updated_at : null,
       schemaVersion: 3
     });
   } catch (err) {
-    console.error("GET /api/top-wallets snapshot error:", err);
+    console.error("GET /api/top-wallets error:", err);
     return res.status(500).json({
       ok: false,
-      error: "Failed to load top wallets snapshot"
+      error: "Failed to load top wallets"
     });
   }
 });

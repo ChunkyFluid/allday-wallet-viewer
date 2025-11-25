@@ -5,17 +5,17 @@ import pool from "./db/pool.js";
 dotenv.config();
 
 async function refreshWalletSummarySnapshot() {
-  const client = await pool.connect();
+    const client = await pool.connect();
 
-  try {
-    console.log("Refreshing wallet_summary_snapshot…");
-    await client.query("BEGIN");
+    try {
+        console.log("Refreshing wallet_summary_snapshot…");
+        await client.query("BEGIN");
 
-    // Clear existing snapshot
-    await client.query("TRUNCATE TABLE wallet_summary_snapshot");
+        // Clear existing snapshot
+        await client.query("TRUNCATE TABLE wallet_summary_snapshot");
 
-    // Rebuild from wallet_holdings + nft_core_metadata
-    await client.query(`
+        // Rebuild from wallet_holdings + nft_core_metadata
+        await client.query(`
       INSERT INTO wallet_summary_snapshot (
         wallet_address,
         moments_total,
@@ -45,16 +45,16 @@ async function refreshWalletSummarySnapshot() {
       GROUP BY h.wallet_address;
     `);
 
-    await client.query("COMMIT");
-    console.log("wallet_summary_snapshot refresh complete.");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Error refreshing wallet_summary_snapshot:", err);
-    process.exitCode = 1;
-  } finally {
-    client.release();
-    await pool.end();
-  }
+        await client.query("COMMIT");
+        console.log("wallet_summary_snapshot refresh complete.");
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("Error refreshing wallet_summary_snapshot:", err);
+        process.exitCode = 1;
+    } finally {
+        client.release();
+        await pool.end();
+    }
 }
 
 refreshWalletSummarySnapshot();

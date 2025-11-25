@@ -15,6 +15,7 @@
         --accent-blue: #007bff;
         --accent-cyan: #0dcaf0;
         --accent-teal: #17a2b8;
+        --accent-alt: #00cccc;
         --danger: #f97373;
         --success: #22c55e;
       }
@@ -39,6 +40,7 @@
         color: var(--accent-cyan);
         text-decoration: none;
       }
+
       a:hover {
         text-decoration: underline;
       }
@@ -73,6 +75,12 @@
         align-items: center;
         justify-content: center;
         font-size: 1.4rem;
+      }
+
+      .brand-logo img {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
       }
 
       .brand-title {
@@ -114,6 +122,7 @@
         cursor: pointer;
         white-space: nowrap;
       }
+
       .btn-primary:hover {
         filter: brightness(1.05);
       }
@@ -121,19 +130,16 @@
       .btn-secondary {
         border-radius: 999px;
         border: 1px solid var(--border-subtle);
-        padding: 0.35rem 0.8rem;
-        background: #020617;
-        color: var(--text-muted);
+        background: rgba(15, 23, 42, 0.9);
+        color: var(--text-main);
         font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
         cursor: pointer;
       }
-      .btn-secondary[disabled] {
+
+      .btn-secondary:disabled {
         opacity: 0.4;
         cursor: default;
-      }
-      .btn-secondary:not([disabled]):hover {
-        border-color: var(--accent-cyan);
-        color: var(--accent-cyan);
       }
 
       .wallet-summary-card {
@@ -186,22 +192,27 @@
         font-size: 0.7rem;
         font-weight: 500;
       }
+
       .chip-common {
         background: #4b5563;
         color: #e5e7eb;
       }
+
       .chip-uncommon {
         background: #6b7280;
         color: #e5e7eb;
       }
+
       .chip-rare {
         background: #f97316;
         color: #111827;
       }
+
       .chip-legendary {
         background: linear-gradient(135deg, #facc15, #f97316);
         color: #111827;
       }
+
       .chip-ultimate {
         background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
         color: white;
@@ -296,6 +307,7 @@
         padding: 0.3rem 0.8rem;
         cursor: pointer;
       }
+
       .export-btn:hover {
         background: rgba(13, 148, 136, 0.1);
       }
@@ -338,10 +350,12 @@
       th.sortable:hover {
         color: var(--accent-cyan);
       }
+
       th.sort-asc::after {
         content: " ▲";
         font-size: 0.65em;
       }
+
       th.sort-desc::after {
         content: " ▼";
         font-size: 0.65em;
@@ -350,9 +364,11 @@
       tbody tr:nth-child(2n) {
         background: rgba(15, 23, 42, 0.7);
       }
+
       tbody tr:nth-child(2n + 1) {
         background: rgba(15, 23, 42, 0.4);
       }
+
       tbody tr:hover {
         background: rgba(37, 99, 235, 0.25);
       }
@@ -366,11 +382,13 @@
         font-size: 0.7rem;
         font-weight: 500;
       }
+
       .locked-pill.locked {
         background: rgba(236, 72, 153, 0.15);
         color: #f472b6;
         border: 1px solid rgba(236, 72, 153, 0.7);
       }
+
       .locked-pill.unlocked {
         background: rgba(16, 185, 129, 0.15);
         color: #6ee7b7;
@@ -387,8 +405,23 @@
       .link-group a {
         color: var(--accent-cyan);
       }
+
       .link-group a:hover {
         text-decoration: underline;
+      }
+
+      @media (max-width: 960px) {
+        .app-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .wallet-form {
+          width: 100%;
+          flex: unset;
+        }
+        .content {
+          grid-template-columns: minmax(0, 1fr);
+        }
       }
 
       .main-nav {
@@ -419,15 +452,6 @@
         background: rgba(37, 99, 235, 0.3);
       }
 
-      #wallet-pager {
-        margin-top: 0.75rem;
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        font-size: 0.8rem;
-        justify-content: flex-end;
-      }
-
       @media (max-width: 1100px) {
         .app-header {
           flex-wrap: wrap;
@@ -450,18 +474,12 @@
         }
       }
 
-      @media (max-width: 960px) {
-        .app-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .wallet-form {
-          width: 100%;
-          flex: unset;
-        }
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
+      #wallet-pager {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        font-size: 0.8rem;
       }
     </style>
   </head>
@@ -470,11 +488,12 @@
       <header class="app-header">
         <div class="brand">
           <div class="brand-logo">🐱</div>
-          <div class="brand-title">Chunky's NFLAD Viewer</div>
+          <div>
+            <div class="brand-title">Chunky's NFLAD Viewer</div>
+          </div>
         </div>
-
         <nav class="main-nav">
-          <a href="/" class="active">Wallet</a>
+          <a href="/">Wallet</a>
           <a href="/profiles.html">Profiles</a>
           <a href="/top-holders.html">Top holders</a>
           <a href="/explorer.html">Browse</a>
@@ -530,7 +549,7 @@
             <select id="filter-locked" class="filter-select"></select>
           </div>
 
-          <button id="reset-filters" class="reset-filters" type="button">Reset filters</button>
+          <button id="reset-filters" class="reset-filters">Reset filters</button>
         </aside>
 
         <section class="table-panel">
@@ -542,20 +561,23 @@
           <div class="table-wrapper">
             <table id="wallet-table">
               <thead>
-                <tr>
-                  <th class="sortable" data-sort-key="playerName">Player</th>
-                  <th class="sortable" data-sort-key="team_name">Team</th>
-                  <th class="sortable" data-sort-key="position">Pos</th>
-                  <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">Serial</th>
-                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
-                  <th class="sortable" data-sort-key="series_name">Series</th>
-                  <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="is_locked">Locked</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
-                  <th>Links</th>
-                </tr>
-              </thead>
+  <tr>
+    <th class="sortable" data-sort-key="playerName">Player</th>
+    <th class="sortable" data-sort-key="team_name">Team</th>
+    <th class="sortable" data-sort-key="position">Pos</th>
+    <th class="sortable" data-sort-key="tier">Tier</th>
+    <th class="sortable" data-sort-key="serial_number">Serial</th>
+    <th class="sortable" data-sort-key="max_mint_size">Max</th>
+    <th class="sortable" data-sort-key="series_name">Series</th>
+    <th class="sortable" data-sort-key="set_name">Set</th>
+    <th class="sortable" data-sort-key="asp_90d">ASP 90d</th>
+    <th class="sortable" data-sort-key="low_ask">Low ask</th>
+    <th class="sortable" data-sort-key="is_locked">Locked</th>
+    <th class="sortable" data-sort-key="last_event_ts">Last event</th>
+    <th>Links</th>
+  </tr>
+</thead>
+
               <tbody id="wallet-tbody"></tbody>
             </table>
           </div>
@@ -569,7 +591,7 @@
       </main>
     </div>
 
-    <!-- Keep existing nav-account logic -->
+    <!-- Update nav "Login" text based on /api/me -->
     <script>
       (function () {
         async function updateNavAccount() {
@@ -596,11 +618,14 @@
       })();
     </script>
 
-    <!-- Auto-load default wallet if logged in and URL has no ?wallet -->
+    <!-- Auto-load default wallet if logged in and no ?wallet= in URL -->
     <script>
       async function maybeLoadDefaultWallet() {
         const walletInput = document.getElementById("wallet-input");
-        if (!walletInput) return;
+        if (!walletInput) {
+          console.warn("wallet-input field not found on wallet page");
+          return;
+        }
 
         const params = new URLSearchParams(window.location.search);
         const walletFromUrl = (params.get("wallet") || "").trim();
@@ -608,22 +633,34 @@
           walletInput.value = walletFromUrl;
           if (typeof window.runQuery === "function") {
             window.runQuery(walletFromUrl);
+          } else if (typeof window.loadWallet === "function") {
+            window.loadWallet(walletFromUrl);
           }
           return;
         }
 
         try {
           const res = await fetch("/api/me", { credentials: "include" });
-          if (!res.ok) return;
+          if (!res.ok) {
+            console.warn("GET /api/me failed with HTTP", res.status);
+            return;
+          }
           const data = await res.json();
-          if (!data.ok || !data.user || !data.user.default_wallet_address) return;
+          if (!data.ok || !data.user || !data.user.default_wallet_address) {
+            return;
+          }
 
           const wallet = (data.user.default_wallet_address || "").trim();
           if (!wallet) return;
 
           walletInput.value = wallet;
+
           if (typeof window.runQuery === "function") {
             window.runQuery(wallet);
+          } else if (typeof window.loadWallet === "function") {
+            window.loadWallet(wallet);
+          } else {
+            console.warn("No runQuery/loadWallet function found to load wallet automatically");
           }
         } catch (err) {
           console.error("Failed to auto-load default wallet:", err);

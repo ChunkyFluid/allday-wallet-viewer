@@ -1,332 +1,328 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Login – Chunky's NFLAD Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      :root {
-        --bg-main: #050816;
-        --bg-card: #101322;
-        --border-subtle: rgba(255, 255, 255, 0.06);
-        --text-main: #f9fafb;
-        --text-muted: #9ca3af;
-        --accent-purple: #6f42c1;
-        --accent-blue: #007bff;
-        --accent-cyan: #0dcaf0;
-      }
+    <head>
+        <meta charset="UTF-8" />
+        <title>Login – Chunky's NFLAD Viewer</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+            :root {
+                --bg-main: #050816;
+                --bg-card: #101322;
+                --border-subtle: rgba(255, 255, 255, 0.06);
+                --text-main: #f9fafb;
+                --text-muted: #9ca3af;
+                --accent-purple: #6f42c1;
+                --accent-blue: #007bff;
+                --accent-cyan: #0dcaf0;
+            }
 
-      * {
-        box-sizing: border-box;
-      }
+            * {
+                box-sizing: border-box;
+            }
 
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
-        background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
-        color: var(--text-main);
-      }
+            body {
+                margin: 0;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    sans-serif;
+                background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
+                color: var(--text-main);
+            }
 
-      a {
-        color: var(--accent-cyan);
-        text-decoration: none;
-      }
+            a {
+                color: var(--accent-cyan);
+                text-decoration: none;
+            }
 
-      a:hover {
-        text-decoration: underline;
-      }
+            a:hover {
+                text-decoration: underline;
+            }
 
-      .app-shell {
-        max-width: 95%;
-        margin: 0 auto;
-        padding: 1.5rem 4%;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
+            .app-shell {
+                max-width: 95%;
+                margin: 0 auto;
+                padding: 1.5rem 4%;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
 
-      .app-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 2rem;
-      }
+            .app-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
 
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+            }
 
-      .brand-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-      }
+            .brand-logo {
+                width: 36px;
+                height: 36px;
+                border-radius: 999px;
+                background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.4rem;
+            }
 
-      .brand-title {
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
-      }
+            .brand-title {
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+                font-size: 0.95rem;
+            }
 
-      .main-nav {
-        display: flex;
-        gap: 0.75rem;
-        font-size: 0.9rem;
-      }
+            .main-nav {
+                display: flex;
+                gap: 0.75rem;
+                font-size: 0.9rem;
+            }
 
-      .main-nav a {
-        color: var(--text-muted);
-        text-decoration: none;
-        padding: 0.35rem 0.9rem;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          border-color 0.15s ease;
-      }
+            .main-nav a {
+                color: var(--text-muted);
+                text-decoration: none;
+                padding: 0.35rem 0.9rem;
+                border-radius: 999px;
+                border: 1px solid transparent;
+                transition:
+                    background 0.15s ease,
+                    color 0.15s ease,
+                    border-color 0.15s ease;
+            }
 
-      .main-nav a:hover {
-        color: var(--text-main);
-        border-color: rgba(148, 163, 184, 0.6);
-        background: rgba(15, 23, 42, 0.8);
-      }
+            .main-nav a:hover {
+                color: var(--text-main);
+                border-color: rgba(148, 163, 184, 0.6);
+                background: rgba(15, 23, 42, 0.8);
+            }
 
-      .main-nav a.active {
-        color: #fff;
-        border-color: var(--accent-blue);
-        background: rgba(37, 99, 235, 0.3);
-      }
+            .main-nav a.active {
+                color: #fff;
+                border-color: var(--accent-blue);
+                background: rgba(37, 99, 235, 0.3);
+            }
 
-      @media (max-width: 960px) {
-        .app-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .main-nav {
-          flex-wrap: wrap;
-          justify-content: center;
-        }
-      }
+            @media (max-width: 960px) {
+                .app-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+                .main-nav {
+                    flex-wrap: wrap;
+                    justify-content: center;
+                }
+            }
 
-      .login-wrapper {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+            .login-wrapper {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
 
-      .login-card {
-        background: var(--bg-card);
-        border-radius: 0.9rem;
-        border: 1px solid var(--border-subtle);
-        padding: 1.75rem 1.9rem;
-        max-width: 420px;
-        width: 100%;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-      }
+            .login-card {
+                background: var(--bg-card);
+                border-radius: 0.9rem;
+                border: 1px solid var(--border-subtle);
+                padding: 1.75rem 1.9rem;
+                max-width: 420px;
+                width: 100%;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            }
 
-      .login-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 0.4rem;
-      }
+            .login-title {
+                font-size: 1.1rem;
+                font-weight: 600;
+                margin-bottom: 0.4rem;
+            }
 
-      .login-subtitle {
-        font-size: 0.85rem;
-        color: var(--text-muted);
-        margin-bottom: 1.4rem;
-      }
+            .login-subtitle {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                margin-bottom: 1.4rem;
+            }
 
-      .btn-dapper {
-        width: 100%;
-        border-radius: 999px;
-        border: none;
-        padding: 0.7rem 1rem;
-        font-size: 0.9rem;
-        font-weight: 600;
-        cursor: pointer;
-        background: linear-gradient(
-          135deg,
-          var(--accent-purple),
-          var(--accent-blue)
-        );
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.4rem;
-      }
+            .btn-dapper {
+                width: 100%;
+                border-radius: 999px;
+                border: none;
+                padding: 0.7rem 1rem;
+                font-size: 0.9rem;
+                font-weight: 600;
+                cursor: pointer;
+                background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.4rem;
+            }
 
-      .btn-dapper:hover {
-        filter: brightness(1.05);
-      }
+            .btn-dapper:hover {
+                filter: brightness(1.05);
+            }
 
-      .status {
-        margin-top: 1rem;
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        min-height: 1.2em;
-      }
+            .status {
+                margin-top: 1rem;
+                font-size: 0.8rem;
+                color: var(--text-muted);
+                min-height: 1.2em;
+            }
 
-      .status.error {
-        color: #f97373;
-      }
+            .status.error {
+                color: #f97373;
+            }
 
-      .status.success {
-        color: #4ade80;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-logo">🐱</div>
-          <div class="brand-title">Chunky's NFLAD Viewer</div>
+            .status.success {
+                color: #4ade80;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app-shell">
+            <header class="app-header">
+                <div class="brand">
+                    <div class="brand-logo">🐱</div>
+                    <div class="brand-title">Chunky's NFLAD Viewer</div>
+                </div>
+
+                <nav class="main-nav">
+                    <a href="/">Wallet</a>
+                    <a href="/profiles.html">Profiles</a>
+                    <a href="/top-holders.html">Top holders</a>
+                    <a href="/explorer.html">Browse</a>
+                    <a href="/faq.html">FAQ</a>
+                    <a href="/contact.html">Contact</a>
+                    <a href="/login.html" class="active" id="nav-account-link">Login</a>
+                </nav>
+            </header>
+
+            <div class="login-wrapper">
+                <section class="login-card">
+                    <div class="login-title">Sign in with Dapper</div>
+                    <div class="login-subtitle">
+                        Use your Dapper / Flow wallet to log in. We'll remember your wallet and auto-load it as your
+                        default view.
+                    </div>
+
+                    <button id="btn-dapper-login" class="btn-dapper" type="button">
+                        <span>Sign in with Dapper</span>
+                    </button>
+
+                    <div id="login-status" class="status"></div>
+                </section>
+            </div>
         </div>
 
-        <nav class="main-nav">
-          <a href="/">Wallet</a>
-          <a href="/profiles.html">Profiles</a>
-          <a href="/top-holders.html">Top holders</a>
-          <a href="/explorer.html">Browse</a>
-          <a href="/faq.html">FAQ</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/login.html" class="active" id="nav-account-link">Login</a>
-        </nav>
-      </header>
+        <!-- OFFICIAL FCL UMD FROM CDN -->
+        <script src="https://unpkg.com/@onflow/fcl@1.10.0/dist/fcl.umd.min.js"></script>
 
-      <div class="login-wrapper">
-        <section class="login-card">
-          <div class="login-title">Sign in with Dapper</div>
-          <div class="login-subtitle">
-            Use your Dapper / Flow wallet to log in. We'll remember your wallet
-            and auto-load it as your default view.
-          </div>
+        <script>
+            // Normalise global in case the bundle uses onflowFcl instead of fcl
+            (function normalizeFclGlobal() {
+                if (!window.fcl && window.onflowFcl) {
+                    window.fcl = window.onflowFcl;
+                }
+            })();
 
-          <button id="btn-dapper-login" class="btn-dapper" type="button">
-            <span>Sign in with Dapper</span>
-          </button>
+            const statusEl = document.getElementById("login-status");
+            const btn = document.getElementById("btn-dapper-login");
 
-          <div id="login-status" class="status"></div>
-        </section>
-      </div>
-    </div>
-
-    <!-- OFFICIAL FCL UMD FROM CDN -->
-    <script src="https://unpkg.com/@onflow/fcl@1.10.0/dist/fcl.umd.min.js"></script>
-
-    <script>
-      // Normalise global in case the bundle uses onflowFcl instead of fcl
-      (function normalizeFclGlobal() {
-        if (!window.fcl && window.onflowFcl) {
-          window.fcl = window.onflowFcl;
-        }
-      })();
-
-      const statusEl = document.getElementById("login-status");
-      const btn = document.getElementById("btn-dapper-login");
-
-      function setStatus(msg, type) {
-        statusEl.textContent = msg || "";
-        statusEl.classList.remove("error", "success");
-        if (type) statusEl.classList.add(type);
-      }
-
-      (function setupFcl() {
-        const fcl = window.fcl;
-        if (!fcl) {
-          console.error("FCL script did not attach window.fcl");
-          setStatus("Flow/FCL library failed to load. Check console.", "error");
-          return;
-        }
-
-        // Dapper-only config (mainnet NFL All Day)
-        fcl
-          .config()
-          .put("accessNode.api", "https://rest-mainnet.onflow.org")
-          .put(
-            "discovery.wallet",
-            // Dapper wallet-only authn endpoint (mainnet)
-            "https://accounts.meetdapper.com/fcl/authn-restricted"
-          )
-          .put("flow.network", "mainnet")
-          .put("discovery.wallet.method", "TAB/RPC")
-          .put("app.detail.title", "Chunky's NFLAD Viewer")
-          .put(
-            "app.detail.icon",
-            "https://nflallday.com/favicon.ico" // or your own icon later
-          );
-
-        // Subscribe to currentUser so we know when login finishes
-        fcl.currentUser().subscribe(async (user) => {
-          if (!user || !user.loggedIn) {
-            setStatus("Not logged in.", null);
-            return;
-          }
-
-          try {
-            // FCL addr is usually without 0x prefix
-            let addr = (user.addr || "").toLowerCase().trim();
-            if (!addr) {
-              setStatus("No wallet address found from Dapper.", "error");
-              return;
-            }
-            if (!addr.startsWith("0x")) addr = "0x" + addr;
-
-            setStatus("Logged in with " + addr + " – saving session…", null);
-
-            const res = await fetch("/api/login-dapper", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ wallet_address: addr })
-            });
-
-            const data = await res.json();
-            if (!res.ok || !data.ok) {
-              console.error("/api/login-dapper error:", data);
-              setStatus(
-                data.error || "Failed to create session on server.",
-                "error"
-              );
-              return;
+            function setStatus(msg, type) {
+                statusEl.textContent = msg || "";
+                statusEl.classList.remove("error", "success");
+                if (type) statusEl.classList.add(type);
             }
 
-            setStatus("Login saved. Redirecting to your wallet…", "success");
+            (function setupFcl() {
+                const fcl = window.fcl;
+                if (!fcl) {
+                    console.error("FCL script did not attach window.fcl");
+                    setStatus("Flow/FCL library failed to load. Check console.", "error");
+                    return;
+                }
 
-            // Send them to main wallet page with ?wallet= for immediate load
-            const redirectUrl = "/?wallet=" + encodeURIComponent(addr);
-            setTimeout(() => {
-              window.location.href = redirectUrl;
-            }, 600);
-          } catch (err) {
-            console.error("login-dapper subscribe error:", err);
-            setStatus("Error saving login on server.", "error");
-          }
-        });
+                // Dapper-only config (mainnet NFL All Day)
+                fcl.config()
+                    .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                    .put(
+                        "discovery.wallet",
+                        // Dapper wallet-only authn endpoint (mainnet)
+                        "https://accounts.meetdapper.com/fcl/authn-restricted"
+                    )
+                    .put("flow.network", "mainnet")
+                    .put("discovery.wallet.method", "TAB/RPC")
+                    .put("app.detail.title", "Chunky's NFLAD Viewer")
+                    .put(
+                        "app.detail.icon",
+                        "https://nflallday.com/favicon.ico" // or your own icon later
+                    );
 
-        btn.addEventListener("click", async () => {
-          try {
-            setStatus("Opening Dapper login…", null);
-            await fcl.authenticate();
-          } catch (err) {
-            console.error("Dapper login error:", err);
-            setStatus("Failed to start Dapper login. Check console.", "error");
-          }
-        });
-      })();
-    </script>
-  </body>
+                // Subscribe to currentUser so we know when login finishes
+                fcl.currentUser().subscribe(async (user) => {
+                    if (!user || !user.loggedIn) {
+                        setStatus("Not logged in.", null);
+                        return;
+                    }
+
+                    try {
+                        // FCL addr is usually without 0x prefix
+                        let addr = (user.addr || "").toLowerCase().trim();
+                        if (!addr) {
+                            setStatus("No wallet address found from Dapper.", "error");
+                            return;
+                        }
+                        if (!addr.startsWith("0x")) addr = "0x" + addr;
+
+                        setStatus("Logged in with " + addr + " – saving session…", null);
+
+                        const res = await fetch("/api/login-dapper", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ wallet_address: addr })
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok || !data.ok) {
+                            console.error("/api/login-dapper error:", data);
+                            setStatus(data.error || "Failed to create session on server.", "error");
+                            return;
+                        }
+
+                        setStatus("Login saved. Redirecting to your wallet…", "success");
+
+                        // Send them to main wallet page with ?wallet= for immediate load
+                        const redirectUrl = "/?wallet=" + encodeURIComponent(addr);
+                        setTimeout(() => {
+                            window.location.href = redirectUrl;
+                        }, 600);
+                    } catch (err) {
+                        console.error("login-dapper subscribe error:", err);
+                        setStatus("Error saving login on server.", "error");
+                    }
+                });
+
+                btn.addEventListener("click", async () => {
+                    try {
+                        setStatus("Opening Dapper login…", null);
+                        await fcl.authenticate();
+                    } catch (err) {
+                        console.error("Dapper login error:", err);
+                        setStatus("Failed to start Dapper login. Check console.", "error");
+                    }
+                });
+            })();
+        </script>
+    </body>
 </html>

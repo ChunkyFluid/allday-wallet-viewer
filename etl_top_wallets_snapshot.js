@@ -14,7 +14,7 @@ async function refreshTopWalletsSnapshot() {
     // Wipe previous snapshot
     await client.query("TRUNCATE TABLE top_wallets_snapshot");
 
-    // Recompute from wallet_holdings + metadata
+    // Recompute from wallet_holdings + metadata, EXCLUDING contract/system wallets
     await client.query(`
       INSERT INTO top_wallets_snapshot (
         wallet_address,
@@ -48,6 +48,10 @@ async function refreshTopWalletsSnapshot() {
         ON w.wallet_address = wh.wallet_address
       LEFT JOIN public.nft_core_metadata AS ncm
         ON ncm.nft_id = wh.nft_id
+      WHERE wh.wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d', -- AllDay contract
+        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
+      )
       GROUP BY
         wh.wallet_address,
         COALESCE(wp.display_name, w.username, wh.wallet_address);
@@ -61,7 +65,6 @@ async function refreshTopWalletsSnapshot() {
     process.exitCode = 1;
   } finally {
     client.release();
-    // optional; if you want clean exit
     await pool.end();
   }
 }

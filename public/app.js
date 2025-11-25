@@ -8,6 +8,10 @@ let currentSortKey = "last_event_ts";
 let currentSortDir = "desc";
 let currentPage = 1;
 
+// price maps keyed by edition_id
+let priceAspByEdition = {};
+let priceLowAskByEdition = {};
+
 function getEls() {
   return {
     form: document.getElementById("wallet-form"),
@@ -27,7 +31,7 @@ function getEls() {
     filterPosition: document.getElementById("filter-position"),
     filterLocked: document.getElementById("filter-locked"),
     resetFilters: document.getElementById("reset-filters"),
-    table: document.getElementById("wallet-table")
+    table: document.getElementById("wallet-table"),
   };
 }
 
@@ -162,7 +166,12 @@ function applySort() {
     if (vb == null) return dir === "asc" ? -1 : 1;
 
     // type-aware
-    if (key === "serial_number" || key === "max_mint_size") {
+    if (
+      key === "serial_number" ||
+      key === "max_mint_size" ||
+      key === "asp_90d" ||
+      key === "low_ask"
+    ) {
       va = Number(va) || 0;
       vb = Number(vb) || 0;
     } else if (key === "is_locked") {
@@ -209,10 +218,24 @@ function renderPage(page) {
 
     const serial = r.serial_number ?? "";
     const max = r.max_mint_size ?? "";
-    const momentUrl = r.nft_id ? `https://nflallday.com/moments/${r.nft_id}` : "";
+    const momentUrl = r.nft_id
+      ? `https://nflallday.com/moments/${r.nft_id}`
+      : "";
     const marketUrl = r.edition_id
       ? `https://nflallday.com/listing/moment/${r.edition_id}`
       : "";
+
+    const aspVal = r.asp_90d != null ? Number(r.asp_90d) : null;
+    const lowAskVal = r.low_ask != null ? Number(r.low_ask) : null;
+
+    const aspText =
+      aspVal != null && !Number.isNaN(aspVal)
+        ? `$${aspVal.toFixed(2)}`
+        : "";
+    const lowAskText =
+      lowAskVal != null && !Number.isNaN(lowAskVal)
+        ? `$${lowAskVal.toFixed(2)}`
+        : "";
 
     tr.innerHTML = `
       <td>${playerName || "(unknown)"}</td>
@@ -223,6 +246,8 @@ function renderPage(page) {
       <td>${max}</td>
       <td>${r.series_name || ""}</td>
       <td>${r.set_name || ""}</td>
+      <td>${aspText}</td>
+      <td>${lowAskText}</td>
       <td>
         <span class="locked-pill ${r.is_locked ? "locked" : "unlocked"}">
           ${r.is_locked ? "Locked" : "Unlocked"}
@@ -231,16 +256,8 @@ function renderPage(page) {
       <td>${formatDate(r.last_event_ts)}</td>
       <td>
         <div class="link-group">
-          ${
-            momentUrl
-              ? `<a href="${momentUrl}" target="_blank" rel="noopener">Moment</a>`
-              : ""
-          }
-          ${
-            marketUrl
-              ? `<a href="${marketUrl}" target="_blank" rel="noopener">Market</a>`
-              : ""
-          }
+          ${momentUrl ? `<a href="${momentUrl}" target="_blank" rel="noopener">Moment</a>` : ""}
+          ${marketUrl ? `<a href="${marketUrl}" target="_blank" rel="noopener">Market</a>` : ""}
         </div>
       </td>
     `;
@@ -312,12 +329,8 @@ async function fetchWalletSummary(wallet) {
         <span class="chip-pill-tier chip-common">Common: ${byTier.Common ?? 0}</span>
         <span class="chip-pill-tier chip-uncommon">Uncommon: ${byTier.Uncommon ?? 0}</span>
         <span class="chip-pill-tier chip-rare">Rare: ${byTier.Rare ?? 0}</span>
-        <span class="chip-pill-tier chip-legendary">Legendary: ${
-          byTier.Legendary ?? 0
-        }</span>
-        <span class="chip-pill-tier chip-ultimate">Ultimate: ${
-          byTier.Ultimate ?? 0
-        }</span>
+        <span class="chip-pill-tier chip-legendary">Legendary: ${byTier.Legendary ?? 0}</span>
+        <span class="chip-pill-tier chip-ultimate">Ultimate: ${byTier.Ultimate ?? 0}</span>
       </div>
     `;
     els.summaryCard.style.display = "flex";
@@ -333,6 +346,27 @@ async function fetchWalletMoments(wallet) {
     throw new Error(data.error || "Failed to load wallet");
   }
   return data.rows || [];
+}
+
+async function fetchPricesForEditions(editionIds) {
+  if (!editionIds.length) {
+    return { asp: {}, lowAsk: {} };
+  }
+
+  const params = new URLSearchParams();
+  params.set("editions", editionIds.join(","));
+
+  const res = await fetch(`/api/prices?${params.toString()}`);
+  const data = await res.json();
+  if (!data.ok) {
+    console.warn("fetchPricesForEditions failed:", data.error);
+    return { asp: {}, lowAsk: {} };
+  }
+
+  return {
+    asp: data.asp || {},
+    lowAsk: data.lowAsk || {},
+  };
 }
 
 function wireEvents() {
@@ -355,7 +389,7 @@ function wireEvents() {
     els.filterSet,
     els.filterTier,
     els.filterPosition,
-    els.filterLocked
+    els.filterLocked,
   ].filter(Boolean);
 
   filterEls.forEach((sel) => {
@@ -437,8 +471,10 @@ function exportCsv() {
     "jersey_number",
     "series_name",
     "set_name",
+    "asp_90d",
+    "low_ask",
     "is_locked",
-    "last_event_ts"
+    "last_event_ts",
   ];
 
   const lines = [];
@@ -449,7 +485,6 @@ function exportCsv() {
       .map((h) => {
         let v = r[h];
         if (v == null) v = "";
-        // simple CSV escaping
         const s = String(v).replace(/"/g, '""');
         if (s.search(/[",\n]/) >= 0) {
           return `"${s}"`;
@@ -492,6 +527,34 @@ window.runQuery = async function runQuery(walletRaw) {
   try {
     await fetchWalletSummary(wallet);
     allMoments = await fetchWalletMoments(wallet);
+
+    // fetch prices for all editions in this wallet
+    const editionIds = [...new Set(allMoments.map((r) => r.edition_id).filter(Boolean))];
+
+    priceAspByEdition = {};
+    priceLowAskByEdition = {};
+
+    if (editionIds.length) {
+      try {
+        const priceData = await fetchPricesForEditions(editionIds);
+        priceAspByEdition = priceData.asp;
+        priceLowAskByEdition = priceData.lowAsk;
+
+        // decorate rows with price info so sorting/CSV work
+        allMoments = allMoments.map((r) => {
+          const ed = r.edition_id;
+          const asp = ed && priceAspByEdition[ed] != null ? priceAspByEdition[ed] : null;
+          const lowAsk = ed && priceLowAskByEdition[ed] != null ? priceLowAskByEdition[ed] : null;
+          return {
+            ...r,
+            asp_90d: asp,
+            low_ask: lowAsk,
+          };
+        });
+      } catch (err) {
+        console.error("Failed to fetch prices for editions", err);
+      }
+    }
 
     buildFilterOptions();
     applyFilters();
