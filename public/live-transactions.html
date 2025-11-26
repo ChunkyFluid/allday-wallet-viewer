@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Live Transactions – Chunky's NFLAD Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/header.css" />
+    <style>
+      :root {
+        --bg-main: #050816;
+        --bg-card: #101322;
+        --border-subtle: rgba(255, 255, 255, 0.06);
+        --text-main: #f9fafb;
+        --text-muted: #9ca3af;
+        --accent-purple: #6f42c1;
+        --accent-blue: #007bff;
+        --accent-cyan: #0dcaf0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
+        color: var(--text-main);
+      }
+
+      main.app-main {
+        max-width: 1400px;
+        margin: 1.5rem auto 2.5rem;
+        padding: 0 1.5rem;
+      }
+
+      .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
+
+      .page-subtitle {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        font-size: 0.9rem;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        animation: pulse 2s infinite;
+      }
+
+      .status-dot.active {
+        background: #22c55e;
+      }
+
+      .status-dot.error {
+        background: #f97373;
+        animation: none;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-card);
+        color: var(--text-main);
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+      }
+
+      .btn:hover {
+        border-color: var(--accent-blue);
+        background: rgba(0, 123, 255, 0.1);
+      }
+
+      .btn-primary {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #0056b3;
+      }
+
+      .transactions-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--bg-card);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-subtle);
+      }
+
+      .transactions-table thead {
+        background: rgba(111, 66, 193, 0.1);
+      }
+
+      .transactions-table th {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .transactions-table td {
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--border-subtle);
+        font-size: 0.9rem;
+      }
+
+      .transactions-table tbody tr {
+        transition: background 0.2s;
+      }
+
+      .transactions-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .transactions-table tbody tr.new {
+        background: rgba(34, 197, 94, 0.1);
+        animation: highlight 2s ease-out;
+      }
+
+      @keyframes highlight {
+        0% { background: rgba(34, 197, 94, 0.3); }
+        100% { background: rgba(34, 197, 94, 0.1); }
+      }
+
+      .event-type {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .event-type.Deposit {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      .event-type.Withdraw {
+        background: rgba(249, 115, 115, 0.2);
+        color: #f97373;
+      }
+
+      .event-type.NFTLocked {
+        background: rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+      }
+
+      .event-type.NFTUnlocked {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+      }
+
+      .wallet-link {
+        color: var(--accent-cyan);
+        text-decoration: none;
+        font-family: monospace;
+        font-size: 0.85rem;
+      }
+
+      .wallet-link:hover {
+        text-decoration: underline;
+      }
+
+      .nft-link {
+        color: var(--accent-blue);
+        text-decoration: none;
+        font-family: monospace;
+        font-size: 0.85rem;
+      }
+
+      .nft-link:hover {
+        text-decoration: underline;
+      }
+
+      .timestamp {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--text-muted);
+      }
+
+      .empty-state-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">🐱</div>
+        <div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
+        </div>
+      </div>
+      <nav class="main-nav">
+        <a href="/" id="nav-wallet">Wallet</a>
+        <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+        <a href="/explorer.html" id="nav-explorer">Browse</a>
+        <a href="/insights.html" id="nav-insights">Insights</a>
+        <a href="/live-transactions.html" id="nav-live" class="active">Live</a>
+        <a href="/faq.html" id="nav-faq">FAQ</a>
+        <a href="/contact.html" id="nav-contact">Contact</a>
+        <a href="/login.html" id="nav-account-link">Login</a>
+      </nav>
+    </header>
+    <script src="/header.js"></script>
+
+    <main class="app-main">
+      <h1 class="page-title">Live NFL All Day Transactions</h1>
+      <p class="page-subtitle">Real-time transactions for NFL All Day moments on the Flow blockchain</p>
+
+      <div class="controls">
+        <div class="status-indicator">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+        <button class="btn btn-primary" id="btn-start">Start</button>
+        <button class="btn" id="btn-stop">Stop</button>
+        <button class="btn" id="btn-clear">Clear</button>
+        <button class="btn" id="btn-toggle-source" title="Toggle between Flow API (live but unreliable) and Snowflake (reliable but ~1 min delay)">Use Snowflake</button>
+        <span style="color: var(--text-muted); font-size: 0.85rem;">
+          Showing <span id="count">0</span> transactions
+        </span>
+      </div>
+
+      <table class="transactions-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>NFT ID</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Block</th>
+          </tr>
+        </thead>
+        <tbody id="transactions-tbody">
+          <tr>
+            <td colspan="6" class="empty-state">
+              <div class="empty-state-icon">📡</div>
+              <div>Click "Start" to begin monitoring live transactions</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+
+    <script>
+      const POLL_INTERVAL = 3000; // 3 seconds
+
+      let isMonitoring = false;
+      let pollInterval = null;
+      let lastBlockHeight = null;
+      let transactions = [];
+      const MAX_TRANSACTIONS = 100;
+      let useSnowflake = false; // Toggle to use Snowflake instead of Flow API
+      let lastEventTimestamp = null;
+
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+      const btnStart = document.getElementById('btn-start');
+      const btnStop = document.getElementById('btn-stop');
+      const btnClear = document.getElementById('btn-clear');
+      const btnToggleSource = document.getElementById('btn-toggle-source');
+      const tbody = document.getElementById('transactions-tbody');
+      const countEl = document.getElementById('count');
+
+      function updateStatus(status, text) {
+        statusDot.className = 'status-dot ' + status;
+        statusText.textContent = text;
+      }
+
+      function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString();
+      }
+
+      function formatWallet(wallet) {
+        if (!wallet) return '-';
+        const short = wallet.length > 10 ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : wallet;
+        return `<a href="/?wallet=${encodeURIComponent(wallet)}" class="wallet-link">${short}</a>`;
+      }
+
+      function formatNftId(nftId) {
+        if (!nftId) return '-';
+        const short = nftId.length > 12 ? nftId.slice(0, 8) + '...' + nftId.slice(-4) : nftId;
+        return `<a href="https://nflallday.com/moments/${nftId}" target="_blank" class="nft-link">${short}</a>`;
+      }
+
+      function addTransaction(tx) {
+        // Add to beginning of array
+        transactions.unshift(tx);
+        
+        // Keep only last MAX_TRANSACTIONS
+        if (transactions.length > MAX_TRANSACTIONS) {
+          transactions = transactions.slice(0, MAX_TRANSACTIONS);
+        }
+
+        renderTransactions();
+      }
+
+      function renderTransactions() {
+        if (transactions.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="empty-state">
+                <div class="empty-state-icon">📡</div>
+                <div>No transactions yet. Waiting for activity...</div>
+              </td>
+            </tr>
+          `;
+          countEl.textContent = '0';
+          return;
+        }
+
+        countEl.textContent = transactions.length;
+
+        tbody.innerHTML = transactions.map((tx, idx) => `
+          <tr class="${idx === 0 ? 'new' : ''}">
+            <td class="timestamp">${formatTime(tx.timestamp)}</td>
+            <td><span class="event-type ${tx.type}">${tx.type}</span></td>
+            <td>${formatNftId(tx.nftId)}</td>
+            <td>${formatWallet(tx.from)}</td>
+            <td>${formatWallet(tx.to)}</td>
+            <td class="timestamp">${tx.blockHeight}</td>
+          </tr>
+        `).join('');
+      }
+
+      async function fetchLatestEvents() {
+        try {
+          if (useSnowflake) {
+            // Use Snowflake for more reliable event fetching
+            // Note: Snowflake data is delayed by 1-2 hours, so we query 3 hours back
+            const hoursAgo = 3; // Get events from last 3 hours to account for delay
+            const eventsRes = await fetch(`/api/recent-events-snowflake?limit=100&hours=${hoursAgo}`);
+            
+            if (!eventsRes.ok) {
+              throw new Error(`Failed to fetch events from Snowflake: HTTP ${eventsRes.status}`);
+            }
+            
+            const eventsData = await eventsRes.json();
+            if (!eventsData.ok) {
+              throw new Error(eventsData.error || 'Failed to fetch events');
+            }
+            
+            const events = eventsData.events || [];
+            
+            // Filter out events we've already seen by transaction ID (more reliable than timestamp)
+            const seenTxIds = new Set(transactions.map(t => t.txId).filter(Boolean));
+            const newEvents = events.filter(tx => {
+              // Skip if we've already seen this transaction
+              if (tx.txId && seenTxIds.has(tx.txId)) return false;
+              
+              // Also check by timestamp if no txId
+              if (!lastEventTimestamp) return true;
+              const txTime = new Date(tx.timestamp);
+              return txTime > lastEventTimestamp;
+            });
+            
+            // Process new events
+            for (const tx of newEvents) {
+              addTransaction(tx);
+            }
+            
+            // Update last seen timestamp
+            if (events.length > 0) {
+              const latestTime = new Date(Math.max(...events.map(tx => new Date(tx.timestamp).getTime())));
+              if (!lastEventTimestamp || latestTime > lastEventTimestamp) {
+                lastEventTimestamp = latestTime;
+              }
+            }
+            
+            updateStatus('active', `Monitoring via Snowflake (${events.length} events in last ${minutesAgo} min)`);
+            return;
+          }
+          
+          // Original Flow API approach
+          // Get latest block first using our proxy
+          const blockRes = await fetch('/api/flow-latest-block');
+          if (!blockRes.ok) {
+            const errorText = await blockRes.text();
+            throw new Error(`Failed to get latest block: HTTP ${blockRes.status} - ${errorText.substring(0, 100)}`);
+          }
+          
+          const blockData = await blockRes.json();
+          if (!blockData.ok) {
+            throw new Error(blockData.error || 'Failed to get latest block');
+          }
+          
+          const currentBlockHeight = blockData.height;
+
+          if (!lastBlockHeight || lastBlockHeight < 0) {
+            // Start from current block (only look forward)
+            lastBlockHeight = currentBlockHeight;
+          }
+          
+          // Ensure we don't query with invalid heights
+          if (currentBlockHeight <= 0) {
+            throw new Error("Invalid block height received from server");
+          }
+          
+          if (lastBlockHeight >= currentBlockHeight) {
+            // No new blocks, just update status
+            updateStatus('active', `Monitoring (Block ${currentBlockHeight}, no new blocks)`);
+            return;
+          }
+          
+          // Limit to small block ranges to avoid 500 errors
+          const maxBlockRange = 2;
+          const queryEndHeight = Math.min(currentBlockHeight, lastBlockHeight + maxBlockRange);
+
+          // Fetch events from lastBlockHeight to queryEndHeight using our proxy
+          const eventsRes = await fetch(
+            `/api/flow-events?start_height=${lastBlockHeight}&end_height=${queryEndHeight}`
+          );
+
+          if (!eventsRes.ok) {
+            const errorText = await eventsRes.text();
+            throw new Error(`Failed to fetch events: HTTP ${eventsRes.status} - ${errorText.substring(0, 100)}`);
+          }
+
+          const eventsData = await eventsRes.json();
+          if (!eventsData.ok) {
+            throw new Error(eventsData.error || 'Failed to fetch events');
+          }
+
+          const events = eventsData.events || [];
+
+          // Process new events
+          for (const tx of events) {
+            addTransaction(tx);
+          }
+
+          // Update lastBlockHeight to where we queried
+          lastBlockHeight = queryEndHeight;
+          updateStatus('active', `Monitoring (Block ${currentBlockHeight}, queried ${lastBlockHeight}-${queryEndHeight})`);
+        } catch (err) {
+          console.error('Error fetching events:', err);
+          const errorMsg = err.message || 'Unknown error';
+          updateStatus('error', 'Error: ' + errorMsg.substring(0, 50));
+          // Don't stop monitoring on error, just log it
+        }
+      }
+
+      function startMonitoring() {
+        if (isMonitoring) return;
+        
+        isMonitoring = true;
+        updateStatus('active', 'Starting...');
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+
+        // Fetch immediately
+        fetchLatestEvents();
+
+        // Then poll every POLL_INTERVAL
+        pollInterval = setInterval(fetchLatestEvents, POLL_INTERVAL);
+      }
+
+      function stopMonitoring() {
+        if (!isMonitoring) return;
+        
+        isMonitoring = false;
+        updateStatus('', 'Stopped');
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+      }
+
+      function clearTransactions() {
+        transactions = [];
+        renderTransactions();
+      }
+
+      btnStart.addEventListener('click', startMonitoring);
+      btnStop.addEventListener('click', stopMonitoring);
+      btnClear.addEventListener('click', clearTransactions);
+      
+      if (btnToggleSource) {
+        btnToggleSource.addEventListener('click', () => {
+          useSnowflake = !useSnowflake;
+          btnToggleSource.textContent = useSnowflake ? 'Use Flow API' : 'Use Snowflake';
+          btnToggleSource.title = useSnowflake 
+            ? 'Switch to Flow API (live but unreliable)' 
+            : 'Switch to Snowflake (reliable but ~1 min delay)';
+          if (isMonitoring) {
+            // Restart monitoring with new source
+            stopMonitoring();
+            setTimeout(startMonitoring, 100);
+          }
+        });
+      }
+      
+      btnStop.disabled = true;
+
+      // Auto-start on page load
+      // startMonitoring();
+    </script>
+  </body>
+</html>
+

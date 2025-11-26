@@ -1711,6 +1711,430 @@ app.post("/api/login-dapper", async (req, res) => {
   }
 });
 
+// Live Flow blockchain events proxy
+// Note: Flow REST API is unreliable, so we query one event type at a time with small block ranges
+app.get("/api/flow-events", async (req, res) => {
+  try {
+    let { start_height, end_height } = req.query;
+    const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
+    const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
+
+    // Validate and parse block heights
+    start_height = start_height ? parseInt(start_height, 10) : null;
+    end_height = end_height ? parseInt(end_height, 10) : null;
+    
+    if (start_height !== null && (isNaN(start_height) || start_height < 0)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invalid start_height: must be a non-negative integer"
+      });
+    }
+    
+    if (end_height !== null && (isNaN(end_height) || end_height < 0)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Invalid end_height: must be a non-negative integer"
+      });
+    }
+    
+    if (start_height !== null && end_height !== null && start_height > end_height) {
+      return res.status(400).json({
+        ok: false,
+        error: "start_height must be less than or equal to end_height"
+      });
+    }
+
+    // Flow REST API is very unreliable - query one event type at a time with very small ranges
+    const eventTypes = [
+      `${ALLDAY_CONTRACT}.Deposit`,
+      `${ALLDAY_CONTRACT}.Withdraw`
+    ];
+    
+    // Limit block range to 1-2 blocks to avoid 500 errors
+    const maxBlockRange = 2;
+    if (start_height !== null && end_height !== null && (end_height - start_height) > maxBlockRange) {
+      end_height = start_height + maxBlockRange;
+    }
+
+    // Query each event type separately and merge results
+    const allEvents = [];
+    for (const eventType of eventTypes) {
+      try {
+        const urlParams = new URLSearchParams();
+        urlParams.set("type", eventType);
+        if (start_height !== null) urlParams.set("start_height", start_height.toString());
+        if (end_height !== null) urlParams.set("end_height", end_height.toString());
+        
+        const url = `${FLOW_ACCESS_NODE}/v1/events?${urlParams.toString()}`;
+        console.log(`Fetching ${eventType} from blocks ${start_height}-${end_height}`);
+
+        const flowRes = await fetch(url);
+        const responseText = await flowRes.text();
+        
+        if (!flowRes.ok) {
+          if (flowRes.status === 500) {
+            console.warn(`Flow API 500 error for ${eventType} (blocks ${start_height}-${end_height})`);
+            continue; // Skip this event type
+          } else {
+            console.error(`Flow API error for ${eventType}:`, flowRes.status);
+            continue;
+          }
+        }
+        
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseErr) {
+          console.error(`Failed to parse response for ${eventType}`);
+          continue;
+        }
+        
+        if (data.results && Array.isArray(data.results)) {
+          allEvents.push(...data.results);
+          console.log(`Got ${data.results.length} ${eventType} events`);
+        }
+      } catch (err) {
+        console.error(`Error fetching ${eventType}:`, err.message);
+        continue;
+      }
+    }
+    
+    // Process all collected events
+    const data = { results: allEvents };
+    
+    // Transform events to a simpler format
+    const events = (data.results || []).map(event => {
+      const eventType = event.type ? event.type.split(".").pop() : "Unknown";
+      // Flow events have payload as base64 encoded, or as direct fields
+      let payload = {};
+      
+      if (event.payload) {
+        // Try to parse if it's a string
+        if (typeof event.payload === 'string') {
+          try {
+            payload = JSON.parse(Buffer.from(event.payload, 'base64').toString());
+          } catch {
+            // If not base64, try direct JSON
+            try {
+              payload = JSON.parse(event.payload);
+            } catch {
+              payload = {};
+            }
+          }
+        } else {
+          payload = event.payload;
+        }
+      }
+      
+      // Also check event.data which might contain the actual event data
+      if (event.data) {
+        payload = { ...payload, ...event.data };
+      }
+      
+      return {
+        type: eventType,
+        nftId: payload.id || payload.nftID || payload.nft_id || null,
+        from: payload.from ? payload.from.toLowerCase() : null,
+        to: payload.to ? payload.to.toLowerCase() : null,
+        timestamp: event.block_timestamp || event.timestamp,
+        blockHeight: event.block_height || event.height,
+        txId: event.transaction_id || event.tx_id
+      };
+    });
+
+    console.log(`Fetched ${events.length} events from blocks ${start_height} to ${end_height}`);
+    
+    // Debug: log raw events if we got any
+    if (data.results && data.results.length > 0) {
+      console.log("=== RAW EVENT STRUCTURE ===");
+      console.log("Number of events:", data.results.length);
+      console.log("First event keys:", Object.keys(data.results[0]));
+      console.log("First event full structure:", JSON.stringify(data.results[0], null, 2).substring(0, 1500));
+    } else {
+      console.log("No events in response. Response keys:", Object.keys(data || {}));
+      console.log("Response structure:", JSON.stringify(data).substring(0, 500));
+    }
+
+    return res.json({
+      ok: true,
+      events: events,
+      start_height: start_height || null,
+      end_height: end_height || null
+    });
+  } catch (err) {
+    console.error("GET /api/flow-events error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch Flow events: " + (err.message || String(err))
+    });
+  }
+});
+
+// Direct Flow blockchain query to see what events actually exist
+app.get("/api/test-flow-events", async (req, res) => {
+  try {
+    const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
+    const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
+    
+    // Get latest block first
+    const blockRes = await fetch(`${FLOW_ACCESS_NODE}/v1/blocks?height=final`);
+    const blockData = await blockRes.json();
+    let currentBlock = 0;
+    
+    if (Array.isArray(blockData) && blockData.length > 0) {
+      currentBlock = parseInt(blockData[0].header?.height || blockData[0].height || 0);
+    } else if (blockData.header?.height) {
+      currentBlock = parseInt(blockData.header.height);
+    }
+    
+    console.log(`Current Flow block height: ${currentBlock}`);
+    
+    // Query last 100 blocks for any AllDay events
+    const startBlock = Math.max(0, currentBlock - 100);
+    const endBlock = currentBlock;
+    
+    const eventTypes = [
+      `${ALLDAY_CONTRACT}.Deposit`,
+      `${ALLDAY_CONTRACT}.Withdraw`
+    ];
+    
+    const allEvents = [];
+    for (const eventType of eventTypes) {
+      try {
+        const url = `${FLOW_ACCESS_NODE}/v1/events?type=${encodeURIComponent(eventType)}&start_height=${startBlock}&end_height=${endBlock}`;
+        console.log(`Querying Flow for ${eventType} from blocks ${startBlock}-${endBlock}`);
+        
+        const flowRes = await fetch(url);
+        if (flowRes.ok) {
+          const data = await flowRes.json();
+          if (data.results && data.results.length > 0) {
+            allEvents.push(...data.results);
+            console.log(`Found ${data.results.length} ${eventType} events`);
+          }
+        } else {
+          console.log(`Flow API returned ${flowRes.status} for ${eventType}`);
+        }
+      } catch (err) {
+        console.error(`Error querying ${eventType}:`, err.message);
+      }
+    }
+    
+    return res.json({
+      ok: true,
+      currentBlock: currentBlock,
+      queryRange: `${startBlock}-${endBlock}`,
+      eventsFound: allEvents.length,
+      events: allEvents.slice(0, 10), // Return first 10 for inspection
+      message: allEvents.length > 0 
+        ? `Found ${allEvents.length} events in last 100 blocks`
+        : "No events found in last 100 blocks"
+    });
+  } catch (err) {
+    console.error("GET /api/test-flow-events error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to test Flow query: " + (err.message || String(err))
+    });
+  }
+});
+
+// Test endpoint to check what events exist in Snowflake
+app.get("/api/test-snowflake-events", async (req, res) => {
+  try {
+    await ensureSnowflakeConnected();
+    
+    // Query for the most recent events regardless of time
+    const sql = `
+      SELECT
+        EVENT_DATA:id::STRING AS nft_id,
+        LOWER(EVENT_DATA:to::STRING) AS to_addr,
+        LOWER(EVENT_DATA:from::STRING) AS from_addr,
+        EVENT_TYPE AS event_type,
+        BLOCK_TIMESTAMP AS block_timestamp,
+        BLOCK_HEIGHT AS block_height,
+        TX_ID AS tx_id,
+        EVENT_INDEX AS event_index
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay'
+        AND EVENT_TYPE IN ('Deposit', 'Withdraw', 'MomentNFTMinted', 'MomentNFTBurned')
+        AND TX_SUCCEEDED = TRUE
+      ORDER BY BLOCK_TIMESTAMP DESC, BLOCK_HEIGHT DESC, EVENT_INDEX DESC
+      LIMIT 20
+    `;
+    
+    console.log("Test query: Getting most recent events from Snowflake...");
+    
+    const result = await executeSql(sql);
+    console.log(`Test query returned ${result ? result.length : 0} events`);
+    
+    if (result && result.length > 0) {
+      console.log("Most recent event timestamp:", result[0].block_timestamp || result[0].BLOCK_TIMESTAMP);
+      console.log("Sample event:", JSON.stringify(result[0]).substring(0, 500));
+    }
+    
+    return res.json({
+      ok: true,
+      count: result ? result.length : 0,
+      events: result || [],
+      message: result && result.length > 0 
+        ? `Found ${result.length} recent events. Most recent: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP}`
+        : "No events found in Snowflake"
+    });
+  } catch (err) {
+    console.error("GET /api/test-snowflake-events error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to test Snowflake query: " + (err.message || String(err))
+    });
+  }
+});
+
+// Alternative: Get recent events from Snowflake (more reliable than Flow REST API)
+// Note: Snowflake data is typically delayed by 1-2 hours, so we query a longer time window
+app.get("/api/recent-events-snowflake", async (req, res) => {
+  try {
+    const { limit = 50, hours = 3 } = req.query;
+    const limitNum = Math.min(parseInt(limit, 10) || 50, 200);
+    const hoursAgo = parseInt(hours, 10) || 3; // Default to 3 hours to account for Snowflake delay
+    
+    // Calculate timestamp for X hours ago (Snowflake data is delayed)
+    const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    // Format for Snowflake: 'YYYY-MM-DD HH:MM:SS'
+    const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
+    
+    await ensureSnowflakeConnected();
+    
+    // Query for multiple event types: Deposit, Withdraw, MomentNFTMinted, MomentNFTBurned
+    // Note: Snowflake returns fields in uppercase, so we need to handle both cases
+    const sql = `
+      SELECT
+        EVENT_DATA:id::STRING AS nft_id,
+        LOWER(EVENT_DATA:to::STRING) AS to_addr,
+        LOWER(EVENT_DATA:from::STRING) AS from_addr,
+        EVENT_TYPE AS event_type,
+        BLOCK_TIMESTAMP AS block_timestamp,
+        BLOCK_HEIGHT AS block_height,
+        TX_ID AS tx_id,
+        EVENT_INDEX AS event_index
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay'
+        AND EVENT_TYPE IN ('Deposit', 'Withdraw', 'MomentNFTMinted', 'MomentNFTBurned')
+        AND TX_SUCCEEDED = TRUE
+        AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+      ORDER BY BLOCK_TIMESTAMP DESC, BLOCK_HEIGHT DESC, EVENT_INDEX DESC
+      LIMIT ${limitNum}
+    `;
+    
+    console.log(`Querying Snowflake for events in last ${hoursAgo} hours (since ${cutoffStr})`);
+    console.log(`Current time: ${new Date().toISOString()}`);
+    
+    const result = await executeSql(sql);
+    console.log(`Snowflake returned ${result ? result.length : 0} events`);
+    
+    if (result && result.length > 0) {
+      console.log(`Sample event:`, JSON.stringify(result[0]).substring(0, 300));
+      console.log(`Most recent event timestamp: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP}`);
+      console.log(`Most recent event block: ${result[0].block_height || result[0].BLOCK_HEIGHT}`);
+    } else {
+      console.log("No events found. This could mean:");
+      console.log("1. No events occurred in the last", hoursAgo, "hours");
+      console.log("2. Snowflake data is delayed beyond", hoursAgo, "hours");
+      console.log("3. Events are in a different contract or have different event types");
+    }
+    
+    const events = (result || []).map(row => {
+      // Snowflake returns fields in uppercase (NFT_ID, TO_ADDR, etc.)
+      // Handle both uppercase and lowercase field names
+      const nftId = row.NFT_ID || row.nft_id || null;
+      const eventType = row.EVENT_TYPE || row.event_type;
+      const fromAddr = row.FROM_ADDR || row.from_addr || null;
+      const toAddr = row.TO_ADDR || row.to_addr || null;
+      const timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
+      const blockHeight = row.BLOCK_HEIGHT || row.block_height;
+      const txId = row.TX_ID || row.tx_id;
+      
+      return {
+        type: eventType,
+        nftId: nftId,
+        from: fromAddr,
+        to: toAddr,
+        timestamp: timestamp,
+        blockHeight: blockHeight,
+        txId: txId
+      };
+    });
+    
+    return res.json({
+      ok: true,
+      events: events,
+      source: "snowflake",
+      hoursAgo: hoursAgo,
+      cutoffTime: cutoffStr,
+      currentTime: new Date().toISOString(),
+      note: "Snowflake data is typically delayed by 1-2 hours"
+    });
+  } catch (err) {
+    console.error("GET /api/recent-events-snowflake error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch recent events from Snowflake: " + (err.message || String(err))
+    });
+  }
+});
+
+// Get latest block height
+app.get("/api/flow-latest-block", async (req, res) => {
+  try {
+    const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
+    const url = `${FLOW_ACCESS_NODE}/v1/blocks?height=final`;
+    
+    console.log("Fetching latest block from:", url);
+    
+    const flowRes = await fetch(url);
+    const responseText = await flowRes.text();
+    
+    if (!flowRes.ok) {
+      console.error("Flow API error:", flowRes.status, responseText.substring(0, 500));
+      throw new Error(`Flow API error: ${flowRes.status} - ${responseText.substring(0, 200)}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.error("Failed to parse Flow API response:", responseText.substring(0, 500));
+      throw new Error("Invalid JSON response from Flow API");
+    }
+    
+    // Flow API returns blocks in an array, or a single block object
+    let block = data;
+    if (Array.isArray(data) && data.length > 0) {
+      block = data[0];
+    }
+    
+    // Flow API returns height in block.header.height as a string
+    const heightStr = block.header?.height || block.height;
+    const height = parseInt(heightStr, 10);
+    
+    if (!height || height <= 0 || isNaN(height)) {
+      console.error("Invalid block height from Flow API. Response:", JSON.stringify(block).substring(0, 500));
+      throw new Error("Invalid block height returned from Flow API (got: " + heightStr + ")");
+    }
+    
+    return res.json({
+      ok: true,
+      height: height,
+      timestamp: block.timestamp || block.header?.timestamp || block.block?.header?.timestamp
+    });
+  } catch (err) {
+    console.error("GET /api/flow-latest-block error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch latest block: " + (err.message || String(err))
+    });
+  }
+});
+
 // Simple health check
 app.get("/api/health", async (req, res) => {
   try {

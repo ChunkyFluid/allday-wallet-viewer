@@ -9,6 +9,7 @@
       '/top-holders.html': 'nav-top-holders',
       '/explorer.html': 'nav-explorer',
       '/insights.html': 'nav-insights',
+      '/live-transactions.html': 'nav-live',
       '/faq.html': 'nav-faq',
       '/contact.html': 'nav-contact',
       '/login.html': 'nav-account-link'
