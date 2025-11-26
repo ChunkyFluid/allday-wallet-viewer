@@ -2042,9 +2042,9 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       console.log("3. Events are in a different contract or have different event types");
     }
     
-    const events = (result || []).map(row => {
+    // First, map all events
+    const rawEvents = (result || []).map(row => {
       // Snowflake returns fields in uppercase (NFT_ID, TO_ADDR, etc.)
-      // Handle both uppercase and lowercase field names
       const nftId = row.NFT_ID || row.nft_id || null;
       const eventType = row.EVENT_TYPE || row.event_type;
       const fromAddr = row.FROM_ADDR || row.from_addr || null;
@@ -2052,6 +2052,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       const timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
       const blockHeight = row.BLOCK_HEIGHT || row.block_height;
       const txId = row.TX_ID || row.tx_id;
+      const eventIndex = row.EVENT_INDEX || row.event_index;
       
       return {
         type: eventType,
@@ -2060,13 +2061,148 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
         to: toAddr,
         timestamp: timestamp,
         blockHeight: blockHeight,
-        txId: txId
+        txId: txId,
+        eventIndex: eventIndex
       };
     });
     
+    // Group events by transaction ID and NFT ID to combine Withdraw/Deposit pairs
+    const eventMap = new Map();
+    
+    for (const event of rawEvents) {
+      const key = `${event.txId}-${event.nftId}`;
+      
+      if (!eventMap.has(key)) {
+        eventMap.set(key, {
+          withdraw: null,
+          deposit: null,
+          nftId: event.nftId,
+          txId: event.txId,
+          timestamp: event.timestamp,
+          blockHeight: event.blockHeight
+        });
+      }
+      
+      const group = eventMap.get(key);
+      if (event.type === 'Withdraw') {
+        group.withdraw = event;
+      } else if (event.type === 'Deposit') {
+        group.deposit = event;
+      }
+    }
+    
+    // Convert grouped events into combined "Sold" events
+    const events = [];
+    for (const group of eventMap.values()) {
+      // If we have both Withdraw and Deposit, it's a sale
+      if (group.withdraw && group.deposit) {
+        events.push({
+          type: 'Sold',
+          nftId: group.nftId,
+          from: group.withdraw.from, // Seller
+          to: group.deposit.to, // Buyer
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId
+        });
+      } else if (group.withdraw) {
+        // Only Withdraw (moment left a wallet, but no deposit found - might be to marketplace)
+        events.push({
+          type: 'Listed',
+          nftId: group.nftId,
+          from: group.withdraw.from,
+          to: null,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId
+        });
+      } else if (group.deposit) {
+        // Only Deposit (moment entered a wallet, but no withdraw found - might be from marketplace)
+        events.push({
+          type: 'Purchased',
+          nftId: group.nftId,
+          from: null,
+          to: group.deposit.to,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId
+        });
+      }
+    }
+    
+    // Sort by timestamp descending (most recent first)
+    events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Now enrich events with wallet names and moment details
+    const enrichedEvents = [];
+    for (const event of events) {
+      const enriched = { ...event };
+      
+      // Get wallet names for seller and buyer
+      if (event.from) {
+        try {
+          const sellerResult = await pgQuery(
+            `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+            [event.from]
+          );
+          enriched.sellerName = sellerResult.rows[0]?.display_name || null;
+        } catch (err) {
+          console.error(`Error fetching seller name for ${event.from}:`, err.message);
+        }
+      }
+      
+      if (event.to) {
+        try {
+          const buyerResult = await pgQuery(
+            `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+            [event.to]
+          );
+          enriched.buyerName = buyerResult.rows[0]?.display_name || null;
+        } catch (err) {
+          console.error(`Error fetching buyer name for ${event.to}:`, err.message);
+        }
+      }
+      
+      // Get moment details (player, team, etc.)
+      if (event.nftId) {
+        try {
+          const momentResult = await pgQuery(
+            `SELECT 
+              first_name, 
+              last_name, 
+              team_name, 
+              position,
+              tier,
+              set_name,
+              series_name
+            FROM nft_core_metadata 
+            WHERE nft_id = $1 LIMIT 1`,
+            [event.nftId]
+          );
+          const moment = momentResult.rows[0];
+          if (moment) {
+            enriched.moment = {
+              playerName: moment.first_name && moment.last_name 
+                ? `${moment.first_name} ${moment.last_name}` 
+                : null,
+              teamName: moment.team_name,
+              position: moment.position,
+              tier: moment.tier,
+              setName: moment.set_name,
+              seriesName: moment.series_name
+            };
+          }
+        } catch (err) {
+          console.error(`Error fetching moment details for ${event.nftId}:`, err.message);
+        }
+      }
+      
+      enrichedEvents.push(enriched);
+    }
+    
     return res.json({
       ok: true,
-      events: events,
+      events: enrichedEvents,
       source: "snowflake",
       hoursAgo: hoursAgo,
       cutoffTime: cutoffStr,

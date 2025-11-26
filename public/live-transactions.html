@@ -179,6 +179,21 @@
         color: #f97373;
       }
 
+      .event-type.sold {
+        background: rgba(34, 197, 94, 0.2);
+        color: #22c55e;
+      }
+
+      .event-type.purchased {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+      }
+
+      .event-type.listed {
+        background: rgba(251, 191, 36, 0.2);
+        color: #fbbf24;
+      }
+
       .event-type.NFTLocked {
         background: rgba(251, 191, 36, 0.2);
         color: #fbbf24;
@@ -272,9 +287,9 @@
           <tr>
             <th>Time</th>
             <th>Type</th>
-            <th>NFT ID</th>
-            <th>From</th>
-            <th>To</th>
+                    <th>Moment</th>
+          <th>Seller</th>
+          <th>Buyer</th>
             <th>Block</th>
           </tr>
         </thead>
@@ -319,14 +334,22 @@
         return date.toLocaleTimeString();
       }
 
-      function formatWallet(wallet) {
+      function formatWallet(wallet, walletName) {
         if (!wallet) return '-';
-        const short = wallet.length > 10 ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : wallet;
-        return `<a href="/?wallet=${encodeURIComponent(wallet)}" class="wallet-link">${short}</a>`;
+        const displayName = walletName || (wallet.length > 10 ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : wallet);
+        return `<a href="/?wallet=${encodeURIComponent(wallet)}" class="wallet-link" title="${wallet}">${displayName}</a>`;
       }
 
-      function formatNftId(nftId) {
+      function formatMoment(nftId, moment) {
         if (!nftId) return '-';
+        if (moment && moment.playerName) {
+          const parts = [moment.playerName];
+          if (moment.teamName) parts.push(moment.teamName);
+          if (moment.tier) parts.push(`(${moment.tier})`);
+          const display = parts.join(' • ');
+          return `<a href="https://nflallday.com/moments/${nftId}" target="_blank" class="nft-link" title="NFT ID: ${nftId}">${display}</a>`;
+        }
+        // Fallback to NFT ID if no moment data
         const short = nftId.length > 12 ? nftId.slice(0, 8) + '...' + nftId.slice(-4) : nftId;
         return `<a href="https://nflallday.com/moments/${nftId}" target="_blank" class="nft-link">${short}</a>`;
       }
@@ -359,16 +382,34 @@
 
         countEl.textContent = transactions.length;
 
-        tbody.innerHTML = transactions.map((tx, idx) => `
-          <tr class="${idx === 0 ? 'new' : ''}">
-            <td class="timestamp">${formatTime(tx.timestamp)}</td>
-            <td><span class="event-type ${tx.type}">${tx.type}</span></td>
-            <td>${formatNftId(tx.nftId)}</td>
-            <td>${formatWallet(tx.from)}</td>
-            <td>${formatWallet(tx.to)}</td>
-            <td class="timestamp">${tx.blockHeight}</td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = transactions.map((tx, idx) => {
+          // Determine event type styling
+          let eventClass = tx.type.toLowerCase();
+          let eventLabel = tx.type;
+          
+          // Map event types to better labels
+          if (tx.type === 'Sold') {
+            eventClass = 'sold';
+            eventLabel = 'Sold';
+          } else if (tx.type === 'Purchased') {
+            eventClass = 'purchased';
+            eventLabel = 'Purchased';
+          } else if (tx.type === 'Listed') {
+            eventClass = 'listed';
+            eventLabel = 'Listed';
+          }
+          
+          return `
+            <tr class="${idx === 0 ? 'new' : ''}">
+              <td class="timestamp">${formatTime(tx.timestamp)}</td>
+              <td><span class="event-type ${eventClass}">${eventLabel}</span></td>
+              <td>${formatMoment(tx.nftId, tx.moment)}</td>
+              <td>${formatWallet(tx.from, tx.sellerName)}</td>
+              <td>${formatWallet(tx.to, tx.buyerName)}</td>
+              <td class="timestamp">${tx.blockHeight}</td>
+            </tr>
+          `;
+        }).join('');
       }
 
       async function fetchLatestEvents() {
@@ -415,7 +456,7 @@
               }
             }
             
-            updateStatus('active', `Monitoring via Snowflake (${events.length} events in last ${minutesAgo} min)`);
+            updateStatus('active', `Monitoring via Snowflake (${events.length} events in last ${hoursAgo} hours, ${newEvents.length} new)`);
             return;
           }
           
