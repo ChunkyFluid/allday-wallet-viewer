@@ -1058,6 +1058,284 @@ app.get("/api/top-wallets", async (req, res) => {
   }
 });
 
+// Top wallets by team
+app.get("/api/top-wallets-by-team", async (req, res) => {
+  let limit = parseInt(req.query.limit, 10);
+  if (Number.isNaN(limit) || limit <= 0) limit = 50;
+  if (limit > 500) limit = 500;
+
+  const team = (req.query.team || "").toString().trim();
+  if (!team) {
+    return res.status(400).json({ ok: false, error: "Missing ?team=" });
+  }
+
+  try {
+    // Use snapshot table for fast reads
+    const { rows } = await pool.query(
+      `
+      SELECT
+        wallet_address,
+        display_name,
+        total_moments,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate
+      FROM top_wallets_by_team_snapshot
+      WHERE team_name = $1
+      ORDER BY total_moments DESC, display_name ASC
+      LIMIT $2;
+      `,
+      [team, limit]
+    );
+
+    return res.json({
+      ok: true,
+      team,
+      limit,
+      count: rows.length,
+      wallets: rows
+    });
+  } catch (err) {
+    console.error("GET /api/top-wallets-by-team error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load top wallets by team: " + (err.message || String(err))
+    });
+  }
+});
+
+// Top wallets by tier
+app.get("/api/top-wallets-by-tier", async (req, res) => {
+  let limit = parseInt(req.query.limit, 10);
+  if (Number.isNaN(limit) || limit <= 0) limit = 50;
+  if (limit > 500) limit = 500;
+
+  const tier = (req.query.tier || "").toString().trim();
+  if (!tier) {
+    return res.status(400).json({ ok: false, error: "Missing ?tier=" });
+  }
+
+  try {
+    // Use snapshot table for fast reads
+    const { rows } = await pool.query(
+      `
+      SELECT
+        wallet_address,
+        display_name,
+        total_moments,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate
+      FROM top_wallets_by_tier_snapshot
+      WHERE tier = LOWER($1)
+      ORDER BY total_moments DESC, display_name ASC
+      LIMIT $2;
+      `,
+      [tier, limit]
+    );
+
+    return res.json({
+      ok: true,
+      tier,
+      limit,
+      count: rows.length,
+      wallets: rows
+    });
+  } catch (err) {
+    console.error("GET /api/top-wallets-by-tier error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load top wallets by tier: " + (err.message || String(err))
+    });
+  }
+});
+
+// Top wallets by value (collection value)
+app.get("/api/top-wallets-by-value", async (req, res) => {
+  let limit = parseInt(req.query.limit, 10);
+  if (Number.isNaN(limit) || limit <= 0) limit = 50;
+  if (limit > 500) limit = 500;
+
+  const valueType = (req.query.valueType || "floor").toString().trim().toLowerCase();
+  // Use floor_value for ordering (safe since we control the value)
+  const orderByColumn = valueType === "asp" ? "asp_value" : "floor_value";
+
+  try {
+    // Use snapshot table for fast reads
+    const orderBy = valueType === "asp" ? "asp_value" : "floor_value";
+    const { rows } = await pool.query(
+      `
+      SELECT
+        wallet_address,
+        display_name,
+        total_moments,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        floor_value,
+        asp_value
+      FROM top_wallets_by_value_snapshot
+      ORDER BY ${orderBy} DESC, total_moments DESC, display_name ASC
+      LIMIT $1;
+      `,
+      [limit]
+    );
+
+    return res.json({
+      ok: true,
+      valueType,
+      limit,
+      count: rows.length,
+      wallets: rows.map(row => ({
+        ...row,
+        floor_value: Number(row.floor_value) || 0,
+        asp_value: Number(row.asp_value) || 0
+      }))
+    });
+  } catch (err) {
+    console.error("GET /api/top-wallets-by-value error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load top wallets by value: " + (err.message || String(err))
+    });
+  }
+});
+
+// Cache for teams list (refreshes every 5 minutes)
+let teamsCache = null;
+let teamsCacheTime = 0;
+const TEAMS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Get list of teams for filter dropdown
+app.get("/api/teams", async (req, res) => {
+  try {
+    // Return cached result if available and fresh
+    const now = Date.now();
+    if (teamsCache && (now - teamsCacheTime) < TEAMS_CACHE_TTL) {
+      return res.json({
+        ok: true,
+        teams: teamsCache,
+        cached: true
+      });
+    }
+
+    // Use a more efficient query with LIMIT and index hint
+    const { rows } = await pool.query(
+      `
+      SELECT DISTINCT team_name
+      FROM nft_core_metadata
+      WHERE team_name IS NOT NULL AND team_name != ''
+      ORDER BY team_name ASC
+      LIMIT 100;
+      `
+    );
+
+    const teams = rows.map(r => r.team_name);
+    
+    // Update cache
+    teamsCache = teams;
+    teamsCacheTime = now;
+
+    return res.json({
+      ok: true,
+      teams: teams,
+      cached: false
+    });
+  } catch (err) {
+    console.error("GET /api/teams error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load teams: " + (err.message || String(err))
+    });
+  }
+});
+
+// Global insights: aggregate stats across all wallets
+app.get("/api/insights", async (req, res) => {
+  try {
+    // Get aggregate stats from top_wallets_snapshot (which has all wallets)
+    const statsResult = await pool.query(
+      `
+      SELECT
+        COUNT(*)::bigint AS total_wallets,
+        SUM(total_moments)::bigint AS total_moments,
+        AVG(total_moments)::numeric AS avg_collection_size,
+        SUM(unlocked_moments)::bigint AS total_unlocked,
+        SUM(locked_moments)::bigint AS total_locked,
+        SUM(tier_common)::bigint AS tier_common_total,
+        SUM(tier_uncommon)::bigint AS tier_uncommon_total,
+        SUM(tier_rare)::bigint AS tier_rare_total,
+        SUM(tier_legendary)::bigint AS tier_legendary_total,
+        SUM(tier_ultimate)::bigint AS tier_ultimate_total
+      FROM top_wallets_snapshot
+      WHERE wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d', -- AllDay contract
+        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
+      );
+      `
+    );
+
+    // Get size distribution buckets
+    const sizeDistResult = await pool.query(
+      `
+      SELECT
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
+        COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
+      FROM top_wallets_snapshot
+      WHERE wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d',
+        '0xb6f2481eba4df97b'
+      );
+      `
+    );
+
+    const stats = statsResult.rows[0] || {};
+    const sizeDist = sizeDistResult.rows[0] || {};
+
+    return res.json({
+      ok: true,
+      stats: {
+        totalWallets: Number(stats.total_wallets) || 0,
+        totalMoments: Number(stats.total_moments) || 0,
+        avgCollectionSize: Math.round(Number(stats.avg_collection_size) || 0),
+        totalUnlocked: Number(stats.total_unlocked) || 0,
+        totalLocked: Number(stats.total_locked) || 0,
+        tierCommon: Number(stats.tier_common_total) || 0,
+        tierUncommon: Number(stats.tier_uncommon_total) || 0,
+        tierRare: Number(stats.tier_rare_total) || 0,
+        tierLegendary: Number(stats.tier_legendary_total) || 0,
+        tierUltimate: Number(stats.tier_ultimate_total) || 0
+      },
+      sizeDistribution: {
+        "1-10": Number(sizeDist.bin_1_10) || 0,
+        "10-100": Number(sizeDist.bin_10_100) || 0,
+        "100-1000": Number(sizeDist.bin_100_1000) || 0,
+        "1000+": Number(sizeDist.bin_1000_plus) || 0
+      }
+    });
+  } catch (err) {
+    console.error("GET /api/insights error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to load insights"
+    });
+  }
+});
+
 // Paged wallet query: /api/query-paged?wallet=0x...&page=1&pageSize=200
 app.get("/api/query-paged", async (req, res) => {
   try {

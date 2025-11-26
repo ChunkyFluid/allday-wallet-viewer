@@ -58,6 +58,9 @@ call :RUNSTEP "Sync wallet holdings from Snowflake" "node scripts\sync_wallet_ho
 call :RUNSTEP "Sync wallet profiles from Dapper" "node scripts\sync_wallet_profiles_from_dapper.js"
 call :RUNSTEP "Load edition prices CSV into edition_price_scrape" "node scripts\load_edition_prices_from_csv.js"
 call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
+call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
+call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
+call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
 goto END
 
 :: --------- Option 2: Full refresh ----------
@@ -67,10 +70,9 @@ call :RUNSTEP "Sync wallet holdings from Snowflake" "node scripts\sync_wallet_ho
 call :RUNSTEP "Sync wallet profiles from Dapper" "node scripts\sync_wallet_profiles_from_dapper.js"
 call :RUNSTEP "Load edition prices CSV into edition_price_scrape" "node scripts\load_edition_prices_from_csv.js"
 call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
-
-:: If/when you add more snapshot ETLs, just uncomment these:
-:: call :RUNSTEP "Refresh top_holders_snapshot" "node etl_top_holders_snapshot.js"
-:: call :RUNSTEP "Refresh wallet_profile_stats" "node etl_wallet_profile_stats.js"
+call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
+call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
+call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
 goto END
 
 :END

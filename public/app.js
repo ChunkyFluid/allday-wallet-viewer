@@ -66,6 +66,63 @@ function formatUsd(value) {
     });
 }
 
+function computeTopSets(moments, limit = 5) {
+    const setCounts = new Map();
+    for (const m of moments) {
+        const setName = m.set_name;
+        if (!setName) continue;
+        setCounts.set(setName, (setCounts.get(setName) || 0) + 1);
+    }
+    return Array.from(setCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+}
+
+function computeTopPlayers(moments, limit = 5) {
+    const playerCounts = new Map();
+    for (const m of moments) {
+        const playerName = [m.first_name, m.last_name].filter(Boolean).join(" ");
+        if (!playerName) continue;
+        playerCounts.set(playerName, (playerCounts.get(playerName) || 0) + 1);
+    }
+    return Array.from(playerCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+}
+
+// Filter by tier (called from tier chip onclick handlers)
+window.filterByTier = function(tier) {
+    const els = getEls();
+    if (!els || !els.filterTier) return;
+    
+    // Find the actual tier value in the dropdown options (case-insensitive match)
+    const tierLower = tier.toLowerCase();
+    let actualTierValue = null;
+    
+    for (const option of els.filterTier.options) {
+        if (option.value && option.value.toLowerCase() === tierLower) {
+            actualTierValue = option.value;
+            break;
+        }
+    }
+    
+    // If we found a matching option, use it; otherwise try the original value
+    const targetValue = actualTierValue || tier;
+    
+    // If clicking the same tier that's already selected, clear the filter
+    if (els.filterTier.value === targetValue) {
+        els.filterTier.value = "";
+    } else {
+        els.filterTier.value = targetValue;
+    }
+    
+    applyFilters();
+    applySort();
+    renderPage(1);
+};
+
 function buildFilterOptions() {
     const els = getEls();
     const teams = new Set();
@@ -149,7 +206,7 @@ function applyFilters() {
 
         if (series && r.series_name !== series) return false;
         if (setName && r.set_name !== setName) return false;
-        if (tier && r.tier !== tier) return false;
+        if (tier && (r.tier || "").toLowerCase() !== tier.toLowerCase()) return false;
         if (position && r.position !== position) return false;
 
         if (lockedVal === "locked" && !r.is_locked) return false;
@@ -295,6 +352,10 @@ function updateSortHeaderClasses() {
     });
 }
 
+// Client-side cache for prices and filters
+const priceCache = new Map();
+const filterCache = new Map();
+
 async function fetchWalletSummary(wallet) {
     const els = getEls();
     if (!els.summaryCard) return;
@@ -349,16 +410,63 @@ async function fetchWalletSummary(wallet) {
         </div>
       </div>
       <div class="wallet-summary-chips">
-        <span class="chip-pill-tier chip-common">Common: ${byTier.Common ?? 0}</span>
-        <span class="chip-pill-tier chip-uncommon">Uncommon: ${byTier.Uncommon ?? 0}</span>
-        <span class="chip-pill-tier chip-rare">Rare: ${byTier.Rare ?? 0}</span>
-        <span class="chip-pill-tier chip-legendary">Legendary: ${byTier.Legendary ?? 0}</span>
-        <span class="chip-pill-tier chip-ultimate">Ultimate: ${byTier.Ultimate ?? 0}</span>
+        <span class="chip-pill-tier chip-common" style="cursor: pointer;" onclick="filterByTier('Common')" title="Click to filter by Common tier">Common: ${byTier.Common ?? 0}</span>
+        <span class="chip-pill-tier chip-uncommon" style="cursor: pointer;" onclick="filterByTier('Uncommon')" title="Click to filter by Uncommon tier">Uncommon: ${byTier.Uncommon ?? 0}</span>
+        <span class="chip-pill-tier chip-rare" style="cursor: pointer;" onclick="filterByTier('Rare')" title="Click to filter by Rare tier">Rare: ${byTier.Rare ?? 0}</span>
+        <span class="chip-pill-tier chip-legendary" style="cursor: pointer;" onclick="filterByTier('Legendary')" title="Click to filter by Legendary tier">Legendary: ${byTier.Legendary ?? 0}</span>
+        <span class="chip-pill-tier chip-ultimate" style="cursor: pointer;" onclick="filterByTier('Ultimate')" title="Click to filter by Ultimate tier">Ultimate: ${byTier.Ultimate ?? 0}</span>
       </div>
     `;
         els.summaryCard.style.display = "flex";
     } catch (err) {
         console.error("fetchWalletSummary error", err);
+    }
+}
+
+function updateSummaryWithStats(wallet) {
+    const els = getEls();
+    if (!els.summaryCard || !allMoments || allMoments.length === 0) return;
+
+    const topSets = computeTopSets(allMoments);
+    const topPlayers = computeTopPlayers(allMoments);
+
+    // Find the main summary div and append stats
+    const mainDiv = els.summaryCard.querySelector(".wallet-summary-main");
+    if (!mainDiv) return;
+
+    // Remove any existing stats divs
+    const existingStats = mainDiv.querySelectorAll(".wallet-stats-extra");
+    existingStats.forEach(el => el.remove());
+
+    // Add new stats
+    if (topSets.length > 0 || topPlayers.length > 0) {
+        const statsDiv = document.createElement("div");
+        statsDiv.className = "wallet-stats-extra";
+        statsDiv.style.cssText = "margin-top: 0.5rem;";
+        
+        if (topSets.length > 0) {
+            const setsDiv = document.createElement("div");
+            setsDiv.className = "wallet-summary-chips";
+            setsDiv.style.cssText = "margin-top: 0.5rem;";
+            setsDiv.innerHTML = `
+                <span style="font-size: 0.7rem; color: var(--text-muted); margin-right: 0.5rem;">Top sets:</span>
+                ${topSets.map(s => `<span class="chip" style="font-size: 0.7rem;">${s.name} (${s.count})</span>`).join('')}
+            `;
+            statsDiv.appendChild(setsDiv);
+        }
+        
+        if (topPlayers.length > 0) {
+            const playersDiv = document.createElement("div");
+            playersDiv.className = "wallet-summary-chips";
+            playersDiv.style.cssText = "margin-top: 0.5rem;";
+            playersDiv.innerHTML = `
+                <span style="font-size: 0.7rem; color: var(--text-muted); margin-right: 0.5rem;">Top players:</span>
+                ${topPlayers.map(p => `<span class="chip" style="font-size: 0.7rem;">${p.name} (${p.count})</span>`).join('')}
+            `;
+            statsDiv.appendChild(playersDiv);
+        }
+        
+        mainDiv.appendChild(statsDiv);
     }
 }
 
@@ -375,17 +483,30 @@ async function attachPricesToMoments(moments) {
     const editionIds = [...new Set(moments.map((r) => r.edition_id).filter(Boolean))];
     if (!editionIds.length) return;
 
-    // For very large wallets, a single /api/prices?editions=... URL can
-    // exceed browser/server limits. Chunk the requests and merge results.
-    const chunkSize = 200;
-
+    // Check cache first
+    const uncachedIds = [];
     const lowAskMap = {};
     const aspMap = {};
     const topSaleMap = {};
 
+    for (const id of editionIds) {
+        const cached = priceCache.get(id);
+        if (cached) {
+            if (cached.lowAsk != null) lowAskMap[id] = cached.lowAsk;
+            if (cached.asp != null) aspMap[id] = cached.asp;
+            if (cached.topSale != null) topSaleMap[id] = cached.topSale;
+        } else {
+            uncachedIds.push(id);
+        }
+    }
+
+    // For very large wallets, a single /api/prices?editions=... URL can
+    // exceed browser/server limits. Chunk the requests and merge results.
+    const chunkSize = 200;
+
     try {
-        for (let i = 0; i < editionIds.length; i += chunkSize) {
-            const chunk = editionIds.slice(i, i + chunkSize);
+        for (let i = 0; i < uncachedIds.length; i += chunkSize) {
+            const chunk = uncachedIds.slice(i, i + chunkSize);
             const qs = encodeURIComponent(chunk.join(","));
             const res = await fetch(`/api/prices?editions=${qs}`);
             const data = await res.json();
@@ -395,9 +516,19 @@ async function attachPricesToMoments(moments) {
                 const asp = data.asp || {};
                 const top = data.topSale || {};
 
+                // Merge into maps
                 Object.assign(lowAskMap, low);
                 Object.assign(aspMap, asp);
                 Object.assign(topSaleMap, top);
+
+                // Cache results
+                for (const id of chunk) {
+                    priceCache.set(id, {
+                        lowAsk: low[id] ?? null,
+                        asp: asp[id] ?? null,
+                        topSale: top[id] ?? null
+                    });
+                }
             }
         }
 
@@ -568,11 +699,20 @@ window.runQuery = async function runQuery(walletRaw) {
         els.pagerInfo.textContent = "";
     }
 
+    // Clear any previous error state
+    const errorDiv = document.getElementById("wallet-error");
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+
     try {
         await fetchWalletSummary(wallet);
         allMoments = await fetchWalletMoments(wallet);
 
         await attachPricesToMoments(allMoments);
+
+        // Update summary with mini stats now that we have moments
+        updateSummaryWithStats(wallet);
 
         buildFilterOptions();
         applyFilters();
@@ -580,8 +720,23 @@ window.runQuery = async function runQuery(walletRaw) {
         renderPage(1);
     } catch (err) {
         console.error("runQuery error", err);
+        const errorMsg = err.message || String(err);
+        
         if (els.title) {
-            els.title.textContent = `Failed to load wallet: ${err.message || err}`;
+            els.title.textContent = "Failed to load wallet";
+        }
+        
+        // Show user-friendly error with retry button
+        if (els.tbody) {
+            els.tbody.innerHTML = "";
+            const errorDiv = document.createElement("div");
+            errorDiv.id = "wallet-error";
+            errorDiv.style.cssText = "padding: 2rem; text-align: center; color: var(--text-muted);";
+            errorDiv.innerHTML = `
+                <div style="margin-bottom: 1rem; color: var(--danger);">❌ ${errorMsg}</div>
+                <button class="btn-primary" onclick="window.runQuery('${wallet}')" style="margin-top: 0.5rem;">Retry</button>
+            `;
+            els.tbody.appendChild(errorDiv);
         }
     }
 };

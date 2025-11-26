@@ -351,6 +351,7 @@
   <a href="/profiles.html">Profiles</a>
   <a href="/top-holders.html">Top holders</a>
   <a href="/explorer.html">Browse</a>
+  <a href="/insights.html">Insights</a>
   <a href="/faq.html">FAQ</a>
   <a href="/contact.html">Contact</a>
   <a href="/login.html" id="nav-account-link">Login</a>
@@ -379,11 +380,26 @@
         <div class="top-header">
           <div class="top-header-left">
             <div class="top-header-title">Leaderboard</div>
-            <div class="top-header-subtitle">
+            <div class="top-header-subtitle" id="top-subtitle">
               Ranked by total moments, including locked and unlocked counts and tier breakdowns.
             </div>
           </div>
           <div class="top-header-controls">
+            <div>
+              <div class="top-label">View</div>
+              <select id="top-view" class="top-select">
+                <option value="total">By Total Moments</option>
+                <option value="value">By Collection Value</option>
+                <option value="team">By Team</option>
+                <option value="tier">By Tier</option>
+                <option value="moment">By Moment/Edition</option>
+              </select>
+            </div>
+            <div id="view-filter-container" style="display: none;">
+              <div class="top-label" id="view-filter-label">Filter</div>
+              <select id="view-filter-select" class="top-select" style="display: none;"></select>
+              <input id="view-filter-input" class="top-select" type="text" placeholder="Enter edition ID..." style="display: none;" />
+            </div>
             <div>
               <div class="top-label">Show</div>
               <select id="top-limit" class="top-select">
@@ -416,6 +432,7 @@
                   <th>Rare</th>
                   <th>Legendary</th>
                   <th>Ultimate</th>
+                  <th id="value-header" style="display: none;">Floor Value</th>
                   <th>Wallet viewer</th>
                 </tr>
               </thead>
@@ -428,15 +445,33 @@
 
     <script>
       (function () {
+        const viewSelect = document.getElementById("top-view");
+        const viewFilterContainer = document.getElementById("view-filter-container");
+        const viewFilterSelect = document.getElementById("view-filter-select");
+        const viewFilterInput = document.getElementById("view-filter-input");
+        const viewFilterLabel = document.getElementById("view-filter-label");
         const limitSelect = document.getElementById("top-limit");
         const refreshBtn = document.getElementById("top-refresh");
         const statusEl = document.getElementById("top-status");
+        const subtitleEl = document.getElementById("top-subtitle");
         const tableEl = document.getElementById("top-table");
         const tbodyEl = document.getElementById("top-tbody");
+        const valueHeader = document.getElementById("value-header");
+
+        let teamsList = [];
+        let editionsList = [];
 
         function formatNumber(n) {
           if (n == null) return "0";
           return Number(n).toLocaleString();
+        }
+
+        function formatCurrency(n) {
+          if (n == null || n === 0) return "$0.00";
+          return "$" + Number(n).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
         }
 
         function shortAddr(addr) {
@@ -444,28 +479,151 @@
           return addr.slice(0, 6) + "…" + addr.slice(-4);
         }
 
+        async function loadTeams() {
+          try {
+            const res = await fetch("/api/teams");
+            
+            // Check if response is JSON
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+              const text = await res.text();
+              console.error("Teams endpoint returned non-JSON:", text.substring(0, 200));
+              return;
+            }
+            
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.teams)) {
+              teamsList = data.teams;
+              if (viewFilterSelect) {
+                viewFilterSelect.innerHTML = '<option value="">Select team...</option>' +
+                  teamsList.map(t => `<option value="${t}">${t}</option>`).join('');
+              }
+              console.log("Loaded", teamsList.length, "teams");
+            } else {
+              console.error("Teams endpoint returned invalid data:", data);
+            }
+          } catch (err) {
+            console.error("Failed to load teams:", err);
+          }
+        }
+
+        function updateViewControls() {
+          const view = viewSelect.value;
+          viewFilterContainer.style.display = "none";
+          viewFilterSelect.style.display = "none";
+          viewFilterInput.style.display = "none";
+          valueHeader.style.display = "none";
+
+          if (view === "team") {
+            viewFilterContainer.style.display = "block";
+            viewFilterSelect.style.display = "block";
+            viewFilterLabel.textContent = "Team";
+            subtitleEl.textContent = "Ranked by total moments from selected team.";
+            // Load teams if not already loaded
+            if (teamsList.length === 0) {
+              loadTeams();
+            } else {
+              // Update dropdown with existing teams
+              viewFilterSelect.innerHTML = '<option value="">Select team...</option>' +
+                teamsList.map(t => `<option value="${t}">${t}</option>`).join('');
+            }
+          } else if (view === "tier") {
+            viewFilterContainer.style.display = "block";
+            viewFilterSelect.style.display = "block";
+            viewFilterLabel.textContent = "Tier";
+            viewFilterSelect.innerHTML = `
+              <option value="">Select tier...</option>
+              <option value="Common">Common</option>
+              <option value="Uncommon">Uncommon</option>
+              <option value="Rare">Rare</option>
+              <option value="Legendary">Legendary</option>
+              <option value="Ultimate">Ultimate</option>
+            `;
+            subtitleEl.textContent = "Ranked by total moments of selected tier.";
+          } else if (view === "value") {
+            subtitleEl.textContent = "Ranked by collection floor value (sum of lowest asks).";
+            valueHeader.style.display = "table-cell";
+          } else if (view === "moment") {
+            viewFilterContainer.style.display = "block";
+            viewFilterInput.style.display = "block";
+            viewFilterLabel.textContent = "Edition ID";
+            subtitleEl.textContent = "Ranked by copies owned of selected edition.";
+          } else {
+            subtitleEl.textContent = "Ranked by total moments, including locked and unlocked counts and tier breakdowns.";
+          }
+        }
+
         async function loadTopWallets() {
+          const view = viewSelect.value;
           const limit = limitSelect.value || "50";
-          statusEl.textContent = "Loading top " + limit + " wallets…";
+          const filter = viewFilterSelect.style.display !== "none" ? viewFilterSelect.value : 
+                        (viewFilterInput.style.display !== "none" ? viewFilterInput.value : "");
+
+          statusEl.textContent = "Loading…";
           tableEl.style.display = "none";
           tbodyEl.innerHTML = "";
 
           try {
-            const res = await fetch("/api/top-wallets?limit=" + encodeURIComponent(limit));
+            let url = "";
+            if (view === "total") {
+              url = "/api/top-wallets?limit=" + encodeURIComponent(limit);
+            } else if (view === "value") {
+              url = "/api/top-wallets-by-value?limit=" + encodeURIComponent(limit) + "&valueType=floor";
+            } else if (view === "team") {
+              if (!filter) {
+                statusEl.textContent = "Please select a team.";
+                return;
+              }
+              url = "/api/top-wallets-by-team?limit=" + encodeURIComponent(limit) + "&team=" + encodeURIComponent(filter);
+            } else if (view === "tier") {
+              if (!filter) {
+                statusEl.textContent = "Please select a tier.";
+                return;
+              }
+              url = "/api/top-wallets-by-tier?limit=" + encodeURIComponent(limit) + "&tier=" + encodeURIComponent(filter);
+            } else if (view === "moment") {
+              if (!filter) {
+                statusEl.textContent = "Please enter an edition ID.";
+                return;
+              }
+              url = "/api/top-holders?edition=" + encodeURIComponent(filter);
+            }
+
+            if (!url) {
+              statusEl.textContent = "Invalid view selection.";
+              return;
+            }
+
+            const res = await fetch(url);
+            
+            // Check if response is JSON
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+              const text = await res.text();
+              console.error("Non-JSON response:", text.substring(0, 200));
+              throw new Error("Server returned non-JSON response. Status: " + res.status);
+            }
+            
             const data = await res.json();
 
             if (!res.ok || !data.ok) {
               throw new Error(data.error || "Failed to load leaderboard");
             }
 
-            const wallets = Array.isArray(data.wallets) ? data.wallets : [];
+            const wallets = Array.isArray(data.wallets || data.rows) ? (data.wallets || data.rows) : [];
 
             if (!wallets.length) {
-              statusEl.textContent = "No wallets found in the current snapshot.";
+              statusEl.textContent = "No wallets found.";
               return;
             }
 
-            statusEl.textContent = "Showing top " + wallets.length + " wallet(s) by total moments.";
+            let statusText = "Showing top " + wallets.length + " wallet(s)";
+            if (view === "team") statusText += " for team: " + filter;
+            else if (view === "tier") statusText += " for tier: " + filter;
+            else if (view === "moment") statusText += " for edition: " + filter;
+            else if (view === "value") statusText += " by collection value";
+            else statusText += " by total moments";
+            statusEl.textContent = statusText + ".";
 
             wallets.forEach((w, idx) => {
               const tr = document.createElement("tr");
@@ -473,69 +631,84 @@
               const displayName = w.display_name || w.wallet_address || "(unknown)";
               const addr = w.wallet_address || "";
 
-              const total = w.total_moments;
-
-              const unlocked = Number(w.unlocked_moments || 0);
-              const locked = Number(w.locked_moments || 0);
+              const total = w.total_moments || w.copies || 0;
+              const unlocked = Number(w.unlocked_moments || w.unlocked_count || 0);
+              const locked = Number(w.locked_moments || w.locked_count || 0);
               const tierCommon = Number(w.tier_common || 0);
               const tierUncommon = Number(w.tier_uncommon || 0);
               const tierRare = Number(w.tier_rare || 0);
               const tierLegendary = Number(w.tier_legendary || 0);
               const tierUltimate = Number(w.tier_ultimate || 0);
+              const floorValue = Number(w.floor_value || 0);
 
-              tr.innerHTML =
-                "<td>" +
-                (idx + 1) +
-                "</td>" +
-                "<td>" +
-                displayName +
-                "</td>" +
-                '<td class="addr">' +
-                shortAddr(addr) +
-                "</td>" +
-                "<td>" +
-                formatNumber(total) +
-                "</td>" +
-                '<td class="pill-unlocked">' +
-                formatNumber(unlocked) +
-                "</td>" +
-                '<td class="pill-locked">' +
-                formatNumber(locked) +
-                "</td>" +
-                '<td class="pill-tier-common">' +
-                formatNumber(tierCommon) +
-                "</td>" +
-                '<td class="pill-tier-uncommon">' +
-                formatNumber(tierUncommon) +
-                "</td>" +
-                '<td class="pill-tier-rare">' +
-                formatNumber(tierRare) +
-                "</td>" +
-                '<td class="pill-tier-legendary">' +
-                formatNumber(tierLegendary) +
-                "</td>" +
-                '<td class="pill-tier-ultimate">' +
-                formatNumber(tierUltimate) +
-                "</td>" +
-                '<td><a class="btn-link" href="/?wallet=' +
-                encodeURIComponent(addr) +
-                '">View</a></td>';
+              let rowHtml = 
+                "<td>" + (idx + 1) + "</td>" +
+                "<td>" + displayName + "</td>" +
+                '<td class="addr">' + shortAddr(addr) + "</td>" +
+                "<td>" + formatNumber(total) + "</td>" +
+                '<td class="pill-unlocked">' + formatNumber(unlocked) + "</td>" +
+                '<td class="pill-locked">' + formatNumber(locked) + "</td>" +
+                '<td class="pill-tier-common">' + formatNumber(tierCommon) + "</td>" +
+                '<td class="pill-tier-uncommon">' + formatNumber(tierUncommon) + "</td>" +
+                '<td class="pill-tier-rare">' + formatNumber(tierRare) + "</td>" +
+                '<td class="pill-tier-legendary">' + formatNumber(tierLegendary) + "</td>" +
+                '<td class="pill-tier-ultimate">' + formatNumber(tierUltimate) + "</td>";
 
+              // Add value column when viewing by value (must match header position)
+              if (view === "value") {
+                rowHtml += '<td style="font-weight: 600; color: var(--accent2);">' + formatCurrency(floorValue) + "</td>";
+              }
+
+              rowHtml += '<td><a class="btn-link" href="/?wallet=' + encodeURIComponent(addr) + '">View</a></td>';
+
+              tr.innerHTML = rowHtml;
               tbodyEl.appendChild(tr);
             });
 
             tableEl.style.display = "table";
           } catch (err) {
             console.error("top-wallets error:", err);
-            statusEl.textContent = "Failed to load leaderboard. Check console for details.";
+            let errorMsg = "Failed to load leaderboard.";
+            if (err.message) {
+              errorMsg += " " + err.message;
+            } else if (typeof err === 'string') {
+              errorMsg += " " + err;
+            }
+            statusEl.textContent = errorMsg + " Check console for details.";
             tableEl.style.display = "none";
           }
+        }
+
+        viewSelect.addEventListener("change", () => {
+          updateViewControls();
+          if (viewFilterSelect) viewFilterSelect.value = "";
+          if (viewFilterInput) viewFilterInput.value = "";
+          loadTopWallets();
+        });
+
+        if (viewFilterSelect) {
+          viewFilterSelect.addEventListener("change", loadTopWallets);
+        }
+
+        if (viewFilterInput) {
+          let inputTimeout;
+          viewFilterInput.addEventListener("input", () => {
+            clearTimeout(inputTimeout);
+            inputTimeout = setTimeout(loadTopWallets, 500);
+          });
         }
 
         limitSelect.addEventListener("change", loadTopWallets);
         refreshBtn.addEventListener("click", loadTopWallets);
 
-        // initial load
+        // Initial setup
+        updateViewControls();
+        // Load teams in background
+        loadTeams().then(() => {
+          console.log("Teams loaded successfully");
+        }).catch(err => {
+          console.error("Error loading teams:", err);
+        });
         loadTopWallets();
       })();
     </script>

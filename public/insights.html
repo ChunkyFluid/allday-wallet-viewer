@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Insights – Chunky's NFLAD Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .insights-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .insight-card {
+        background: var(--bg-elevated);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-soft);
+        padding: 1.25rem;
+      }
+
+      .insight-card h3 {
+        margin: 0 0 0.75rem;
+        font-size: 0.95rem;
+        color: var(--text);
+      }
+
+      .insight-card .stat {
+        font-size: 2rem;
+        font-weight: 600;
+        color: var(--accent2);
+        margin: 0.5rem 0;
+      }
+
+      .insight-card .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+
+      .histogram {
+        margin-top: 1rem;
+      }
+
+      .histogram-bar {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        gap: 0.5rem;
+      }
+
+      .histogram-label {
+        min-width: 100px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .histogram-bar-fill {
+        height: 20px;
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        border-radius: 4px;
+        min-width: 20px;
+      }
+
+      .histogram-value {
+        font-size: 0.8rem;
+        color: var(--text);
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">🐱</div>
+        <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
+      </div>
+      <nav class="main-nav">
+        <a href="/">Wallet</a>
+        <a href="/profiles.html">Profiles</a>
+        <a href="/top-holders.html">Top holders</a>
+        <a href="/explorer.html">Browse</a>
+        <a href="/insights.html" class="active">Insights</a>
+        <a href="/faq.html">FAQ</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/login.html" id="nav-account-link">Login</a>
+      </nav>
+    </header>
+
+    <main class="app-main">
+      <div class="page-title">Global Insights</div>
+      <div class="page-subtitle">
+        Distribution and statistics across all wallets in the snapshot.
+      </div>
+
+      <div id="insights-loading" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+        Loading insights...
+      </div>
+
+      <div id="insights-content" class="insights-grid" style="display: none;">
+        <div class="insight-card">
+          <h3>Total Wallets</h3>
+          <div class="stat" id="stat-total-wallets">-</div>
+          <div class="stat-label">Unique wallet addresses</div>
+        </div>
+
+        <div class="insight-card">
+          <h3>Total Moments</h3>
+          <div class="stat" id="stat-total-moments">-</div>
+          <div class="stat-label">Across all wallets</div>
+        </div>
+
+        <div class="insight-card">
+          <h3>Average Collection Size</h3>
+          <div class="stat" id="stat-avg-size">-</div>
+          <div class="stat-label">Moments per wallet</div>
+        </div>
+
+        <div class="insight-card">
+          <h3>Wallet Size Distribution</h3>
+          <div class="histogram" id="histogram-sizes"></div>
+        </div>
+
+        <div class="insight-card">
+          <h3>Tier Distribution</h3>
+          <div class="histogram" id="histogram-tiers"></div>
+        </div>
+
+        <div class="insight-card">
+          <h3>Locked vs Unlocked</h3>
+          <div class="histogram" id="histogram-locked"></div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        async function updateNavAccount() {
+          const link = document.getElementById("nav-account-link");
+          if (!link) return;
+
+          try {
+            const res = await fetch("/api/me");
+            const data = await res.json();
+
+            if (data && data.user) {
+              link.href = "/login.html";
+              link.textContent = data.user.email;
+            } else {
+              link.href = "/login.html";
+              link.textContent = "Login";
+            }
+          } catch (err) {
+            console.error("updateNavAccount error:", err);
+          }
+        }
+
+        updateNavAccount();
+
+        async function loadInsights() {
+          const loadingEl = document.getElementById("insights-loading");
+          const contentEl = document.getElementById("insights-content");
+
+          try {
+            // Fetch aggregate stats from dedicated insights endpoint
+            const res = await fetch("/api/insights");
+            const data = await res.json();
+
+            if (!data.ok || !data.stats) {
+              throw new Error("Failed to load insights data");
+            }
+
+            const stats = data.stats;
+            const sizeDist = data.sizeDistribution || {};
+
+            // Update UI
+            document.getElementById("stat-total-wallets").textContent = (stats.totalWallets || 0).toLocaleString();
+            document.getElementById("stat-total-moments").textContent = (stats.totalMoments || 0).toLocaleString();
+            document.getElementById("stat-avg-size").textContent = (stats.avgCollectionSize || 0).toLocaleString();
+
+            // Render histograms
+            renderHistogram("histogram-sizes", sizeDist, (v) => v.toLocaleString());
+            
+            const tierTotals = {
+              Common: stats.tierCommon || 0,
+              Uncommon: stats.tierUncommon || 0,
+              Rare: stats.tierRare || 0,
+              Legendary: stats.tierLegendary || 0,
+              Ultimate: stats.tierUltimate || 0
+            };
+            renderHistogram("histogram-tiers", tierTotals, (v) => v.toLocaleString());
+            
+            renderHistogram("histogram-locked", {
+              Locked: stats.totalLocked || 0,
+              Unlocked: stats.totalUnlocked || 0
+            }, (v) => v.toLocaleString());
+
+            loadingEl.style.display = "none";
+            contentEl.style.display = "grid";
+          } catch (err) {
+            console.error("loadInsights error:", err);
+            loadingEl.textContent = "Failed to load insights. " + (err.message || String(err));
+          }
+        }
+
+        function renderHistogram(containerId, data, formatValue) {
+          const container = document.getElementById(containerId);
+          if (!container) return;
+
+          const entries = Object.entries(data);
+          const maxValue = Math.max(...entries.map(([, v]) => Number(v) || 0));
+
+          container.innerHTML = entries
+            .map(([label, value]) => {
+              const num = Number(value) || 0;
+              const width = maxValue > 0 ? (num / maxValue) * 100 : 0;
+              return `
+                <div class="histogram-bar">
+                  <div class="histogram-label">${label}</div>
+                  <div class="histogram-bar-fill" style="flex: 1; width: ${width}%;"></div>
+                  <div class="histogram-value">${formatValue(num)}</div>
+                </div>
+              `;
+            })
+            .join("");
+        }
+
+        loadInsights();
+      })();
+    </script>
+  </body>
+</html>
+
