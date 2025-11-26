@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/header.css" />
     <style>
       :root {
         --bg-main: #050816;
@@ -143,8 +144,7 @@
       }
 
       .wallet-summary-card {
-        margin: 1.25rem auto;
-        max-width: 1100px;
+        margin-bottom: 1rem;
         padding: 1rem 1.25rem;
         border-radius: 0.75rem;
         background: rgba(15, 15, 30, 0.9);
@@ -416,101 +416,181 @@
         text-decoration: underline;
       }
 
-      @media (max-width: 960px) {
-        .app-header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .wallet-form {
-          width: 100%;
-          flex: unset;
-        }
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
+      /* Profile Search Styles */
+      .profile-search-section {
+        margin-bottom: 1.25rem;
+        padding: 0;
       }
 
-      .main-nav {
+      .profile-search-card {
+        background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+        border-radius: 0.75rem;
+        border: 1px solid var(--border-subtle);
+        padding: 1.2rem;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
         display: flex;
+        flex-direction: column;
         gap: 0.75rem;
-        margin-left: 2rem;
-        font-size: 0.9rem;
+        max-height: 400px;
       }
-      .main-nav a {
+
+      .profiles-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+
+      .profiles-help {
+        font-size: 0.78rem;
         color: var(--text-muted);
-        text-decoration: none;
-        padding: 0.35rem 0.9rem;
+      }
+
+      .search-label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.25rem;
+        color: var(--text-muted);
+      }
+
+      .search-input {
+        width: 100%;
+        background: rgba(15, 23, 42, 0.9);
         border-radius: 999px;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          color 0.15s ease,
-          border-color 0.15s ease;
-      }
-      .main-nav a:hover {
+        border: 1px solid var(--border-subtle);
+        padding: 0.4rem 0.75rem;
         color: var(--text-main);
-        border-color: rgba(148, 163, 184, 0.6);
-        background: rgba(15, 23, 42, 0.8);
+        font-size: 0.85rem;
+        outline: none;
       }
-      .main-nav a.active {
-        color: #fff;
+
+      .search-input::placeholder {
+        color: var(--text-muted);
+      }
+
+      .profiles-status {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+
+      .profiles-list {
+        margin-top: 0.25rem;
+        padding: 0;
+        list-style: none;
+        overflow: auto;
+        flex: 1 1 auto;
+      }
+
+      .profile-item-btn {
+        width: 100%;
+        text-align: left;
+        background: rgba(15, 23, 42, 0.7);
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-subtle);
+        padding: 0.5rem 0.6rem;
+        margin-bottom: 0.35rem;
+        cursor: pointer;
+        font-size: 0.78rem;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .profile-item-btn:hover {
+        border-color: var(--accent-cyan);
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      .profile-item-btn.active {
         border-color: var(--accent-blue);
         background: rgba(37, 99, 235, 0.3);
       }
 
-      @media (max-width: 1100px) {
-        .app-header {
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 0.75rem;
+      .profile-item-main {
+        min-width: 0;
+      }
+
+      .profile-item-name {
+        font-weight: 600;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .profile-item-address {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: ui-monospace, monospace;
+      }
+
+      .profile-item-stats {
+        text-align: right;
+        font-size: 0.7rem;
+        white-space: nowrap;
+      }
+
+      .profile-item-stats .unlocked {
+        color: #22c55e;
+      }
+
+      @media (max-width: 960px) {
+        .content {
+          grid-template-columns: minmax(0, 1fr);
         }
-        .brand {
-          margin-bottom: 0.5rem;
-        }
-        .main-nav {
-          order: 3;
-          width: 100%;
-          justify-content: center;
-          flex-wrap: wrap;
-          margin-left: 0;
-        }
-        .wallet-form {
-          width: 100%;
-          max-width: 480px;
+        .profile-search-card {
+          max-height: 300px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-logo">🐱</div>
-          <div>
-            <div class="brand-title">Chunky's NFLAD Viewer</div>
-          </div>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">🐱</div>
+        <div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
         </div>
+      </div>
         <nav class="main-nav">
-          <a href="/" class="active">Wallet</a>
-          <a href="/profiles.html">Profiles</a>
-          <a href="/top-holders.html">Top holders</a>
-          <a href="/explorer.html">Browse</a>
-          <a href="/insights.html">Insights</a>
-          <a href="/faq.html">FAQ</a>
-          <a href="/contact.html">Contact</a>
+          <a href="/" id="nav-wallet" class="active">Wallet</a>
+          <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+          <a href="/explorer.html" id="nav-explorer">Browse</a>
+          <a href="/insights.html" id="nav-insights">Insights</a>
+          <a href="/faq.html" id="nav-faq">FAQ</a>
+          <a href="/contact.html" id="nav-contact">Contact</a>
           <a href="/login.html" id="nav-account-link">Login</a>
         </nav>
-
-        <form id="wallet-form" class="wallet-form">
-          <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
-          <button type="submit" class="btn-primary">View Wallet</button>
-        </form>
-      </header>
-
-      <section id="wallet-summary-card" class="wallet-summary-card"></section>
+    </header>
+    <script src="/header.js"></script>
+    <div class="app-shell">
 
       <main class="content">
         <aside class="filters-panel">
+          <!-- Profile Search Section -->
+          <section id="profile-search-section" class="profile-search-section">
+            <div class="profile-search-card">
+              <div class="profiles-title">Search profiles</div>
+              <div>
+                <input
+                  id="prof-search-input"
+                  type="text"
+                  class="search-input"
+                  placeholder="Display name or wallet address..."
+                  autocomplete="off"
+                />
+              </div>
+              <div id="prof-status" class="profiles-status">
+                Start typing to search.
+              </div>
+              <ul id="prof-list" class="profiles-list"></ul>
+            </div>
+          </section>
+
           <h3>Filters</h3>
 
           <div class="filter-group">
@@ -552,6 +632,7 @@
         </aside>
 
         <section class="table-panel">
+          <section id="wallet-summary-card" class="wallet-summary-card"></section>
           <div class="table-header">
             <h3 id="moments-title">Moments</h3>
             <button id="export-csv" class="export-btn">Export CSV</button>
@@ -620,16 +701,9 @@
 
     <script>
       async function maybeLoadDefaultWallet() {
-        const walletInput = document.getElementById("wallet-input");
-        if (!walletInput) {
-          console.warn("wallet-input field not found on wallet page");
-          return;
-        }
-
         const params = new URLSearchParams(window.location.search);
         const walletFromUrl = (params.get("wallet") || "").trim();
         if (walletFromUrl) {
-          walletInput.value = walletFromUrl;
           if (typeof window.runQuery === "function") {
             window.runQuery(walletFromUrl);
           } else if (typeof window.loadWallet === "function") {
@@ -652,8 +726,6 @@
           const wallet = (data.user.default_wallet_address || "").trim();
           if (!wallet) return;
 
-          walletInput.value = wallet;
-
           if (typeof window.runQuery === "function") {
             window.runQuery(wallet);
           } else if (typeof window.loadWallet === "function") {
@@ -670,5 +742,155 @@
     </script>
 
     <script src="app.js"></script>
+    <script>
+      // Profile search functionality
+      (function () {
+        const searchInput = document.getElementById("prof-search-input");
+        const statusEl = document.getElementById("prof-status");
+        const listEl = document.getElementById("prof-list");
+
+        if (!searchInput || !statusEl || !listEl) {
+          console.warn("Profile search elements not found");
+          return;
+        }
+
+        let currentProfiles = [];
+        let currentSelectedIndex = -1;
+        let searchTimeout = null;
+
+        function formatNumber(n) {
+          if (n == null) return "0";
+          return Number(n).toLocaleString();
+        }
+
+        function renderList() {
+          listEl.innerHTML = "";
+
+          if (!currentProfiles.length) {
+            const li = document.createElement("li");
+            li.className = "profiles-help";
+            li.textContent = "No profiles found for this search.";
+            listEl.appendChild(li);
+            return;
+          }
+
+          currentProfiles.forEach((p, idx) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "profile-item-btn" + (idx === currentSelectedIndex ? " active" : "");
+            btn.dataset.index = String(idx);
+
+            const mainDiv = document.createElement("div");
+            mainDiv.className = "profile-item-main";
+
+            const nameDiv = document.createElement("div");
+            nameDiv.className = "profile-item-name";
+            nameDiv.textContent = p.display_name || "(unknown)";
+
+            const addrDiv = document.createElement("div");
+            addrDiv.className = "profile-item-address";
+            addrDiv.textContent = p.wallet_address || "";
+
+            mainDiv.appendChild(nameDiv);
+            mainDiv.appendChild(addrDiv);
+
+            const statsDiv = document.createElement("div");
+            statsDiv.className = "profile-item-stats";
+            statsDiv.innerHTML =
+              '<div>' +
+              formatNumber(p.total_moments) +
+              " moments</div>" +
+              '<div class="unlocked">' +
+              formatNumber(p.unlocked_moments) +
+              " unlocked</div>";
+
+            btn.appendChild(mainDiv);
+            btn.appendChild(statsDiv);
+
+            btn.addEventListener("click", () => {
+              currentSelectedIndex = idx;
+              renderList();
+              loadWalletFromProfile(p);
+            });
+
+            const li = document.createElement("li");
+            li.appendChild(btn);
+            listEl.appendChild(li);
+          });
+        }
+
+        async function loadWalletFromProfile(profile) {
+          const walletAddress = profile.wallet_address;
+          if (!walletAddress) return;
+
+          // Update the wallet input field
+          const walletInput = document.getElementById("wallet-input");
+          if (walletInput) {
+            walletInput.value = walletAddress;
+          }
+
+          // Load the wallet using the existing runQuery function
+          if (window.runQuery) {
+            await window.runQuery(walletAddress);
+          }
+
+          // Scroll to top to show the wallet summary
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function runSearch(term) {
+          const trimmed = term.trim();
+
+          if (!trimmed) {
+            currentProfiles = [];
+            currentSelectedIndex = -1;
+            statusEl.textContent = "Start typing to search for profiles.";
+            listEl.innerHTML = "";
+            return;
+          }
+
+          statusEl.textContent = "Searching…";
+
+          try {
+            const res = await fetch(
+              "/api/profiles?query=" + encodeURIComponent(trimmed)
+            );
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+              throw new Error(data.error || "Search failed");
+            }
+
+            currentProfiles = data.profiles || [];
+            currentSelectedIndex = currentProfiles.length ? 0 : -1;
+
+            if (!currentProfiles.length) {
+              statusEl.textContent = "No profiles found for \"" + trimmed + "\".";
+            } else {
+              statusEl.textContent =
+                "Found " +
+                currentProfiles.length +
+                " profile(s) for \"" +
+                trimmed +
+                "\".";
+            }
+
+            renderList();
+          } catch (err) {
+            console.error("profiles search error:", err);
+            statusEl.textContent = "Search failed: " + (err.message || "Check console for details.");
+            currentProfiles = [];
+            currentSelectedIndex = -1;
+            renderList();
+          }
+        }
+
+        searchInput.addEventListener("input", () => {
+          const value = searchInput.value;
+          if (searchTimeout) clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => runSearch(value), 300);
+        });
+      })();
+    </script>
   </body>
 </html>

@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <title>Browse Moments – Chunky's NFLAD Viewer</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+        <link rel="stylesheet" href="/header.css" />
         <style>
             :root {
                 --bg: #050815;
@@ -48,93 +48,12 @@
 
             /* Header / nav */
 
-            header.app-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 0.75rem 2rem;
-                border-bottom: 1px solid var(--border-soft);
-                background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
-            }
-
-            .brand {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .brand-logo {
-                width: 32px;
-                height: 32px;
-                border-radius: 999px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: linear-gradient(135deg, #ffb64d, #ff5b81);
-                font-size: 20px;
-            }
-
-            .brand-title {
-                font-weight: 600;
-                letter-spacing: 0.04em;
-                font-size: 0.9rem;
-            }
-
-            nav.main-nav {
-                display: flex;
-                gap: 1.25rem;
-                font-size: 0.9rem;
-            }
-
-            nav.main-nav a {
-                color: var(--text-muted);
-            }
-
-            nav.main-nav a.active {
-                color: var(--text);
-                font-weight: 600;
-            }
-
-            .wallet-form {
-                display: flex;
-                gap: 0.5rem;
-                align-items: center;
-            }
-
-            .wallet-input {
-                min-width: 260px;
-                background: rgba(12, 17, 32, 0.9);
-                border-radius: 999px;
-                border: 1px solid var(--border-soft);
-                padding: 0.45rem 0.9rem;
-                color: var(--text);
-                font-size: 0.85rem;
-                outline: none;
-            }
-
-            .wallet-input::placeholder {
-                color: #616887;
-            }
-
-            .btn-primary {
-                border-radius: 999px;
-                border: none;
-                padding: 0.45rem 1.1rem;
-                background: linear-gradient(135deg, var(--accent), var(--accent2));
-                color: #fff;
-                font-size: 0.85rem;
-                cursor: pointer;
-                white-space: nowrap;
-            }
-
-            .btn-primary:hover {
-                filter: brightness(1.05);
-            }
+            /* Header styles are in /header.css */
 
             /* Layout */
 
             main.app-main {
-                max-width: 1320px;
+                max-width: 1800px;
                 margin: 1.5rem auto 2.5rem;
                 padding: 0 1.5rem;
             }
@@ -224,6 +143,21 @@
                 color: var(--accent2);
             }
 
+            .expand-icon {
+                color: var(--text-muted);
+                font-size: 0.7rem;
+                display: inline-block;
+                width: 16px;
+            }
+
+            tr[style*="cursor: pointer"]:hover {
+                background: rgba(111, 66, 193, 0.1);
+            }
+
+            .edition-moments-row {
+                background: rgba(15, 23, 42, 0.3);
+            }
+
             /* Results */
 
             .results-card {
@@ -278,7 +212,11 @@
 
             table.table th,
             table.table td {
-                padding: 0.4rem 0.6rem;
+                padding: 0.35rem 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            table.table td {
                 white-space: nowrap;
             }
 
@@ -294,6 +232,38 @@
                 font-weight: 500;
                 color: var(--text-muted);
                 border-bottom: 1px solid var(--border-soft);
+            }
+
+            table.table th.sortable {
+                cursor: pointer;
+                user-select: none;
+                position: relative;
+                padding-right: 1.5rem;
+            }
+
+            table.table th.sortable:hover {
+                background: rgba(111, 66, 193, 0.1);
+                color: var(--text);
+            }
+
+            table.table th.sortable::after {
+                content: "⇅";
+                position: absolute;
+                right: 0.4rem;
+                opacity: 0.3;
+                font-size: 0.7rem;
+            }
+
+            table.table th.sortable.sort-asc::after {
+                content: "↑";
+                opacity: 1;
+                color: var(--accent2);
+            }
+
+            table.table th.sortable.sort-desc::after {
+                content: "↓";
+                opacity: 1;
+                color: var(--accent2);
             }
 
             table.table tbody tr:nth-child(even) {
@@ -340,6 +310,21 @@
                 color: #111;
             }
 
+            .expand-icon {
+                color: var(--text-muted);
+                font-size: 0.7rem;
+                display: inline-block;
+                width: 16px;
+            }
+
+            tr[style*="cursor: pointer"]:hover {
+                background: rgba(111, 66, 193, 0.1);
+            }
+
+            .edition-moments-row {
+                background: rgba(15, 23, 42, 0.3);
+            }
+
             @media (max-width: 960px) {
                 header.app-header {
                     flex-direction: column;
@@ -363,35 +348,25 @@
         </style>
     </head>
     <body>
+        <link rel="stylesheet" href="/header.css" />
         <header class="app-header">
             <div class="brand">
                 <div class="brand-logo">🐱</div>
-                <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
+                <div>
+                    <div class="brand-title">Chunky's NFLAD Viewer</div>
+                </div>
             </div>
-
-<nav class="main-nav">
-  <a href="/">Wallet</a>
-  <a href="/profiles.html">Profiles</a>
-  <a href="/top-holders.html">Top holders</a>
-  <a href="/explorer.html">Browse</a>
-  <a href="/insights.html">Insights</a>
-  <a href="/faq.html">FAQ</a>
-  <a href="/contact.html">Contact</a>
-  <a href="/login.html" id="nav-account-link">Login</a>
-</nav>
-
-
-            <form id="wallet-form" class="wallet-form" action="/" method="GET">
-                <input
-                    id="wallet-input"
-                    name="wallet"
-                    type="text"
-                    class="wallet-input"
-                    placeholder="0x… wallet address"
-                    autocomplete="off" />
-                <button type="submit" class="btn-primary">View Wallet</button>
-            </form>
+            <nav class="main-nav">
+                <a href="/" id="nav-wallet">Wallet</a>
+                <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+                <a href="/explorer.html" id="nav-explorer" class="active">Browse</a>
+                <a href="/insights.html" id="nav-insights">Insights</a>
+                <a href="/faq.html" id="nav-faq">FAQ</a>
+                <a href="/contact.html" id="nav-contact">Contact</a>
+                <a href="/login.html" id="nav-account-link">Login</a>
+            </nav>
         </header>
+        <script src="/header.js"></script>
 
         <main class="app-main">
             <div class="page-title">Moment explorer</div>
@@ -463,27 +438,52 @@
                         <div class="results-subtitle" id="ex-results-summary">
                             Enter filters on the left and hit Search.
                         </div>
+                        <div id="ex-pager-info" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; display: none;"></div>
                     </div>
                     <div class="results-body">
                         <div id="ex-empty" class="empty-state">No search yet.</div>
 
                         <div class="table-container">
+                            <div style="margin-bottom: 0.75rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: space-between;">
+                                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <label style="font-size: 0.85rem; color: var(--text-muted);">Sort by:</label>
+                                    <select id="ex-sort" class="filter-select" style="width: auto; min-width: 150px;">
+                                        <option value="player">Player (A-Z)</option>
+                                        <option value="player-desc">Player (Z-A)</option>
+                                        <option value="price-low">Price: Lowest Ask (Low-High)</option>
+                                        <option value="price-high">Price: Lowest Ask (High-Low)</option>
+                                        <option value="asp-low">Price: Avg Sale (Low-High)</option>
+                                        <option value="asp-high">Price: Avg Sale (High-Low)</option>
+                                        <option value="tier">Tier</option>
+                                        <option value="moments">Moments Count</option>
+                                    </select>
+                                </div>
+                                <button id="ex-export-csv" class="btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Export CSV</button>
+                            </div>
                             <table class="table" id="ex-table" style="display: none">
                                 <thead>
                                     <tr>
-                                        <th>NFT ID</th>
-                                        <th>Player</th>
-                                        <th>Team</th>
-                                        <th>Pos</th>
-                                        <th>Tier</th>
-                                        <th>Serial / Max</th>
-                                        <th>Series</th>
-                                        <th>Set</th>
+                                        <th class="sortable" data-sort="edition_id">Edition ID</th>
+                                        <th class="sortable" data-sort="player">Player</th>
+                                        <th class="sortable" data-sort="team">Team</th>
+                                        <th class="sortable" data-sort="position">Pos</th>
+                                        <th class="sortable" data-sort="tier">Tier</th>
+                                        <th class="sortable" data-sort="moments">Moments</th>
+                                        <th>Serial Range</th>
+                                        <th class="sortable" data-sort="max">Max</th>
+                                        <th class="sortable" data-sort="price">Lowest Ask</th>
+                                        <th class="sortable" data-sort="asp">Avg Sale</th>
+                                        <th class="sortable" data-sort="series">Series</th>
+                                        <th class="sortable" data-sort="set">Set</th>
                                         <th>Links</th>
                                     </tr>
                                 </thead>
                                 <tbody id="ex-tbody"></tbody>
                             </table>
+                            <div id="ex-pager" style="margin-top: 1rem; display: none; gap: 0.5rem; align-items: center; justify-content: center; flex-wrap: wrap;">
+                                <button id="ex-pager-prev" class="btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">← Previous</button>
+                                <button id="ex-pager-next" class="btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Next →</button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -574,6 +574,238 @@
                 }
             }
 
+            const PAGE_SIZE = 100;
+            let currentEditions = [];
+            let currentSortColumn = null;
+            let currentSortDirection = "asc"; // "asc" or "desc"
+            let currentPage = 1;
+
+            function formatPrice(price) {
+                if (price == null) return "—";
+                return "$" + Number(price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function updateSortHeaderClasses() {
+                const table = document.getElementById("ex-table");
+                if (!table || table.style.display === "none") return;
+                
+                const headers = table.querySelectorAll("th.sortable");
+                headers.forEach((th) => {
+                    th.classList.remove("sort-asc", "sort-desc");
+                    if (th.dataset.sort === currentSortColumn) {
+                        th.classList.add(currentSortDirection === "asc" ? "sort-asc" : "sort-desc");
+                    }
+                });
+            }
+
+            function sortEditions(editions, sortColumn, direction) {
+                const sorted = [...editions];
+                const isAsc = direction === "asc";
+                
+                switch (sortColumn) {
+                    case "edition_id":
+                        sorted.sort((a, b) => {
+                            const aVal = (a.edition_id || "").toLowerCase();
+                            const bVal = (b.edition_id || "").toLowerCase();
+                            return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                        });
+                        break;
+                    case "player":
+                        sorted.sort((a, b) => {
+                            const aName = ((a.last_name || "") + " " + (a.first_name || "")).trim();
+                            const bName = ((b.last_name || "") + " " + (b.first_name || "")).trim();
+                            return isAsc ? aName.localeCompare(bName) : bName.localeCompare(aName);
+                        });
+                        break;
+                    case "team":
+                        sorted.sort((a, b) => {
+                            const aVal = (a.team_name || "").toLowerCase();
+                            const bVal = (b.team_name || "").toLowerCase();
+                            return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                        });
+                        break;
+                    case "position":
+                        sorted.sort((a, b) => {
+                            const aVal = (a.position || "").toLowerCase();
+                            const bVal = (b.position || "").toLowerCase();
+                            return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                        });
+                        break;
+                    case "tier":
+                        const tierOrder = { "Common": 1, "Uncommon": 2, "Rare": 3, "Legendary": 4, "Ultimate": 5 };
+                        sorted.sort((a, b) => {
+                            const aTier = tierOrder[a.tier] || 99;
+                            const bTier = tierOrder[b.tier] || 99;
+                            return isAsc ? aTier - bTier : bTier - aTier;
+                        });
+                        break;
+                    case "moments":
+                        sorted.sort((a, b) => {
+                            const aVal = a.total_moments || 0;
+                            const bVal = b.total_moments || 0;
+                            return isAsc ? aVal - bVal : bVal - aVal;
+                        });
+                        break;
+                    case "max":
+                        sorted.sort((a, b) => {
+                            const aVal = a.max_mint_size ?? -1;
+                            const bVal = b.max_mint_size ?? -1;
+                            return isAsc ? aVal - bVal : bVal - aVal;
+                        });
+                        break;
+                    case "price":
+                        sorted.sort((a, b) => {
+                            const aPrice = a.lowest_ask_usd ?? (isAsc ? Infinity : -1);
+                            const bPrice = b.lowest_ask_usd ?? (isAsc ? Infinity : -1);
+                            return isAsc ? aPrice - bPrice : bPrice - aPrice;
+                        });
+                        break;
+                    case "asp":
+                        sorted.sort((a, b) => {
+                            const aPrice = a.avg_sale_usd ?? (isAsc ? Infinity : -1);
+                            const bPrice = b.avg_sale_usd ?? (isAsc ? Infinity : -1);
+                            return isAsc ? aPrice - bPrice : bPrice - aPrice;
+                        });
+                        break;
+                    case "series":
+                        sorted.sort((a, b) => {
+                            const aVal = (a.series_name || "").toLowerCase();
+                            const bVal = (b.series_name || "").toLowerCase();
+                            return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                        });
+                        break;
+                    case "set":
+                        sorted.sort((a, b) => {
+                            const aVal = (a.set_name || "").toLowerCase();
+                            const bVal = (b.set_name || "").toLowerCase();
+                            return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                        });
+                        break;
+                    default:
+                        // Default to player sort
+                        sorted.sort((a, b) => {
+                            const aName = ((a.last_name || "") + " " + (a.first_name || "")).trim();
+                            const bName = ((b.last_name || "") + " " + (b.first_name || "")).trim();
+                            return isAsc ? aName.localeCompare(bName) : bName.localeCompare(aName);
+                        });
+                }
+                return sorted;
+            }
+
+            // Legacy function for dropdown compatibility
+            function sortEditionsLegacy(editions, sortBy) {
+                // Map dropdown values to new sort system
+                let column = "player";
+                let direction = "asc";
+                
+                switch (sortBy) {
+                    case "player": column = "player"; direction = "asc"; break;
+                    case "player-desc": column = "player"; direction = "desc"; break;
+                    case "price-low": column = "price"; direction = "asc"; break;
+                    case "price-high": column = "price"; direction = "desc"; break;
+                    case "asp-low": column = "asp"; direction = "asc"; break;
+                    case "asp-high": column = "asp"; direction = "desc"; break;
+                    case "tier": column = "tier"; direction = "asc"; break;
+                    case "moments": column = "moments"; direction = "desc"; break;
+                }
+                
+                currentSortColumn = column;
+                currentSortDirection = direction;
+                // Don't update header classes here - will be called after table is rendered
+                return sortEditions(editions, column, direction);
+            }
+
+
+            function renderTable(editions, page = 1) {
+                const tbody = document.getElementById("ex-tbody");
+                const table = document.getElementById("ex-table");
+                const empty = document.getElementById("ex-empty");
+                const pagerInfo = document.getElementById("ex-pager-info");
+                
+                tbody.innerHTML = "";
+
+                if (!editions || !editions.length) {
+                    empty.style.display = "block";
+                    empty.textContent = "No editions matched your filters.";
+                    table.style.display = "none";
+                    pagerInfo.style.display = "none";
+                    return;
+                }
+
+                empty.style.display = "none";
+                table.style.display = "table";
+
+                // Pagination
+                const total = editions.length;
+                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                currentPage = Math.max(1, Math.min(page, totalPages));
+                const start = (currentPage - 1) * PAGE_SIZE;
+                const end = Math.min(start + PAGE_SIZE, total);
+                const pageEditions = editions.slice(start, end);
+
+                // Update pager info
+                if (totalPages > 1) {
+                    pagerInfo.style.display = "block";
+                    pagerInfo.textContent = `Page ${currentPage} of ${totalPages} • Showing ${start + 1}-${end} of ${total.toLocaleString()} editions`;
+                } else {
+                    pagerInfo.style.display = "none";
+                }
+
+                for (const e of pageEditions) {
+                    const tr = document.createElement("tr");
+                    const playerName = [e.first_name, e.last_name].filter(Boolean).join(" ");
+                    const serialRange = e.min_serial && e.max_serial 
+                        ? `${e.min_serial} - ${e.max_serial}` 
+                        : e.min_serial 
+                            ? `#${e.min_serial}` 
+                            : "—";
+
+                    const tier = (e.tier || "").toLowerCase();
+                    let tierClass = "";
+                    if (tier === "common") tierClass = "pill-tier-common";
+                    else if (tier === "uncommon") tierClass = "pill-tier-uncommon";
+                    else if (tier === "rare") tierClass = "pill-tier-rare";
+                    else if (tier === "legendary") tierClass = "pill-tier-legendary";
+                    else if (tier === "ultimate") tierClass = "pill-tier-ultimate";
+
+                    const marketUrl = e.edition_id ? `https://nflallday.com/listing/moment/${e.edition_id}` : "";
+
+                    tr.innerHTML = `
+              <td style="font-family: ui-monospace, monospace; font-size: 0.7rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${e.edition_id || ""}">${e.edition_id || ""}</td>
+              <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;" title="${playerName || "(unknown)"}">${playerName || "(unknown)"}</td>
+              <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${e.team_name || ""}</td>
+              <td>${e.position || ""}</td>
+              <td>
+                ${tierClass ? `<span class="pill-tier ${tierClass}">${e.tier || ""}</span>` : e.tier || ""}
+              </td>
+              <td style="text-align: center;"><strong>${e.total_moments || 0}</strong></td>
+              <td style="font-size: 0.7rem; max-width: 90px; overflow: hidden; text-overflow: ellipsis;">${serialRange}</td>
+              <td style="text-align: center;">${e.max_mint_size || "—"}</td>
+              <td style="font-weight: 500; text-align: right; min-width: 80px;">${formatPrice(e.lowest_ask_usd)}</td>
+              <td style="text-align: right; min-width: 80px;">${formatPrice(e.avg_sale_usd)}</td>
+              <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${e.series_name || ""}</td>
+              <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${e.set_name || ""}</td>
+              <td>
+                ${marketUrl ? `<a href="${marketUrl}" target="_blank">Market</a>` : ""}
+              </td>
+            `;
+                    tbody.appendChild(tr);
+                }
+
+                // Update pagination buttons
+                const prevBtn = document.getElementById("ex-pager-prev");
+                const nextBtn = document.getElementById("ex-pager-next");
+                if (prevBtn) {
+                    prevBtn.disabled = currentPage <= 1;
+                }
+                if (nextBtn) {
+                    nextBtn.disabled = currentPage >= totalPages;
+                }
+
+                // Update sort header classes after table is rendered
+                updateSortHeaderClasses();
+            }
+
             async function runSearch() {
                 const player = document.getElementById("ex-player").value.trim();
                 const team = document.getElementById("ex-team").value.trim();
@@ -610,65 +842,43 @@
                 table.style.display = "none";
 
                 try {
-                    const res = await fetch("/api/search-moments?" + params.toString());
+                    const res = await fetch("/api/search-editions?" + params.toString());
                     const data = await res.json();
-                    if (!data.ok) throw new Error(data.error || "Search failed");
-
-                    summary.textContent = "Found " + data.count + " moment(s).";
-                    tbody.innerHTML = "";
-
-                    if (!data.rows || !data.rows.length) {
-                        empty.style.display = "block";
-                        empty.textContent = "No moments matched your filters.";
-                        table.style.display = "none";
-                        return;
+                    
+                    if (!res.ok || !data.ok) {
+                        const errorMsg = data.error || `HTTP ${res.status}: ${res.statusText}`;
+                        console.error("API error:", errorMsg, data);
+                        throw new Error(errorMsg);
                     }
 
-                    empty.style.display = "none";
-                    table.style.display = "table";
-
-                    for (const r of data.rows) {
-                        const tr = document.createElement("tr");
-                        const playerName = [r.first_name, r.last_name].filter(Boolean).join(" ");
-                        const serial = r.serial_number ?? "";
-                        const max = r.max_mint_size ?? "";
-                        const serialText = serial || max ? `${serial || "–"} / ${max || "?"}` : "";
-
-                        const momentUrl = r.nft_id ? `https://nflallday.com/moments/${r.nft_id}` : "";
-                        const marketUrl = r.edition_id ? `https://nflallday.com/listing/moment/${r.edition_id}` : "";
-
-                        const tier = (r.tier || "").toLowerCase();
-                        let tierClass = "";
-                        if (tier === "common") tierClass = "pill-tier-common";
-                        else if (tier === "uncommon") tierClass = "pill-tier-uncommon";
-                        else if (tier === "rare") tierClass = "pill-tier-rare";
-                        else if (tier === "legendary") tierClass = "pill-tier-legendary";
-                        else if (tier === "ultimate") tierClass = "pill-tier-ultimate";
-
-                        tr.innerHTML = `
-              <td>${r.nft_id || ""}</td>
-              <td>${playerName || "(unknown)"}</td>
-              <td>${r.team_name || ""}</td>
-              <td>${r.position || ""}</td>
-              <td>
-                ${tierClass ? `<span class="pill-tier ${tierClass}">${r.tier || ""}</span>` : r.tier || ""}
-              </td>
-              <td>${serialText}</td>
-              <td>${r.series_name || ""}</td>
-              <td>${r.set_name || ""}</td>
-              <td>
-                ${momentUrl ? `<a href="${momentUrl}" target="_blank">Moment</a>` : ""}
-                ${marketUrl ? ` · <a href="${marketUrl}" target="_blank">Market</a>` : ""}
-              </td>
-            `;
-
-                        tbody.appendChild(tr);
+                    if (!data.editions) {
+                        console.error("Unexpected API response format:", data);
+                        throw new Error("Invalid response format from server");
                     }
+
+                    currentEditions = data.editions || [];
+                    summary.textContent = "Found " + currentEditions.length.toLocaleString() + " edition(s).";
+                    
+                    // Show/hide pagination
+                    const pager = document.getElementById("ex-pager");
+                    if (pager) {
+                        pager.style.display = currentEditions.length > PAGE_SIZE ? "flex" : "none";
+                    }
+                    
+                    // Apply sorting
+                    const sortBy = document.getElementById("ex-sort").value;
+                    let sorted = sortEditionsLegacy(currentEditions, sortBy);
+                    renderTable(sorted, 1);
                 } catch (err) {
-                    console.error(err);
-                    summary.textContent = "Search failed.";
+                    console.error("runSearch error:", err);
+                    console.error("Error details:", {
+                        message: err.message,
+                        stack: err.stack,
+                        name: err.name
+                    });
+                    summary.textContent = "Search failed: " + (err.message || "Unknown error");
                     empty.style.display = "block";
-                    empty.textContent = "Something went wrong.";
+                    empty.textContent = "Something went wrong. Check console for details.";
                     table.style.display = "none";
                 }
             }
@@ -680,17 +890,135 @@
                 document.getElementById("ex-series").value = "";
                 document.getElementById("ex-set").value = "";
                 document.getElementById("ex-position").value = "";
+                document.getElementById("ex-sort").value = "player";
 
                 document.getElementById("ex-results-summary").textContent = "Enter filters on the left and hit Search.";
                 document.getElementById("ex-empty").style.display = "block";
                 document.getElementById("ex-empty").textContent = "No search yet.";
                 document.getElementById("ex-table").style.display = "none";
                 document.getElementById("ex-tbody").innerHTML = "";
+                currentEditions = [];
             }
 
             // Wire up buttons and load filter options
             document.getElementById("ex-search-btn").addEventListener("click", runSearch);
             document.getElementById("ex-reset-btn").addEventListener("click", resetFilters);
+            
+            // Wire up sort dropdown
+            document.getElementById("ex-sort").addEventListener("change", () => {
+                if (currentEditions.length) {
+                    const sortBy = document.getElementById("ex-sort").value;
+                    let sorted = sortEditionsLegacy(currentEditions, sortBy);
+                    renderTable(sorted, 1); // Reset to page 1 when sorting changes
+                }
+            });
+
+            // Wire up pagination buttons
+            const prevBtn = document.getElementById("ex-pager-prev");
+            const nextBtn = document.getElementById("ex-pager-next");
+            if (prevBtn) {
+                prevBtn.addEventListener("click", () => {
+                    if (currentEditions.length) {
+                        const sortBy = document.getElementById("ex-sort").value;
+                        let sorted = sortEditionsLegacy(currentEditions, sortBy);
+                        renderTable(sorted, currentPage - 1);
+                    }
+                });
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener("click", () => {
+                    if (currentEditions.length) {
+                        const sortBy = document.getElementById("ex-sort").value;
+                        let sorted = sortEditionsLegacy(currentEditions, sortBy);
+                        renderTable(sorted, currentPage + 1);
+                    }
+                });
+            }
+
+            // Wire up CSV export
+            document.getElementById("ex-export-csv").addEventListener("click", () => {
+                if (!currentEditions.length) return;
+
+                const sortBy = document.getElementById("ex-sort").value;
+                const sorted = sortEditionsLegacy(currentEditions, sortBy);
+
+                const headers = [
+                    "edition_id",
+                    "first_name",
+                    "last_name",
+                    "team_name",
+                    "position",
+                    "tier",
+                    "total_moments",
+                    "min_serial",
+                    "max_serial",
+                    "max_mint_size",
+                    "lowest_ask_usd",
+                    "avg_sale_usd",
+                    "top_sale_usd",
+                    "series_name",
+                    "set_name"
+                ];
+
+                const lines = [];
+                lines.push(headers.join(","));
+
+                for (const e of sorted) {
+                    const line = headers
+                        .map((h) => {
+                            let v = e[h];
+                            if (v == null) v = "";
+                            const s = String(v).replace(/"/g, '""');
+                            if (s.search(/[",\n]/) >= 0) {
+                                return `"${s}"`;
+                            }
+                            return s;
+                        })
+                        .join(",");
+                    lines.push(line);
+                }
+
+                const csv = lines.join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `editions-${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            // Wire up column header clicks
+            document.addEventListener("DOMContentLoaded", () => {
+                const table = document.getElementById("ex-table");
+                if (table) {
+                    const headers = table.querySelectorAll("th.sortable");
+                    headers.forEach((th) => {
+                        th.addEventListener("click", () => {
+                            const sortColumn = th.dataset.sort;
+                            if (!sortColumn) return;
+
+                            // Toggle direction if clicking the same column
+                            if (currentSortColumn === sortColumn) {
+                                currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+                            } else {
+                                currentSortColumn = sortColumn;
+                                currentSortDirection = "asc";
+                            }
+
+                            updateSortHeaderClasses();
+                            
+                            if (currentEditions.length) {
+                                const sorted = sortEditions(currentEditions, currentSortColumn, currentSortDirection);
+                                renderTable(sorted, 1); // Reset to page 1 when sorting changes
+                            }
+                        });
+                    });
+                }
+            });
 
             loadFilterOptions();
         </script>

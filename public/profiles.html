@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Profiles – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+    <link rel="stylesheet" href="/header.css" />
     <style>
       :root {
         --bg: #050815;
@@ -48,88 +48,7 @@
 
       /* Header / nav */
 
-      header.app-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.75rem 2rem;
-        border-bottom: 1px solid var(--border-soft);
-        background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-
-      .brand-logo {
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, #ffb64d, #ff5b81);
-        font-size: 20px;
-      }
-
-      .brand-title {
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        font-size: 0.9rem;
-      }
-
-      nav.main-nav {
-        display: flex;
-        gap: 1.25rem;
-        font-size: 0.9rem;
-      }
-
-      nav.main-nav a {
-        color: var(--text-muted);
-      }
-
-      nav.main-nav a.active {
-        color: var(--text);
-        font-weight: 600;
-      }
-
-      .wallet-form {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-      }
-
-      .wallet-input {
-        min-width: 260px;
-        background: rgba(12, 17, 32, 0.9);
-        border-radius: 999px;
-        border: 1px solid var(--border-soft);
-        padding: 0.45rem 0.9rem;
-        color: var(--text);
-        font-size: 0.85rem;
-        outline: none;
-      }
-
-      .wallet-input::placeholder {
-        color: #616887;
-      }
-
-      .btn-primary {
-        border-radius: 999px;
-        border: none;
-        padding: 0.45rem 1.1rem;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
-        color: #fff;
-        font-size: 0.85rem;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .btn-primary:hover {
-        filter: brightness(1.05);
-      }
+      /* Header styles are in /header.css */
 
       .btn-secondary {
         border-radius: 999px;
@@ -429,11 +348,6 @@
           gap: 0.75rem;
         }
 
-        .wallet-form {
-          width: 100%;
-          justify-content: flex-start;
-        }
-
         main.app-main {
           padding: 0 1rem;
         }
@@ -449,35 +363,26 @@
     </style>
   </head>
   <body>
+    <link rel="stylesheet" href="/header.css" />
     <header class="app-header">
       <div class="brand">
         <div class="brand-logo">🐱</div>
-        <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
+        <div>
+          <div class="brand-title">Chunky's NFLAD Viewer</div>
+        </div>
       </div>
-
-<nav class="main-nav">
-  <a href="/">Wallet</a>
-  <a href="/profiles.html">Profiles</a>
-  <a href="/top-holders.html">Top holders</a>
-  <a href="/explorer.html">Browse</a>
-  <a href="/insights.html">Insights</a>
-  <a href="/faq.html">FAQ</a>
-  <a href="/contact.html">Contact</a>
-  <a href="/login.html" id="nav-account-link">Login</a>
-</nav>
-
-
-      <form id="wallet-form" class="wallet-form" action="/" method="GET">
-        <input
-          id="wallet-input"
-          name="wallet"
-          type="text"
-          class="wallet-input"
-          placeholder="0x… wallet address"
-          autocomplete="off"
-        />
-        <button type="submit" class="btn-primary">View Wallet</button>
-      </form>
+      <nav class="main-nav">
+        <a href="/" id="nav-wallet">Wallet</a>
+        <a href="/profiles.html" id="nav-profiles" class="active">Profiles</a>
+        <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+        <a href="/explorer.html" id="nav-explorer">Browse</a>
+        <a href="/insights.html" id="nav-insights">Insights</a>
+        <a href="/faq.html" id="nav-faq">FAQ</a>
+        <a href="/contact.html" id="nav-contact">Contact</a>
+        <a href="/login.html" id="nav-account-link">Login</a>
+      </nav>
+    </header>
+    <script src="/header.js"></script>
     </header>
 
     <main class="app-main">

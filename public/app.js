@@ -10,8 +10,6 @@ let currentPage = 1;
 
 function getEls() {
     return {
-        form: document.getElementById("wallet-form"),
-        walletInput: document.getElementById("wallet-input"),
         tbody: document.getElementById("wallet-tbody"),
         title: document.getElementById("moments-title"),
         exportBtn: document.getElementById("export-csv"),
@@ -356,7 +354,8 @@ function updateSortHeaderClasses() {
 const priceCache = new Map();
 const filterCache = new Map();
 
-async function fetchWalletSummary(wallet) {
+// Make fetchWalletSummary available globally for profile search
+window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
     const els = getEls();
     if (!els.summaryCard) return;
 
@@ -550,14 +549,7 @@ async function attachPricesToMoments(moments) {
 
 function wireEvents() {
     const els = getEls();
-    if (!els.form || !els.walletInput) return;
-
-    els.form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const wallet = (els.walletInput.value || "").trim();
-        if (!wallet) return;
-        window.runQuery(wallet);
-    });
+    // Wallet form removed - wallet loading is now handled via profile search
 
     const filterEls = [
         els.filterTeam,

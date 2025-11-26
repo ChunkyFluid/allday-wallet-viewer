@@ -441,7 +441,192 @@ app.get("/api/top-holders", async (req, res) => {
   }
 });
 
-// Moment search (explorer)
+// Edition search (explorer) - groups by edition_id
+app.get("/api/search-editions", async (req, res) => {
+  try {
+    const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
+
+    const rawLimit = parseInt(limit, 10);
+    const safeLimit = Math.min(Math.max(rawLimit || 200, 1), 1000);
+
+    const conditionsSnapshot = [];
+    const conditionsLive = [];
+    const params = [];
+    let idx = 1;
+
+    if (player) {
+      conditionsSnapshot.push(`LOWER(first_name || ' ' || last_name) LIKE LOWER($${idx})`);
+      conditionsLive.push(`LOWER(e.first_name || ' ' || e.last_name) LIKE LOWER($${idx})`);
+      params.push(`%${player}%`);
+      idx++;
+    }
+
+    if (team) {
+      conditionsSnapshot.push(`team_name = $${idx}`);
+      conditionsLive.push(`e.team_name = $${idx}`);
+      params.push(team);
+      idx++;
+    }
+
+    if (tier) {
+      conditionsSnapshot.push(`tier = $${idx}`);
+      conditionsLive.push(`e.tier = $${idx}`);
+      params.push(tier);
+      idx++;
+    }
+
+    if (series) {
+      conditionsSnapshot.push(`series_name = $${idx}`);
+      conditionsLive.push(`e.series_name = $${idx}`);
+      params.push(series);
+      idx++;
+    }
+
+    if (set) {
+      conditionsSnapshot.push(`set_name = $${idx}`);
+      conditionsLive.push(`e.set_name = $${idx}`);
+      params.push(set);
+      idx++;
+    }
+
+    if (position) {
+      conditionsSnapshot.push(`position = $${idx}`);
+      conditionsLive.push(`e.position = $${idx}`);
+      params.push(position);
+      idx++;
+    }
+
+    const whereClauseSnapshot = conditionsSnapshot.length ? `WHERE ${conditionsSnapshot.join(" AND ")}` : "";
+    const whereClauseLive = conditionsLive.length ? `WHERE ${conditionsLive.join(" AND ")}` : "";
+
+    // Try snapshot table first, fall back to live query if it doesn't exist
+    let sql = `
+      SELECT
+        edition_id,
+        first_name,
+        last_name,
+        team_name,
+        position,
+        tier,
+        series_name,
+        set_name,
+        max_mint_size,
+        total_moments,
+        min_serial,
+        max_serial,
+        lowest_ask_usd,
+        avg_sale_usd,
+        top_sale_usd
+      FROM editions_snapshot
+      ${whereClauseSnapshot}
+      ORDER BY last_name NULLS LAST, first_name NULLS LAST, edition_id
+      LIMIT $${idx};
+    `;
+
+    params.push(safeLimit);
+
+    let result;
+    try {
+      result = await pgQuery(sql, params);
+    } catch (snapshotError) {
+      // If snapshot table doesn't exist, fall back to live query
+      if (snapshotError.message && (snapshotError.message.includes("does not exist") || snapshotError.message.includes("relation") && snapshotError.message.includes("editions_snapshot"))) {
+        console.log("editions_snapshot table not found, falling back to live query");
+        
+        // Remove the limit param we just added
+        params.pop();
+        
+        // Use live query with GROUP BY
+        sql = `
+          SELECT
+            e.edition_id,
+            MAX(e.first_name) AS first_name,
+            MAX(e.last_name) AS last_name,
+            MAX(e.team_name) AS team_name,
+            MAX(e.position) AS position,
+            MAX(e.tier) AS tier,
+            MAX(e.series_name) AS series_name,
+            MAX(e.set_name) AS set_name,
+            MAX(e.max_mint_size) AS max_mint_size,
+            COUNT(*) AS total_moments,
+            MIN(e.serial_number) AS min_serial,
+            MAX(e.serial_number) AS max_serial,
+            eps.lowest_ask_usd,
+            eps.avg_sale_usd,
+            eps.top_sale_usd
+          FROM nft_core_metadata e
+          LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = e.edition_id
+          ${whereClauseLive}
+          GROUP BY e.edition_id, eps.lowest_ask_usd, eps.avg_sale_usd, eps.top_sale_usd
+          ORDER BY MAX(e.last_name) NULLS LAST, MAX(e.first_name) NULLS LAST, e.edition_id
+          LIMIT $${idx};
+        `;
+        
+        params.push(safeLimit);
+        result = await pgQuery(sql, params);
+      } else {
+        throw snapshotError;
+      }
+    }
+
+    return res.json({
+      ok: true,
+      count: result.rowCount,
+      editions: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/search-editions:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// Get all moments for a specific edition
+app.get("/api/edition-moments", async (req, res) => {
+  try {
+    const editionId = (req.query.edition || "").toString().trim();
+    if (!editionId) {
+      return res.status(400).json({ ok: false, error: "Missing ?edition=" });
+    }
+
+    const sql = `
+      SELECT
+        nft_id,
+        edition_id,
+        serial_number,
+        max_mint_size,
+        first_name,
+        last_name,
+        team_name,
+        position,
+        tier,
+        series_name,
+        set_name
+      FROM nft_core_metadata
+      WHERE edition_id = $1
+      ORDER BY serial_number NULLS LAST, nft_id
+      LIMIT 1000;
+    `;
+
+    const result = await pgQuery(sql, [editionId]);
+
+    return res.json({
+      ok: true,
+      count: result.rowCount,
+      moments: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/edition-moments:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// Moment search (explorer) - kept for backward compatibility
 app.get("/api/search-moments", async (req, res) => {
   try {
     const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
@@ -960,6 +1145,7 @@ app.get("/api/profiles", async (req, res) => {
   }
 
   try {
+    // Search by both display name and wallet address
     const sql = `
       SELECT
         s.display_name,
@@ -984,7 +1170,9 @@ app.get("/api/profiles", async (req, res) => {
           ON wh.wallet_address = wp.wallet_address
         LEFT JOIN public.nft_core_metadata AS ncm
           ON ncm.nft_id = wh.nft_id
-        WHERE LOWER(wp.display_name) LIKE LOWER($1 || '%')
+        WHERE 
+          LOWER(wp.display_name) LIKE LOWER($1 || '%')
+          OR LOWER(wp.wallet_address) LIKE LOWER($1 || '%')
       ) AS s
       GROUP BY
         s.display_name,

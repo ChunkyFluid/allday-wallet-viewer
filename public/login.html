@@ -4,6 +4,7 @@
         <meta charset="UTF-8" />
         <title>Login – Chunky's NFLAD Viewer</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="/header.css" />
         <style>
             :root {
                 --bg-main: #050816;
@@ -50,78 +51,7 @@
                 flex-direction: column;
             }
 
-            .app-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                margin-bottom: 2rem;
-            }
-
-            .brand {
-                display: flex;
-                align-items: center;
-                gap: 0.75rem;
-            }
-
-            .brand-logo {
-                width: 36px;
-                height: 36px;
-                border-radius: 999px;
-                background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.4rem;
-            }
-
-            .brand-title {
-                font-weight: 700;
-                letter-spacing: 0.03em;
-                text-transform: uppercase;
-                font-size: 0.95rem;
-            }
-
-            .main-nav {
-                display: flex;
-                gap: 0.75rem;
-                font-size: 0.9rem;
-            }
-
-            .main-nav a {
-                color: var(--text-muted);
-                text-decoration: none;
-                padding: 0.35rem 0.9rem;
-                border-radius: 999px;
-                border: 1px solid transparent;
-                transition:
-                    background 0.15s ease,
-                    color 0.15s ease,
-                    border-color 0.15s ease;
-            }
-
-            .main-nav a:hover {
-                color: var(--text-main);
-                border-color: rgba(148, 163, 184, 0.6);
-                background: rgba(15, 23, 42, 0.8);
-            }
-
-            .main-nav a.active {
-                color: #fff;
-                border-color: var(--accent-blue);
-                background: rgba(37, 99, 235, 0.3);
-            }
-
-            @media (max-width: 960px) {
-                .app-header {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .main-nav {
-                    flex-wrap: wrap;
-                    justify-content: center;
-                }
-            }
+            /* Header styles are in /header.css */
 
             .login-wrapper {
                 flex: 1;
@@ -187,26 +117,28 @@
                 color: #4ade80;
             }
         </style>
+        <link rel="stylesheet" href="/header.css" />
     </head>
     <body>
-        <div class="app-shell">
-            <header class="app-header">
-                <div class="brand">
-                    <div class="brand-logo">🐱</div>
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo">🐱</div>
+                <div>
                     <div class="brand-title">Chunky's NFLAD Viewer</div>
                 </div>
-
-                <nav class="main-nav">
-                    <a href="/">Wallet</a>
-                    <a href="/profiles.html">Profiles</a>
-                    <a href="/top-holders.html">Top holders</a>
-                    <a href="/explorer.html">Browse</a>
-                    <a href="/insights.html">Insights</a>
-                    <a href="/faq.html">FAQ</a>
-                    <a href="/contact.html">Contact</a>
-                    <a href="/login.html" class="active" id="nav-account-link">Login</a>
-                </nav>
-            </header>
+            </div>
+            <nav class="main-nav">
+                <a href="/" id="nav-wallet">Wallet</a>
+                <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+                <a href="/explorer.html" id="nav-explorer">Browse</a>
+                <a href="/insights.html" id="nav-insights">Insights</a>
+                <a href="/faq.html" id="nav-faq">FAQ</a>
+                <a href="/contact.html" id="nav-contact">Contact</a>
+                <a href="/login.html" id="nav-account-link" class="active">Login</a>
+            </nav>
+        </header>
+        <script src="/header.js"></script>
+        <div class="app-shell">
 
             <div class="login-wrapper">
                 <section class="login-card">

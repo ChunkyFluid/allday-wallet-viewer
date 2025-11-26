@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>FAQ – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/header.css" />
     <style>
       :root {
         --bg-main: #050816;
@@ -52,80 +53,7 @@
         min-height: 100vh;
       }
 
-      .app-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-
-      .brand-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-      }
-
-      .brand-logo img {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-      }
-
-      .brand-title {
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
-      }
-
-      .wallet-form {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex: 0 0 420px;
-      }
-
-      #wallet-input {
-        flex: 1;
-        border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.5rem 0.9rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        font-size: 0.9rem;
-      }
-
-      #wallet-input::placeholder {
-        color: var(--text-muted);
-      }
-
-      .btn-primary {
-        border-radius: 999px;
-        border: none;
-        padding: 0.5rem 1.1rem;
-        background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-        color: white;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .btn-primary:hover {
-        filter: brightness(1.05);
-      }
+      /* Header styles are in /header.css */
 
       .wallet-summary-card {
         margin: 1.25rem auto;
@@ -460,6 +388,7 @@
     </style>
   </head>
   <body>
+    <link rel="stylesheet" href="/header.css" />
     <header class="app-header">
       <div class="brand">
         <div class="brand-logo">🐱</div>
@@ -467,22 +396,17 @@
           <div class="brand-title">Chunky's NFLAD Viewer</div>
         </div>
       </div>
-<nav class="main-nav">
-  <a href="/">Wallet</a>
-  <a href="/profiles.html">Profiles</a>
-  <a href="/top-holders.html">Top holders</a>
-  <a href="/explorer.html">Browse</a>
-  <a href="/insights.html">Insights</a>
-  <a href="/faq.html">FAQ</a>
-  <a href="/contact.html">Contact</a>
-  <a href="/login.html" id="nav-account-link">Login</a>
-</nav>
-
-      <form id="wallet-form" class="wallet-form">
-        <input id="wallet-input" type="text" placeholder="0x… wallet address" autocomplete="off" />
-        <button type="submit" class="btn-primary">View Wallet</button>
-      </form>
+      <nav class="main-nav">
+        <a href="/" id="nav-wallet">Wallet</a>
+        <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
+        <a href="/explorer.html" id="nav-explorer">Browse</a>
+        <a href="/insights.html" id="nav-insights">Insights</a>
+        <a href="/faq.html" id="nav-faq" class="active">FAQ</a>
+        <a href="/contact.html" id="nav-contact">Contact</a>
+        <a href="/login.html" id="nav-account-link">Login</a>
+      </nav>
     </header>
+    <script src="/header.js"></script>
 
     <main class="app-main">
       <section class="wallet-summary-card">

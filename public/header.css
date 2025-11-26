@@ -1,0 +1,134 @@
+/* Shared header styles - used across all pages */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: radial-gradient(circle at top left, #141a2e 0, #050815 55%);
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.brand-title {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.main-nav {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+.main-nav a {
+  color: var(--text-muted, #9ca3af);
+  text-decoration: none;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.main-nav a:hover {
+  color: var(--text-main, #f9fafb);
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.main-nav a.active {
+  color: #fff;
+  border-color: var(--accent-blue, #007bff);
+  background: rgba(37, 99, 235, 0.3);
+}
+
+.wallet-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
+  flex: 0 0 420px;
+}
+
+#wallet-input {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.5rem 0.9rem;
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text-main, #f9fafb);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+#wallet-input::placeholder {
+  color: var(--text-muted, #9ca3af);
+}
+
+.btn-primary {
+  border-radius: 999px;
+  border: none;
+  padding: 0.5rem 1.1rem;
+  background: linear-gradient(135deg, var(--accent-purple, #6f42c1), var(--accent-blue, #007bff));
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+@media (max-width: 1100px) {
+  .app-header {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  .brand {
+    margin-bottom: 0;
+  }
+  .main-nav {
+    order: 2;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .wallet-form {
+    order: 3;
+    width: 100%;
+    max-width: 480px;
+    justify-content: center;
+    flex: unset;
+  }
+}
+
