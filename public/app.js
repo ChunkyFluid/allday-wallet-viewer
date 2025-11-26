@@ -296,37 +296,37 @@ function updateSortHeaderClasses() {
 }
 
 async function fetchWalletSummary(wallet) {
-  const els = getEls();
-  if (!els.summaryCard) return;
+    const els = getEls();
+    if (!els.summaryCard) return;
 
-  els.summaryCard.style.display = "none";
-  els.summaryCard.innerHTML = "";
+    els.summaryCard.style.display = "none";
+    els.summaryCard.innerHTML = "";
 
-  try {
-    const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`);
-    const data = await res.json();
-    if (!data.ok) return;
+    try {
+        const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`);
+        const data = await res.json();
+        if (!data.ok) return;
 
-    const stats = data.stats || {};
-    const byTier = stats.byTier || {};
+        const stats = data.stats || {};
+        const byTier = stats.byTier || {};
 
-    const addressLabel = data.displayName ? `${data.displayName} · ${data.wallet}` : data.wallet;
+        const addressLabel = data.displayName ? `${data.displayName} · ${data.wallet}` : data.wallet;
 
-    // Format dollar values nicely
-    const floorVal = Number(stats.floorValue || 0);
-    const aspVal = Number(stats.aspValue || 0);
+        // Format dollar values nicely
+        const floorVal = Number(stats.floorValue || 0);
+        const aspVal = Number(stats.aspValue || 0);
 
-    const floorText = floorVal.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+        const floorText = floorVal.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
 
-    const aspText = aspVal.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+        const aspText = aspVal.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
 
-    els.summaryCard.innerHTML = `
+        els.summaryCard.innerHTML = `
       <div class="wallet-summary-main">
         <div class="wallet-summary-label">Wallet overview</div>
         <div class="wallet-summary-address">${addressLabel}</div>
@@ -346,12 +346,11 @@ async function fetchWalletSummary(wallet) {
         <span class="chip-pill-tier chip-ultimate">Ultimate: ${byTier.Ultimate ?? 0}</span>
       </div>
     `;
-    els.summaryCard.style.display = "flex";
-  } catch (err) {
-    console.error("fetchWalletSummary error", err);
-  }
+        els.summaryCard.style.display = "flex";
+    } catch (err) {
+        console.error("fetchWalletSummary error", err);
+    }
 }
-
 
 async function fetchWalletMoments(wallet) {
     const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
@@ -366,26 +365,42 @@ async function attachPricesToMoments(moments) {
     const editionIds = [...new Set(moments.map((r) => r.edition_id).filter(Boolean))];
     if (!editionIds.length) return;
 
+    // For very large wallets, a single /api/prices?editions=... URL can
+    // exceed browser/server limits. Chunk the requests and merge results.
+    const chunkSize = 200;
+
+    const lowAskMap = {};
+    const aspMap = {};
+    const topSaleMap = {};
+
     try {
-        const res = await fetch(`/api/prices?editions=${encodeURIComponent(editionIds.join(","))}`);
-        const data = await res.json();
+        for (let i = 0; i < editionIds.length; i += chunkSize) {
+            const chunk = editionIds.slice(i, i + chunkSize);
+            const qs = encodeURIComponent(chunk.join(","));
+            const res = await fetch(`/api/prices?editions=${qs}`);
+            const data = await res.json();
 
-        if (data && data.ok !== false) {
-            const lowAskMap = data.lowAsk || {};
-            const aspMap = data.asp || {};
-            const topSaleMap = data.topSale || {};
+            if (data && data.ok !== false) {
+                const low = data.lowAsk || {};
+                const asp = data.asp || {};
+                const top = data.topSale || {};
 
-            for (const r of moments) {
-                const id = r.edition_id;
-                if (!id) continue;
-                const low = lowAskMap[id];
-                const avg = aspMap[id];
-                const top = topSaleMap[id];
-
-                r.low_ask_usd = low != null ? Number(low) : null;
-                r.avg_sale_usd = avg != null ? Number(avg) : null;
-                r.top_sale_usd = top != null ? Number(top) : null;
+                Object.assign(lowAskMap, low);
+                Object.assign(aspMap, asp);
+                Object.assign(topSaleMap, top);
             }
+        }
+
+        for (const r of moments) {
+            const id = r.edition_id;
+            if (!id) continue;
+            const low = lowAskMap[id];
+            const avg = aspMap[id];
+            const top = topSaleMap[id];
+
+            r.low_ask_usd = low != null ? Number(low) : null;
+            r.avg_sale_usd = avg != null ? Number(avg) : null;
+            r.top_sale_usd = top != null ? Number(top) : null;
         }
     } catch (err) {
         console.error("attachPricesToMoments error", err);

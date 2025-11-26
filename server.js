@@ -234,44 +234,6 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
-// GET /api/me  -> current logged-in user
-app.get("/api/me", async (req, res) => {
-  try {
-    const sessUser = req.session?.user;
-    if (!sessUser || !sessUser.id) {
-      return res.json({ ok: false, user: null });
-    }
-
-    const { rows } = await pool.query(
-      `
-      SELECT id, email, default_wallet_address
-      FROM public.users
-      WHERE id = $1
-      LIMIT 1;
-      `,
-      [sessUser.id]
-    );
-
-    if (!rows.length) {
-      return res.json({ ok: false, user: null });
-    }
-
-    const u = rows[0];
-
-    return res.json({
-      ok: true,
-      user: {
-        id: u.id,
-        email: u.email,
-        default_wallet_address: u.default_wallet_address || null
-      }
-    });
-  } catch (err) {
-    console.error("GET /api/me error:", err);
-    return res.status(500).json({ ok: false, error: "Server error" });
-  }
-});
-
 // POST /api/me/wallet  { wallet_address }
 app.post("/api/me/wallet", async (req, res) => {
   try {
@@ -709,12 +671,12 @@ app.get("/api/wallet-summary", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
 
-    // Basic format check
+    // Basic Flow/Dapper-style address check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // 1) Get profile (Dapper display name) if we have it
+    // 1) Display name (from wallet_profiles)
     const profileResult = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -724,36 +686,59 @@ app.get("/api/wallet-summary", async (req, res) => {
       `,
       [wallet]
     );
-
     const profileRow = profileResult.rows[0] || null;
 
-    // 2) Get counts, tier breakdown, and value from Neon
+    // 2) Stats + value based on edition_price_scrape (same source used by /api/prices)
     //
-    // - wallet_holdings = which nft_ids the wallet owns (and locked/unlocked)
-    // - nft_core_metadata = maps nft_id -> edition_id + tier + series/set/etc
-    // - edition_price_stats = one row per edition_id with low_ask / asp_90d / top_sale
-    //
-    // We sum low_ask and asp_90d per *copy*, so owning 3 of the same edition multiplies its floor.
+    // - We JOIN wallet_holdings -> nft_core_metadata on nft_id
+    // - LEFT JOIN edition_price_scrape on edition_id
+    // - Each row in wallet_holdings is ONE copy, so summing lowest_ask_usd/avg_sale_usd
+    //   across rows naturally multiplies by number of copies.
     const statsResult = await pgQuery(
       `
       SELECT
         h.wallet_address,
+
         COUNT(*)::int AS moments_total,
         COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
         COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
-        -- floor value: sum of low_ask across all copies
-        SUM(COALESCE(eps.low_ask, 0))::numeric AS floor_value,
-        -- ASP value: sum of asp_90d across all copies
-        SUM(COALESCE(eps.asp_90d, 0))::numeric AS asp_value
+
+        -- floor_value = sum of lowest_ask_usd per *copy* (unknown prices treated as 0)
+        COALESCE(
+          SUM(
+            CASE
+              WHEN eps.lowest_ask_usd IS NOT NULL THEN eps.lowest_ask_usd
+              ELSE 0
+            END
+          ),
+          0
+        )::numeric AS floor_value,
+
+        -- asp_value = sum of avg_sale_usd per *copy*
+        COALESCE(
+          SUM(
+            CASE
+              WHEN eps.avg_sale_usd IS NOT NULL THEN eps.avg_sale_usd
+              ELSE 0
+            END
+          ),
+          0
+        )::numeric AS asp_value,
+
+        -- how many of your moments have a price row at all
+        COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int
+          AS priced_moments
+
       FROM wallet_holdings h
       JOIN nft_core_metadata m
         ON m.nft_id = h.nft_id
-      LEFT JOIN edition_price_stats eps
+      LEFT JOIN public.edition_price_scrape eps
         ON eps.edition_id = m.edition_id
       WHERE h.wallet_address = $1
       GROUP BY h.wallet_address;
@@ -775,9 +760,9 @@ app.get("/api/wallet-summary", async (req, res) => {
             Legendary: statsRow.legendary_count,
             Ultimate: statsRow.ultimate_count
           },
-          // Turn Postgres numerics into JS numbers
-          floorValue: Number(statsRow.floor_value || 0),
-          aspValue: Number(statsRow.asp_value || 0)
+          floorValue: Number(statsRow.floor_value) || 0,
+          aspValue: Number(statsRow.asp_value) || 0,
+          pricedMoments: Number(statsRow.priced_moments) || 0
         }
       : {
           momentsTotal: 0,
@@ -791,7 +776,8 @@ app.get("/api/wallet-summary", async (req, res) => {
             Ultimate: 0
           },
           floorValue: 0,
-          aspValue: 0
+          aspValue: 0,
+          pricedMoments: 0
         };
 
     return res.json({
@@ -805,7 +791,6 @@ app.get("/api/wallet-summary", async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message || String(err) });
   }
 });
-
 
 // Edition prices
 app.get("/api/prices", async (req, res) => {

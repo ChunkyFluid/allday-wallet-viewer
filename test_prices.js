@@ -1,6 +1,9 @@
 // test_prices.js
 import { pgQuery } from "./db.js";
 
+// LEGACY test for edition_price_stats. Main UI pricing uses
+// public.edition_price_scrape instead.
+
 async function run() {
     const res = await pgQuery(`
     SELECT edition_id, asp_90d, low_ask

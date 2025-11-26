@@ -1,3 +1,8 @@
+-- NOTE: Legacy schema file
+-- This DDL was from an earlier iteration of the project and is not
+-- used by the current app. The live schema is created/managed by
+-- init_db.js and the various ETL scripts instead.
+
 CREATE TABLE IF NOT EXISTS editions (
     edition_id          TEXT PRIMARY KEY,
     set_id              TEXT,

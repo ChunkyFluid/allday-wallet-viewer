@@ -1,4 +1,6 @@
-// etl_edition_prices.js - compute ASP per edition via Snowflake, store in Postgres
+// etl_edition_prices.js - LEGACY analytics script.
+// Computes ASP per edition via Snowflake into edition_price_stats.
+// The main app uses public.edition_price_scrape instead.
 
 import * as dotenv from "dotenv";
 import snowflake from "snowflake-sdk";

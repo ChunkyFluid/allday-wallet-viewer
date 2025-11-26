@@ -56,7 +56,7 @@ goto :eof
 :QUICK
 call :RUNSTEP "Sync wallet holdings from Snowflake" "node scripts\sync_wallet_holdings_from_snowflake.js"
 call :RUNSTEP "Sync wallet profiles from Dapper" "node scripts\sync_wallet_profiles_from_dapper.js"
-call :RUNSTEP "Sync prices from marketplace scrape (may be slow, optional)" "node scripts\sync_prices_from_scrape.js"
+call :RUNSTEP "Load edition prices CSV into edition_price_scrape" "node scripts\load_edition_prices_from_csv.js"
 call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 goto END
 
@@ -65,8 +65,7 @@ goto END
 call :RUNSTEP "Sync NFT core metadata from Snowflake (BIG / SLOW)" "node scripts\sync_nft_core_metadata_from_snowflake.js"
 call :RUNSTEP "Sync wallet holdings from Snowflake" "node scripts\sync_wallet_holdings_from_snowflake.js"
 call :RUNSTEP "Sync wallet profiles from Dapper" "node scripts\sync_wallet_profiles_from_dapper.js"
-call :RUNSTEP "Load edition price stats from OTM CSV" "node scripts\load_edition_price_stats_from_otm.js"
-call :RUNSTEP "Sync prices from marketplace scrape (may be slow)" "node scripts\sync_prices_from_scrape.js"
+call :RUNSTEP "Load edition prices CSV into edition_price_scrape" "node scripts\load_edition_prices_from_csv.js"
 call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 
 :: If/when you add more snapshot ETLs, just uncomment these:

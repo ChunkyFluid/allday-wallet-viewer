@@ -1,4 +1,7 @@
 // scripts/sync_prices_from_scrape.js
+// LEGACY: kept for analytics/experimentation. The main app now reads
+// prices from public.edition_price_scrape (see load_edition_prices_from_csv.js
+// and /api/prices). This script writes to edition_price_stats only.
 // Scrape Lowest Ask and Avg Sale from nflallday.com listing pages
 // and upsert into Neon edition_price_stats, with verbose logging.
 

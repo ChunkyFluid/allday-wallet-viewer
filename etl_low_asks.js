@@ -1,4 +1,5 @@
-// etl_low_asks.js - scrape low asks into edition_price_stats
+// etl_low_asks.js - LEGACY helper to scrape low asks into edition_price_stats.
+// Main app pricing is driven by public.edition_price_scrape instead.
 
 import * as dotenv from "dotenv";
 import fetch from "node-fetch";

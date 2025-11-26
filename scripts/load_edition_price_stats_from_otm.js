@@ -1,4 +1,7 @@
 // scripts/load_edition_price_stats_from_otm.js
+// LEGACY: kept for analytics/experimentation. The main app now uses
+// public.edition_price_scrape (via load_edition_prices_from_csv.js)
+// for UI pricing, not edition_price_stats.
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

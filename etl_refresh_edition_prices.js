@@ -1,6 +1,8 @@
 // etl_refresh_edition_prices.js
-// Scrape Lowest Ask / Avg Sale / Top Sale for every edition_id in nft_core_metadata
-// and upsert into edition_price_stats in Neon.
+// LEGACY: earlier pipeline that scraped Lowest Ask / Avg Sale / Top Sale
+// into edition_price_stats. The main app now reads prices from
+// public.edition_price_scrape (see scripts/load_edition_prices_from_csv.js
+// and /api/prices). Kept for reference only.
 
 import * as dotenv from "dotenv";
 import { Pool } from "pg";
