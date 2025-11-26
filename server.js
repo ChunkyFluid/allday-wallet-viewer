@@ -746,6 +746,27 @@ app.get("/api/wallet-summary", async (req, res) => {
       [wallet]
     );
 
+    // 3) Holdings + price freshness metadata
+    const holdingsMetaResult = await pgQuery(
+      `
+      SELECT
+        MAX(last_event_ts)  AS last_event_ts,
+        MAX(last_synced_at) AS last_synced_at
+      FROM wallet_holdings
+      WHERE wallet_address = $1;
+      `,
+      [wallet]
+    );
+    const holdingsMetaRow = holdingsMetaResult.rows[0] || null;
+
+    const pricesMetaResult = await pgQuery(
+      `
+      SELECT MAX(scraped_at) AS last_scraped_at
+      FROM public.edition_price_scrape;
+      `
+    );
+    const pricesMetaRow = pricesMetaResult.rows[0] || null;
+
     const statsRow = statsResult.rows[0] || null;
 
     const stats = statsRow
@@ -784,7 +805,10 @@ app.get("/api/wallet-summary", async (req, res) => {
       ok: true,
       wallet,
       displayName: profileRow ? profileRow.display_name : null,
-      stats
+      stats,
+      holdingsLastEventTs: holdingsMetaRow ? holdingsMetaRow.last_event_ts : null,
+      holdingsLastSyncedAt: holdingsMetaRow ? holdingsMetaRow.last_synced_at : null,
+      pricesLastScrapedAt: pricesMetaRow ? pricesMetaRow.last_scraped_at : null
     });
   } catch (err) {
     console.error("Error in /api/wallet-summary:", err);
@@ -1166,6 +1190,30 @@ app.post("/api/login-dapper", async (req, res) => {
   } catch (err) {
     console.error("POST /api/login-dapper error:", err);
     return res.status(500).json({ ok: false, error: "Failed to log in with Dapper" });
+  }
+});
+
+// Simple health check
+app.get("/api/health", async (req, res) => {
+  try {
+    const pgRes = await pgQuery("SELECT NOW() AS now");
+
+    return res.json({
+      ok: true,
+      postgres: {
+        ok: true,
+        now: pgRes.rows[0].now,
+      },
+      snowflake: {
+        connected: snowflakeConnected,
+      },
+    });
+  } catch (err) {
+    console.error("Error in /api/health:", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err),
+    });
   }
 });
 

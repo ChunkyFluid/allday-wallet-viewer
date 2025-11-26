@@ -5,7 +5,8 @@ import { pgQuery } from "../db.js";
 
 dotenv.config();
 
-const BATCH_SIZE = 200000;
+// Large enough for throughput, small enough for memory / query time.
+const BATCH_SIZE = 100000;
 
 function createSnowflakeConnection() {
     const connection = snowflake.createConnection({
@@ -85,13 +86,21 @@ async function syncMetadata() {
     const connection = await createSnowflakeConnection();
     await ensureMetadataTable();
 
-    console.log("Truncating Neon nft_core_metadata...");
+    console.log("Truncating Neon nft_core_metadata (full snapshot sync)...");
     await pgQuery(`TRUNCATE TABLE nft_core_metadata;`);
 
-    let offset = 0;
+    // Keyset pagination over nft_id instead of OFFSET/LIMIT for better scaling.
+    let lastNftId = null;
     let total = 0;
 
     while (true) {
+        let whereClause = "";
+        if (lastNftId) {
+            const nftLit = `'${escapeLiteral(lastNftId)}'`;
+            whereClause = `
+      WHERE m.nft_id > ${nftLit}`;
+        }
+
         const sql = `
       SELECT
         m.nft_id                             AS nft_id,
@@ -113,12 +122,14 @@ async function syncMetadata() {
       JOIN ${db}.${schema}.ALLDAY_WALLET_HOLDINGS_CURRENT h
         ON m.nft_id = h.nft_id
       QUALIFY ROW_NUMBER() OVER (PARTITION BY m.nft_id ORDER BY m.nft_id) = 1
+      ${whereClause}
       ORDER BY m.nft_id
-      LIMIT ${BATCH_SIZE}
-      OFFSET ${offset};
+      LIMIT ${BATCH_SIZE};
     `;
 
-        console.log(`Fetching metadata batch from Snowflake: offset=${offset}, limit=${BATCH_SIZE}...`);
+        console.log(
+            `Fetching metadata batch from Snowflake: after_nft_id=${lastNftId || "START"}, limit=${BATCH_SIZE}...`
+        );
         const rows = await executeSnowflake(connection, sql);
 
         console.log(`Snowflake returned ${rows.length} metadata rows for this batch.`);
@@ -179,7 +190,6 @@ async function syncMetadata() {
 
         if (!valueLiterals.length) {
             console.log("No valid metadata rows in this batch after cleaning/dedupe, skipping insert.");
-            offset += rows.length;
             continue;
         }
 
@@ -223,9 +233,13 @@ async function syncMetadata() {
         await pgQuery(insertSql); // no params
 
         total += valueLiterals.length;
-        offset += rows.length;
 
-        console.log(`Upserted ${total} nft_core_metadata rows so far...`);
+        // Advance keyset cursor using the last row in this batch
+        const lastRow = rows[rows.length - 1];
+        const nftIdLast = String(lastRow.NFT_ID ?? lastRow.nft_id);
+        lastNftId = nftIdLast;
+
+        console.log(`Upserted ${total} nft_core_metadata rows so far... last_nft_id=${lastNftId}`);
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM nft_core_metadata;`);

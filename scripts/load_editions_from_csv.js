@@ -33,6 +33,8 @@ function fileExists(filePath) {
     }
 }
 
+const BATCH_SIZE = 1000;
+
 async function loadEditions() {
     const dataDir = path.join(__dirname, "..", "data");
     const filePath = path.join(dataDir, "editions.csv");
@@ -61,6 +63,7 @@ async function loadEditions() {
 
     let count = 0;
     let failed = 0;
+    let batch = [];
 
     try {
         for await (const row of stream) {
@@ -77,9 +80,36 @@ async function loadEditions() {
                 continue;
             }
 
-            try {
-                await pool.query(
-                    `
+            batch.push({
+                edition_id,
+                set_id,
+                set_name,
+                series_id,
+                series_name,
+                tier,
+                max_mint_size
+            });
+
+            if (batch.length >= BATCH_SIZE) {
+                try {
+                    const values = [];
+                    const params = [];
+                    let idx = 1;
+
+                    for (const b of batch) {
+                        values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+                        params.push(
+                            b.edition_id,
+                            b.set_id,
+                            b.set_name,
+                            b.series_id,
+                            b.series_name,
+                            b.tier,
+                            b.max_mint_size
+                        );
+                    }
+
+                    const sql = `
           INSERT INTO editions (
             edition_id,
             set_id,
@@ -89,7 +119,7 @@ async function loadEditions() {
             tier,
             max_mint_size
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7)
+          VALUES ${values.join(",")}
           ON CONFLICT (edition_id)
           DO UPDATE SET
             set_id = EXCLUDED.set_id,
@@ -98,19 +128,77 @@ async function loadEditions() {
             series_name = EXCLUDED.series_name,
             tier = EXCLUDED.tier,
             max_mint_size = EXCLUDED.max_mint_size
-          `,
-                    [edition_id, set_id, set_name, series_id, series_name, tier, max_mint_size]
-                );
-            } catch (err) {
-                failed += 1;
-                console.error(
-                    `Row failed for edition_id=${edition_id}: ${err.code || ""} ${err.message || String(err)}`
-                );
-            }
+          `;
 
-            count += 1;
-            if (count % 1000 === 0) {
-                console.log(`Upserted ${count} editions so far... (failed: ${failed})`);
+                    await pool.query(sql, params);
+                    count += batch.length;
+                } catch (err) {
+                    failed += batch.length;
+                    console.error(
+                        `Batch upsert failed for ${batch.length} editions: ${err.code || ""} ${
+                            err.message || String(err)
+                        }`
+                    );
+                }
+
+                batch = [];
+
+                if (count % 1000 === 0) {
+                    console.log(`Upserted ${count} editions so far... (failed: ${failed})`);
+                }
+            }
+        }
+
+        // Flush remaining batch
+        if (batch.length > 0) {
+            try {
+                const values = [];
+                const params = [];
+                let idx = 1;
+
+                for (const b of batch) {
+                    values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+                    params.push(
+                        b.edition_id,
+                        b.set_id,
+                        b.set_name,
+                        b.series_id,
+                        b.series_name,
+                        b.tier,
+                        b.max_mint_size
+                    );
+                }
+
+                const sql = `
+        INSERT INTO editions (
+          edition_id,
+          set_id,
+          set_name,
+          series_id,
+          series_name,
+          tier,
+          max_mint_size
+        )
+        VALUES ${values.join(",")}
+        ON CONFLICT (edition_id)
+        DO UPDATE SET
+          set_id = EXCLUDED.set_id,
+          set_name = EXCLUDED.set_name,
+          series_id = EXCLUDED.series_id,
+          series_name = EXCLUDED.series_name,
+          tier = EXCLUDED.tier,
+          max_mint_size = EXCLUDED.max_mint_size
+        `;
+
+                await pool.query(sql, params);
+                count += batch.length;
+            } catch (err) {
+                failed += batch.length;
+                console.error(
+                    `Final batch upsert failed for ${batch.length} editions: ${err.code || ""} ${
+                        err.message || String(err)
+                    }`
+                );
             }
         }
 

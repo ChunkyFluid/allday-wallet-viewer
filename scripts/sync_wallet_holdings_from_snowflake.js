@@ -6,7 +6,8 @@ import { pgQuery } from "../db.js";
 dotenv.config();
 
 // Keep batches small enough that a single INSERT isn't insane
-const BATCH_SIZE = 20000;
+// (large enough for throughput, small enough for memory / query time)
+const BATCH_SIZE = 100000;
 
 function createSnowflakeConnection() {
     const connection = snowflake.createConnection({
@@ -51,6 +52,15 @@ function escapeLiteral(str) {
     return String(str).replace(/'/g, "''");
 }
 
+function formatTimestampForSnowflake(ts) {
+    if (!ts) return null;
+    // Convert to Date if it's a string
+    const date = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(date.getTime())) return null;
+    // Format as ISO 8601 string (Snowflake accepts this format)
+    return date.toISOString().replace('T', ' ').replace('Z', '');
+}
+
 async function ensureWalletHoldingsTable() {
     console.log("Ensuring Neon wallet_holdings table exists...");
     await pgQuery(`
@@ -77,13 +87,39 @@ async function syncWalletHoldings() {
     const connection = await createSnowflakeConnection();
     await ensureWalletHoldingsTable();
 
-    console.log("Truncating Neon wallet_holdings...");
-    await pgQuery(`TRUNCATE TABLE wallet_holdings;`);
+    // Incremental sync:
+    // - We keep existing rows in wallet_holdings.
+    // - Only pull rows from Snowflake with last_event_ts newer than what we already have.
+    // This makes repeated runs much faster than a full truncate+reload.
+    const maxTsRes = await pgQuery(`
+      SELECT COALESCE(MAX(last_event_ts), '2021-01-01'::timestamptz) AS max_ts
+      FROM wallet_holdings;
+    `);
+    const maxTs = maxTsRes.rows[0]?.max_ts;
+    console.log("Current max last_event_ts in Neon wallet_holdings:", maxTs);
 
-    let offset = 0;
+    // Keyset pagination over (wallet_address, nft_id) instead of OFFSET/LIMIT.
+    // Combined with a last_event_ts filter, this scales well as the table grows.
+    let lastWallet = null;
+    let lastNftId = null;
     let total = 0;
 
     while (true) {
+        // Base filter: only rows newer than the max last_event_ts we already have.
+        // Format timestamp as ISO 8601 for Snowflake compatibility
+        const tsFormatted = maxTs ? formatTimestampForSnowflake(maxTs) : '2021-01-01 00:00:00';
+        const tsLit = tsFormatted ? `'${escapeLiteral(tsFormatted)}'::timestamp_ntz` : `'2021-01-01 00:00:00'::timestamp_ntz`;
+
+        let whereClause = `
+        WHERE last_event_ts > ${tsLit}`;
+
+        if (lastWallet && lastNftId) {
+            const lastWalletLit = `'${escapeLiteral(lastWallet)}'`;
+            const lastNftLit = `'${escapeLiteral(lastNftId)}'`;
+            whereClause += `
+          AND (wallet_address, nft_id) > (${lastWalletLit}, ${lastNftLit})`;
+        }
+
         const sql = `
       SELECT
         wallet_address,
@@ -91,12 +127,15 @@ async function syncWalletHoldings() {
         is_locked,
         last_event_ts
       FROM ${db}.${schema}.ALLDAY_WALLET_HOLDINGS_CURRENT
+      ${whereClause}
       ORDER BY wallet_address, nft_id
-      LIMIT ${BATCH_SIZE}
-      OFFSET ${offset};
+      LIMIT ${BATCH_SIZE};
     `;
 
-        console.log(`Fetching holdings batch from Snowflake: offset=${offset}, limit=${BATCH_SIZE}...`);
+        console.log(
+            `Fetching holdings batch from Snowflake: last_event_ts > ${maxTs || "2021-01-01"}, ` +
+                `after=(${lastWallet || "START"}, ${lastNftId || "START"}), limit=${BATCH_SIZE}...`
+        );
         const rows = await executeSnowflake(connection, sql);
 
         console.log(`Snowflake returned ${rows.length} rows for this batch.`);
@@ -140,7 +179,6 @@ async function syncWalletHoldings() {
 
         if (!valueLiterals.length) {
             console.log("No valid rows in this batch after cleaning/dedupe, skipping insert.");
-            offset += rows.length;
             continue;
         }
 
@@ -162,9 +200,16 @@ async function syncWalletHoldings() {
         await pgQuery(insertSql); // no params
 
         total += valueLiterals.length;
-        offset += rows.length;
 
-        console.log(`Upserted ${total} wallet_holdings rows so far...`);
+        // Advance keyset cursor using the last row in this batch
+        const lastRow = rows[rows.length - 1];
+        const waRawLast = lastRow.WALLET_ADDRESS ?? lastRow.wallet_address;
+        lastWallet = (waRawLast || "").toLowerCase();
+        lastNftId = String(lastRow.NFT_ID ?? lastRow.nft_id);
+
+        console.log(
+            `Upserted ${total} wallet_holdings rows so far... last=(${lastWallet}, ${lastNftId})`
+        );
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM wallet_holdings;`);

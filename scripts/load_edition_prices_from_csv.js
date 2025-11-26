@@ -47,19 +47,11 @@ async function main() {
             crlfDelay: Infinity
         });
 
-        const sql = `
-      INSERT INTO public.edition_price_scrape
-        (edition_id, lowest_ask_usd, avg_sale_usd, top_sale_usd, scraped_at)
-      VALUES ($1, $2, $3, $4, now())
-      ON CONFLICT (edition_id) DO UPDATE
-      SET lowest_ask_usd = EXCLUDED.lowest_ask_usd,
-          avg_sale_usd   = EXCLUDED.avg_sale_usd,
-          top_sale_usd   = EXCLUDED.top_sale_usd,
-          scraped_at     = now();
-    `;
+        const BATCH_SIZE = 1000;
 
         let lineNo = 0;
         let inserted = 0;
+        let batch = [];
 
         for await (const line of rl) {
             lineNo++;
@@ -70,21 +62,70 @@ async function main() {
             const trimmed = line.trim();
             if (!trimmed) continue;
 
-            // CSV is simple: no commas in numbers, so split is safe
             const [edition_id, lowest_ask, avg_sale, top_sale] = trimmed.split(",");
-
             if (!edition_id) continue;
 
             const lowest = lowest_ask ? Number(lowest_ask) : null;
             const avg = avg_sale ? Number(avg_sale) : null;
             const top = top_sale ? Number(top_sale) : null;
 
-            await client.query(sql, [edition_id, lowest, avg, top]);
-            inserted++;
+            batch.push({ edition_id, lowest, avg, top });
 
-            if (inserted % 200 === 0) {
-                console.log(`Upserted ${inserted} rows so far...`);
+            if (batch.length >= BATCH_SIZE) {
+                const values = [];
+                const params = [];
+                let idx = 1;
+
+                for (const b of batch) {
+                    values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+                    params.push(b.edition_id, b.lowest, b.avg, b.top);
+                }
+
+                const sql = `
+        INSERT INTO public.edition_price_scrape
+          (edition_id, lowest_ask_usd, avg_sale_usd, top_sale_usd)
+        VALUES ${values.join(",")}
+        ON CONFLICT (edition_id) DO UPDATE
+        SET lowest_ask_usd = EXCLUDED.lowest_ask_usd,
+            avg_sale_usd   = EXCLUDED.avg_sale_usd,
+            top_sale_usd   = EXCLUDED.top_sale_usd,
+            scraped_at     = now();
+      `;
+
+                await client.query(sql, params);
+                inserted += batch.length;
+                batch = [];
+
+                if (inserted % 200 === 0) {
+                    console.log(`Upserted ${inserted} rows so far...`);
+                }
             }
+        }
+
+        // Flush remaining batch
+        if (batch.length > 0) {
+            const values = [];
+            const params = [];
+            let idx = 1;
+
+            for (const b of batch) {
+                values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+                params.push(b.edition_id, b.lowest, b.avg, b.top);
+            }
+
+            const sql = `
+      INSERT INTO public.edition_price_scrape
+        (edition_id, lowest_ask_usd, avg_sale_usd, top_sale_usd)
+      VALUES ${values.join(",")}
+      ON CONFLICT (edition_id) DO UPDATE
+      SET lowest_ask_usd = EXCLUDED.lowest_ask_usd,
+          avg_sale_usd   = EXCLUDED.avg_sale_usd,
+          top_sale_usd   = EXCLUDED.top_sale_usd,
+          scraped_at     = now();
+    `;
+
+            await client.query(sql, params);
+            inserted += batch.length;
         }
 
         console.log(`Done. Total rows upserted: ${inserted}`);

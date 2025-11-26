@@ -312,6 +312,9 @@ async function fetchWalletSummary(wallet) {
 
         const addressLabel = data.displayName ? `${data.displayName} · ${data.wallet}` : data.wallet;
 
+        const holdingsLastSyncedAt = data.holdingsLastSyncedAt || data.holdingsLastEventTs || null;
+        const pricesLastScrapedAt = data.pricesLastScrapedAt || null;
+
         // Format dollar values nicely
         const floorVal = Number(stats.floorValue || 0);
         const aspVal = Number(stats.aspValue || 0);
@@ -326,6 +329,9 @@ async function fetchWalletSummary(wallet) {
             maximumFractionDigits: 2
         });
 
+        const holdingsSyncText = holdingsLastSyncedAt ? formatDate(holdingsLastSyncedAt) : "Unknown";
+        const pricesSyncText = pricesLastScrapedAt ? formatDate(pricesLastScrapedAt) : "Unknown";
+
         els.summaryCard.innerHTML = `
       <div class="wallet-summary-main">
         <div class="wallet-summary-label">Wallet overview</div>
@@ -334,8 +340,12 @@ async function fetchWalletSummary(wallet) {
           <span class="chip">Total: ${stats.momentsTotal ?? 0}</span>
           <span class="chip">Unlocked: ${stats.unlockedCount ?? 0}</span>
           <span class="chip">Locked: ${stats.lockedCount ?? 0}</span>
-          <span class="chip">Floor value: $${floorText}</span>
-          <span class="chip">ASP value: $${aspText}</span>
+          <span class="chip" title="Sum of per-edition lowest asks from edition_price_scrape across all copies in this wallet.">Floor value: $${floorText}</span>
+          <span class="chip" title="Sum of per-edition average sale prices (ASP) from edition_price_scrape across all copies.">ASP value: $${aspText}</span>
+        </div>
+        <div class="wallet-summary-chips">
+          <span class="chip">Holdings last sync: ${holdingsSyncText}</span>
+          <span class="chip">Prices last scrape: ${pricesSyncText}</span>
         </div>
       </div>
       <div class="wallet-summary-chips">
