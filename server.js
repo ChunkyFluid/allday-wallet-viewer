@@ -276,10 +276,11 @@ app.post("/api/me/wallet", async (req, res) => {
 
     const u = rows[0];
 
-    // Optionally update session (purely cosmetic)
+    // Update session with fresh data
     req.session.user = {
       id: u.id,
-      email: u.email
+      email: u.email,
+      default_wallet_address: u.default_wallet_address
     };
 
     return res.json({
@@ -1597,15 +1598,40 @@ app.get("/api/query-paged", async (req, res) => {
 });
 
 // GET /api/me – return current session user (used by nav + wallet auto-load)
-app.get("/api/me", (req, res) => {
+app.get("/api/me", async (req, res) => {
   if (!req.session || !req.session.user) {
     return res.json({ ok: false, user: null });
   }
 
-  return res.json({
-    ok: true,
-    user: req.session.user
-  });
+  try {
+    // Fetch fresh default_wallet_address from database
+    const { rows } = await pool.query(
+      `SELECT id, email, default_wallet_address FROM public.users WHERE id = $1`,
+      [req.session.user.id]
+    );
+
+    if (rows.length) {
+      const user = rows[0];
+      // Update session with fresh data
+      req.session.user = {
+        id: user.id,
+        email: user.email,
+        default_wallet_address: user.default_wallet_address
+      };
+    }
+
+    return res.json({
+      ok: true,
+      user: req.session.user
+    });
+  } catch (err) {
+    console.error("GET /api/me error:", err);
+    // Fallback to session data if DB query fails
+    return res.json({
+      ok: true,
+      user: req.session.user
+    });
+  }
 });
 
 // POST /api/login-dapper  { wallet_address }

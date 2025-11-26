@@ -392,6 +392,31 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
         const holdingsSyncText = holdingsLastSyncedAt ? formatDate(holdingsLastSyncedAt) : "Unknown";
         const pricesSyncText = pricesLastScrapedAt ? formatDate(pricesLastScrapedAt) : "Unknown";
 
+        // Check if user is logged in and if this is their default wallet
+        let setDefaultButtonHtml = "";
+        try {
+            const meRes = await fetch("/api/me", { credentials: "include" });
+            const meData = await meRes.json();
+            if (meData.ok && meData.user) {
+                const isDefault = meData.user.default_wallet_address && 
+                    meData.user.default_wallet_address.toLowerCase() === wallet.toLowerCase();
+                setDefaultButtonHtml = `
+                    <div style="margin-top: 0.75rem;">
+                        <button id="btn-set-default-wallet" 
+                                type="button"
+                                class="btn-secondary" 
+                                style="font-size: 0.8rem; padding: 0.4rem 0.8rem; ${isDefault ? 'opacity: 0.6; cursor: not-allowed;' : ''}; cursor: pointer;"
+                                ${isDefault ? 'disabled' : ''}
+                                title="${isDefault ? 'This is already your default wallet' : 'Set this wallet as your default (auto-loads when you visit the page)'}">
+                            ${isDefault ? '✓ Default wallet' : 'Set as default wallet'}
+                        </button>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            console.error("Failed to check login status:", err);
+        }
+
         els.summaryCard.innerHTML = `
       <div class="wallet-summary-main">
         <div class="wallet-summary-label">Wallet overview</div>
@@ -407,6 +432,7 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
           <span class="chip">Holdings last sync: ${holdingsSyncText}</span>
           <span class="chip">Prices last scrape: ${pricesSyncText}</span>
         </div>
+        ${setDefaultButtonHtml}
       </div>
       <div class="wallet-summary-chips">
         <span class="chip-pill-tier chip-common" style="cursor: pointer;" onclick="filterByTier('Common')" title="Click to filter by Common tier">Common: ${byTier.Common ?? 0}</span>
@@ -416,6 +442,46 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
         <span class="chip-pill-tier chip-ultimate" style="cursor: pointer;" onclick="filterByTier('Ultimate')" title="Click to filter by Ultimate tier">Ultimate: ${byTier.Ultimate ?? 0}</span>
       </div>
     `;
+
+        // Wire up the "Set as default wallet" button
+        const setDefaultBtn = document.getElementById("btn-set-default-wallet");
+        if (setDefaultBtn && !setDefaultBtn.disabled) {
+            setDefaultBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                try {
+                    setDefaultBtn.disabled = true;
+                    setDefaultBtn.textContent = "Saving...";
+                    
+                    const res = await fetch("/api/me/wallet", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ wallet_address: wallet })
+                    });
+                    
+                    const data = await res.json();
+                    if (!res.ok || !data.ok) {
+                        throw new Error(data.error || "Failed to set default wallet");
+                    }
+                    
+                    setDefaultBtn.textContent = "✓ Default wallet";
+                    setDefaultBtn.disabled = true;
+                    setDefaultBtn.style.opacity = "0.6";
+                    setDefaultBtn.style.cursor = "not-allowed";
+                    setDefaultBtn.title = "This is now your default wallet";
+                    
+                    // Update header to reflect new default
+                    if (window.updateNavAccount) window.updateNavAccount();
+                } catch (err) {
+                    console.error("Failed to set default wallet:", err);
+                    alert("Failed to set default wallet: " + (err.message || "Unknown error"));
+                    setDefaultBtn.disabled = false;
+                    setDefaultBtn.textContent = "Set as default wallet";
+                }
+            });
+        }
         els.summaryCard.style.display = "flex";
     } catch (err) {
         console.error("fetchWalletSummary error", err);

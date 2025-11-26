@@ -35,18 +35,36 @@
     if (!link) return;
 
     try {
-      const res = await fetch("/api/me");
+      const res = await fetch("/api/me", { credentials: "include" });
       const data = await res.json();
 
-      if (data && data.user) {
+      if (data && data.ok && data.user) {
+        // Show wallet address for Dapper users, email for regular users
+        let displayText = data.user.email;
+        if (data.user.email && data.user.email.startsWith("dapper:")) {
+          const walletAddr = data.user.email.replace("dapper:", "");
+          // Show shortened version: 0x1234...5678
+          if (walletAddr.length > 10) {
+            displayText = walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4);
+          } else {
+            displayText = walletAddr;
+          }
+        }
+        
         link.href = "/login.html";
-        link.textContent = data.user.email;
+        link.textContent = displayText;
+        link.title = data.user.default_wallet_address 
+          ? `Logged in · Default wallet: ${data.user.default_wallet_address}`
+          : "Logged in";
       } else {
         link.href = "/login.html";
         link.textContent = "Login";
+        link.title = "";
       }
     } catch (err) {
       console.error("updateNavAccount error:", err);
+      link.href = "/login.html";
+      link.textContent = "Login";
     }
   }
 

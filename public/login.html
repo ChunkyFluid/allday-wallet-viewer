@@ -48,58 +48,91 @@
                 padding: 1.5rem 4%;
                 min-height: 100vh;
                 display: flex;
-                flex-direction: column;
-            }
-
-            /* Header styles are in /header.css */
-
-            .login-wrapper {
-                flex: 1;
-                display: flex;
                 align-items: center;
                 justify-content: center;
+            }
+
+            .login-wrapper {
+                width: 100%;
+                max-width: 420px;
             }
 
             .login-card {
                 background: var(--bg-card);
-                border-radius: 0.9rem;
                 border: 1px solid var(--border-subtle);
-                padding: 1.75rem 1.9rem;
-                max-width: 420px;
-                width: 100%;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+                border-radius: 12px;
+                padding: 2rem;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             }
 
             .login-title {
-                font-size: 1.1rem;
-                font-weight: 600;
-                margin-bottom: 0.4rem;
+                font-size: 1.5rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+                color: var(--text-main);
             }
 
             .login-subtitle {
-                font-size: 0.85rem;
+                font-size: 0.9rem;
                 color: var(--text-muted);
-                margin-bottom: 1.4rem;
+                margin-bottom: 1.5rem;
+                line-height: 1.5;
             }
 
-            .btn-dapper {
-                width: 100%;
-                border-radius: 999px;
+            .btn-primary {
+                background: linear-gradient(135deg, var(--accent-blue) 0%, #0056b3 100%);
+                color: white;
                 border: none;
-                padding: 0.7rem 1rem;
-                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+                border-radius: 8px;
+                font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
-                background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-                color: #fff;
+                transition: all 0.2s;
+                width: 100%;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+            }
+
+            .btn-primary:active {
+                transform: translateY(0);
+            }
+
+            .btn-secondary {
+                background: transparent;
+                border: 1px solid var(--border-subtle);
+                color: var(--text-main);
+                border-radius: 999px;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .btn-secondary:hover {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: var(--accent-blue);
+            }
+
+            .btn-google {
+                background: white;
+                color: #333;
+                border: 1px solid #dadce0;
+                padding: 0.75rem 1.5rem;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 0.4rem;
             }
 
-            .btn-dapper:hover {
-                filter: brightness(1.05);
+            .btn-google:hover {
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                background: #f8f9fa;
             }
 
             .status {
@@ -115,6 +148,30 @@
 
             .status.success {
                 color: #4ade80;
+            }
+
+            input[type="email"],
+            input[type="password"] {
+                width: 100%;
+                padding: 0.75rem;
+                background: var(--bg-main);
+                border: 1px solid var(--border-subtle);
+                border-radius: 6px;
+                color: var(--text-main);
+                font-size: 1rem;
+            }
+
+            input[type="email"]:focus,
+            input[type="password"]:focus {
+                outline: none;
+                border-color: var(--accent-blue);
+            }
+
+            label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-size: 0.9rem;
+                color: var(--text-muted);
             }
         </style>
         <link rel="stylesheet" href="/header.css" />
@@ -142,14 +199,115 @@
 
             <div class="login-wrapper">
                 <section class="login-card">
-                    <div class="login-title">Sign in with Dapper</div>
+                    <div class="login-title">Sign In</div>
                     <div class="login-subtitle">
-                        Use your Dapper / Flow wallet to log in. We'll remember your wallet and auto-load it as your
-                        default view.
+                        Sign in to save your default wallet and access your personalized view.
                     </div>
 
-                    <button id="btn-dapper-login" class="btn-dapper" type="button">
-                        <span>Sign in with Dapper</span>
+                    <!-- Email/Password Login Form -->
+                    <form id="login-form" style="display: none;">
+                        <div style="margin-bottom: 1rem;">
+                            <label for="email">Email</label>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                name="email" 
+                                required 
+                                placeholder="your@email.com"
+                            />
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label for="password">Password</label>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                required 
+                                placeholder="••••••••"
+                            />
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label for="login-wallet">Default Wallet Address (optional)</label>
+                            <input 
+                                type="text" 
+                                id="login-wallet" 
+                                name="wallet" 
+                                placeholder="0x..."
+                                pattern="^0x[a-fA-F0-9]{16,64}$"
+                                title="Flow wallet address starting with 0x"
+                            />
+                            <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                                Your wallet will auto-load when you visit the page
+                            </small>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-bottom: 0.75rem;">
+                            Sign In
+                        </button>
+                        <button type="button" id="btn-show-signup" class="btn-secondary" style="width: 100%; font-size: 0.9rem;">
+                            Don't have an account? Sign up
+                        </button>
+                    </form>
+
+                    <!-- Signup Form -->
+                    <form id="signup-form" style="display: none;">
+                        <div style="margin-bottom: 1rem;">
+                            <label for="signup-email">Email</label>
+                            <input 
+                                type="email" 
+                                id="signup-email" 
+                                name="email" 
+                                required 
+                                placeholder="your@email.com"
+                            />
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label for="signup-password">Password (min 8 characters)</label>
+                            <input 
+                                type="password" 
+                                id="signup-password" 
+                                name="password" 
+                                required 
+                                minlength="8"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                        <div style="margin-bottom: 1rem;">
+                            <label for="signup-wallet">Default Wallet Address (optional)</label>
+                            <input 
+                                type="text" 
+                                id="signup-wallet" 
+                                name="wallet" 
+                                placeholder="0x..."
+                                pattern="^0x[a-fA-F0-9]{16,64}$"
+                                title="Flow wallet address starting with 0x"
+                            />
+                            <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                                Your wallet will auto-load when you visit the page
+                            </small>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-bottom: 0.75rem;">
+                            Create Account
+                        </button>
+                        <button type="button" id="btn-show-login" class="btn-secondary" style="width: 100%; font-size: 0.9rem;">
+                            Already have an account? Sign in
+                        </button>
+                    </form>
+
+                    <!-- Google OAuth Button -->
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
+                        <button id="btn-google-login" class="btn-google" type="button" style="width: 100%;">
+                            <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 0.5rem;">
+                                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.96-2.184l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.35 0-4.34-1.587-5.052-3.72H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+                                <path fill="#FBBC05" d="M3.948 10.718c-.18-.54-.282-1.117-.282-1.718 0-.601.102-1.178.282-1.718V4.95H.957C.348 6.174 0 7.55 0 9c0 1.45.348 2.826.957 4.05l2.991-2.332z"/>
+                                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.95L3.948 7.282C4.66 5.147 6.65 3.58 9 3.58z"/>
+                            </svg>
+                            Sign in with Google
+                        </button>
+                    </div>
+
+                    <button id="btn-logout" class="btn-secondary" type="button" style="display: none; width: 100%; margin-top: 0.5rem; padding: 0.6rem 1rem; font-size: 0.9rem;">
+                        <span>Logout</span>
                     </button>
 
                     <div id="login-status" class="status"></div>
@@ -157,105 +315,244 @@
             </div>
         </div>
 
-        <!-- OFFICIAL FCL UMD FROM CDN -->
-        <script src="https://unpkg.com/@onflow/fcl@1.10.0/dist/fcl.umd.min.js"></script>
-
         <script>
-            // Normalise global in case the bundle uses onflowFcl instead of fcl
-            (function normalizeFclGlobal() {
-                if (!window.fcl && window.onflowFcl) {
-                    window.fcl = window.onflowFcl;
-                }
-            })();
-
             const statusEl = document.getElementById("login-status");
-            const btn = document.getElementById("btn-dapper-login");
+            const loginForm = document.getElementById("login-form");
+            const signupForm = document.getElementById("signup-form");
+            const btnShowSignup = document.getElementById("btn-show-signup");
+            const btnShowLogin = document.getElementById("btn-show-login");
+            const btnLogout = document.getElementById("btn-logout");
+            const btnGoogle = document.getElementById("btn-google-login");
 
             function setStatus(msg, type) {
+                if (!statusEl) return;
                 statusEl.textContent = msg || "";
                 statusEl.classList.remove("error", "success");
                 if (type) statusEl.classList.add(type);
             }
 
-            (function setupFcl() {
-                const fcl = window.fcl;
-                if (!fcl) {
-                    console.error("FCL script did not attach window.fcl");
-                    setStatus("Flow/FCL library failed to load. Check console.", "error");
-                    return;
-                }
-
-                // Dapper-only config (mainnet NFL All Day)
-                fcl.config()
-                    .put("accessNode.api", "https://rest-mainnet.onflow.org")
-                    .put(
-                        "discovery.wallet",
-                        // Dapper wallet-only authn endpoint (mainnet)
-                        "https://accounts.meetdapper.com/fcl/authn-restricted"
-                    )
-                    .put("flow.network", "mainnet")
-                    .put("discovery.wallet.method", "TAB/RPC")
-                    .put("app.detail.title", "Chunky's NFLAD Viewer")
-                    .put(
-                        "app.detail.icon",
-                        "https://nflallday.com/favicon.ico" // or your own icon later
-                    );
-
-                // Subscribe to currentUser so we know when login finishes
-                fcl.currentUser().subscribe(async (user) => {
-                    if (!user || !user.loggedIn) {
-                        setStatus("Not logged in.", null);
-                        return;
+            // Check if user is already logged in
+            async function checkLoginStatus() {
+                try {
+                    const res = await fetch("/api/me", { credentials: "include" });
+                    const data = await res.json();
+                    if (data.ok && data.user) {
+                        // User is logged in
+                        loginForm.style.display = "none";
+                        signupForm.style.display = "none";
+                        btnGoogle.style.display = "none";
+                        if (btnLogout) btnLogout.style.display = "block";
+                        setStatus(`Logged in as ${data.user.email}`, "success");
+                        return true;
+                    } else {
+                        // User is not logged in - show login form
+                        loginForm.style.display = "block";
+                        signupForm.style.display = "none";
+                        if (btnLogout) btnLogout.style.display = "none";
+                        return false;
                     }
+                } catch (err) {
+                    console.error("Error checking login status:", err);
+                    loginForm.style.display = "block";
+                    return false;
+                }
+            }
+
+            // Toggle between login and signup forms
+            if (btnShowSignup) {
+                btnShowSignup.addEventListener("click", () => {
+                    loginForm.style.display = "none";
+                    signupForm.style.display = "block";
+                });
+            }
+
+            if (btnShowLogin) {
+                btnShowLogin.addEventListener("click", () => {
+                    signupForm.style.display = "none";
+                    loginForm.style.display = "block";
+                });
+            }
+
+            // Login form submission
+            if (loginForm) {
+                loginForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    setStatus("Signing in...", null);
+
+                    const email = document.getElementById("email").value;
+                    const password = document.getElementById("password").value;
+                    const wallet = (document.getElementById("login-wallet").value || "").trim();
 
                     try {
-                        // FCL addr is usually without 0x prefix
-                        let addr = (user.addr || "").toLowerCase().trim();
-                        if (!addr) {
-                            setStatus("No wallet address found from Dapper.", "error");
-                            return;
-                        }
-                        if (!addr.startsWith("0x")) addr = "0x" + addr;
-
-                        setStatus("Logged in with " + addr + " – saving session…", null);
-
-                        const res = await fetch("/api/login-dapper", {
+                        const res = await fetch("/api/login", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             credentials: "include",
-                            body: JSON.stringify({ wallet_address: addr })
+                            body: JSON.stringify({ email, password })
                         });
 
                         const data = await res.json();
-                        if (!res.ok || !data.ok) {
-                            console.error("/api/login-dapper error:", data);
-                            setStatus(data.error || "Failed to create session on server.", "error");
-                            return;
+                        if (res.ok && data.ok) {
+                            // If wallet address provided, set it as default
+                            if (wallet) {
+                                try {
+                                    // Normalize wallet address
+                                    let walletAddr = wallet.toLowerCase().trim();
+                                    if (!walletAddr.startsWith("0x")) {
+                                        walletAddr = "0x" + walletAddr;
+                                    }
+                                    
+                                    // Validate format
+                                    if (!/^0x[a-f0-9]{16,64}$/.test(walletAddr)) {
+                                        setStatus("Invalid wallet address format. Login successful but wallet not set.", "error");
+                                        setTimeout(() => {
+                                            window.location.href = "/";
+                                        }, 2000);
+                                        return;
+                                    }
+                                    
+                                    const walletRes = await fetch("/api/me/wallet", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        credentials: "include",
+                                        body: JSON.stringify({ wallet_address: walletAddr })
+                                    });
+                                    
+                                    const walletData = await walletRes.json();
+                                    if (walletRes.ok && walletData.ok) {
+                                        setStatus("Login successful! Default wallet set. Redirecting...", "success");
+                                    } else {
+                                        setStatus("Login successful! Redirecting...", "success");
+                                    }
+                                } catch (walletErr) {
+                                    console.error("Failed to set default wallet:", walletErr);
+                                    setStatus("Login successful! Redirecting...", "success");
+                                }
+                            } else {
+                                setStatus("Login successful! Redirecting...", "success");
+                            }
+                            
+                            setTimeout(() => {
+                                window.location.href = "/";
+                            }, 500);
+                        } else {
+                            setStatus(data.error || "Login failed", "error");
                         }
-
-                        setStatus("Login saved. Redirecting to your wallet…", "success");
-
-                        // Send them to main wallet page with ?wallet= for immediate load
-                        const redirectUrl = "/?wallet=" + encodeURIComponent(addr);
-                        setTimeout(() => {
-                            window.location.href = redirectUrl;
-                        }, 600);
                     } catch (err) {
-                        console.error("login-dapper subscribe error:", err);
-                        setStatus("Error saving login on server.", "error");
+                        console.error("Login error:", err);
+                        setStatus("Failed to sign in. Please try again.", "error");
                     }
                 });
+            }
 
-                btn.addEventListener("click", async () => {
+            // Signup form submission
+            if (signupForm) {
+                signupForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    setStatus("Creating account...", null);
+
+                    const email = document.getElementById("signup-email").value;
+                    const password = document.getElementById("signup-password").value;
+                    const wallet = (document.getElementById("signup-wallet").value || "").trim();
+
                     try {
-                        setStatus("Opening Dapper login…", null);
-                        await fcl.authenticate();
+                        const res = await fetch("/api/signup", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ email, password })
+                        });
+
+                        const data = await res.json();
+                        if (res.ok && data.ok) {
+                            // If wallet address provided, set it as default
+                            if (wallet) {
+                                try {
+                                    // Normalize wallet address
+                                    let walletAddr = wallet.toLowerCase().trim();
+                                    if (!walletAddr.startsWith("0x")) {
+                                        walletAddr = "0x" + walletAddr;
+                                    }
+                                    
+                                    // Validate format
+                                    if (!/^0x[a-f0-9]{16,64}$/.test(walletAddr)) {
+                                        setStatus("Invalid wallet address format. Account created but wallet not set.", "error");
+                                        setTimeout(() => {
+                                            window.location.href = "/";
+                                        }, 2000);
+                                        return;
+                                    }
+                                    
+                                    const walletRes = await fetch("/api/me/wallet", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        credentials: "include",
+                                        body: JSON.stringify({ wallet_address: walletAddr })
+                                    });
+                                    
+                                    const walletData = await walletRes.json();
+                                    if (walletRes.ok && walletData.ok) {
+                                        setStatus("Account created! Default wallet set. Redirecting...", "success");
+                                    } else {
+                                        setStatus("Account created! Redirecting...", "success");
+                                    }
+                                } catch (walletErr) {
+                                    console.error("Failed to set default wallet:", walletErr);
+                                    setStatus("Account created! Redirecting...", "success");
+                                }
+                            } else {
+                                setStatus("Account created! Redirecting...", "success");
+                            }
+                            
+                            setTimeout(() => {
+                                window.location.href = "/";
+                            }, 500);
+                        } else {
+                            setStatus(data.error || "Signup failed", "error");
+                        }
                     } catch (err) {
-                        console.error("Dapper login error:", err);
-                        setStatus("Failed to start Dapper login. Check console.", "error");
+                        console.error("Signup error:", err);
+                        setStatus("Failed to create account. Please try again.", "error");
                     }
                 });
-            })();
+            }
+
+            // Google OAuth (placeholder - requires Google Cloud setup)
+            if (btnGoogle) {
+                btnGoogle.addEventListener("click", () => {
+                    setStatus("Google OAuth not yet configured. Please use email/password for now.", "error");
+                    // TODO: Implement Google OAuth
+                    // This requires setting up Google OAuth credentials in Google Cloud Console
+                });
+            }
+
+            // Logout
+            if (btnLogout) {
+                btnLogout.addEventListener("click", async () => {
+                    try {
+                        setStatus("Logging out...", null);
+                        const res = await fetch("/api/logout", {
+                            method: "POST",
+                            credentials: "include"
+                        });
+
+                        if (res.ok) {
+                            setStatus("Logged out successfully.", "success");
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
+                        } else {
+                            setStatus("Failed to logout.", "error");
+                        }
+                    } catch (err) {
+                        console.error("Logout error:", err);
+                        setStatus("Error during logout.", "error");
+                    }
+                });
+            }
+
+            // Initialize on page load
+            checkLoginStatus();
         </script>
     </body>
 </html>
