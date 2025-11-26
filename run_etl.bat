@@ -62,6 +62,7 @@ call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
+call :RUNSTEP "Refresh explorer_filters_snapshot" "node etl_explorer_filters_snapshot.js"
 goto END
 
 :: --------- Option 2: Full refresh ----------
@@ -75,6 +76,7 @@ call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
+call :RUNSTEP "Refresh explorer_filters_snapshot" "node etl_explorer_filters_snapshot.js"
 goto END
 
 :END

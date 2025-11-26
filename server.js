@@ -1420,18 +1420,44 @@ app.get("/api/teams", async (req, res) => {
       });
     }
 
-    // Use a more efficient query with LIMIT and index hint
-    const { rows } = await pool.query(
-      `
-      SELECT DISTINCT team_name
-      FROM nft_core_metadata
-      WHERE team_name IS NOT NULL AND team_name != ''
-      ORDER BY team_name ASC
-      LIMIT 100;
-      `
-    );
+    // Try to use explorer_filters_snapshot first (much faster)
+    let teams = null;
+    try {
+      const snapshotRes = await pool.query(
+        `
+        SELECT teams
+        FROM explorer_filters_snapshot
+        WHERE id = 1
+        LIMIT 1;
+        `
+      );
+      
+      if (snapshotRes.rows.length > 0 && snapshotRes.rows[0].teams) {
+        // PostgreSQL JSONB columns are automatically parsed to JavaScript arrays
+        teams = snapshotRes.rows[0].teams;
+        if (!Array.isArray(teams)) {
+          // Fallback: if somehow it's not an array, try to parse it
+          teams = typeof teams === 'string' ? JSON.parse(teams) : [];
+        }
+      }
+    } catch (snapshotErr) {
+      // If snapshot table doesn't exist or query fails, fall back to live query
+      console.log("explorer_filters_snapshot not available, falling back to live query:", snapshotErr.message);
+    }
 
-    const teams = rows.map(r => r.team_name);
+    // Fallback to live query if snapshot not available
+    if (!teams || teams.length === 0) {
+      const { rows } = await pool.query(
+        `
+        SELECT DISTINCT team_name
+        FROM nft_core_metadata
+        WHERE team_name IS NOT NULL AND team_name != ''
+        ORDER BY team_name ASC
+        LIMIT 100;
+        `
+      );
+      teams = rows.map(r => r.team_name);
+    }
     
     // Update cache
     teamsCache = teams;
