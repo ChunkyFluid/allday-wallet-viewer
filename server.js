@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { Pool } from "pg"; // (still imported; fine even if unused)
 import session from "express-session";
 import bcrypt from "bcrypt";
+import WebSocket from "ws";
 
 dotenv.config();
 
@@ -74,6 +75,257 @@ function ensureSnowflakeConnected() {
 function ensureConnected() {
   return ensureSnowflakeConnected();
 }
+
+// ------------------ Flow WebSocket Stream API for Live Events ------------------
+
+const FLOW_WS_URL = "wss://rest-mainnet.onflow.org/v1/ws";
+const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
+
+// Cache of recent live events (keep last 200)
+let liveEventsCache = [];
+const MAX_LIVE_EVENTS = 200;
+let flowWsConnection = null;
+let flowWsConnected = false;
+let flowWsReconnectTimer = null;
+let lastFlowEventTime = null;
+
+// Event types we care about
+const ALLDAY_EVENT_TYPES = [
+  `${ALLDAY_CONTRACT}.Deposit`,
+  `${ALLDAY_CONTRACT}.Withdraw`
+];
+
+function addLiveEvent(event) {
+  liveEventsCache.unshift(event);
+  if (liveEventsCache.length > MAX_LIVE_EVENTS) {
+    liveEventsCache = liveEventsCache.slice(0, MAX_LIVE_EVENTS);
+  }
+  lastFlowEventTime = new Date();
+}
+
+function connectToFlowWebSocket() {
+  if (flowWsConnection && flowWsConnection.readyState === WebSocket.OPEN) {
+    console.log("Flow WebSocket already connected");
+    return;
+  }
+
+  console.log("Connecting to Flow WebSocket Stream API...");
+  
+  try {
+    flowWsConnection = new WebSocket(FLOW_WS_URL);
+    
+    flowWsConnection.on("open", () => {
+      console.log("Flow WebSocket connected!");
+      flowWsConnected = true;
+      
+      // Subscribe to AllDay events
+      const subscribeMsg = {
+        subscription_id: `allday-events-${Date.now()}`,
+        action: "subscribe",
+        topic: "events",
+        arguments: {
+          event_types: ALLDAY_EVENT_TYPES,
+          start_block_status: "finalized"
+        }
+      };
+      console.log("Sending subscription:", JSON.stringify(subscribeMsg));
+      flowWsConnection.send(JSON.stringify(subscribeMsg));
+      console.log(`Subscribed to AllDay events: ${ALLDAY_EVENT_TYPES.join(', ')}`);
+    });
+    
+    flowWsConnection.on("message", async (data) => {
+      try {
+        const rawData = data.toString();
+        const msg = JSON.parse(rawData);
+        
+        // Log all incoming messages for debugging
+        console.log("Flow WS message received:", JSON.stringify(msg).substring(0, 500));
+        
+        // Handle subscription confirmation
+        if (msg.subscription_id && !msg.events) {
+          console.log(`Subscription confirmed: ${msg.subscription_id}`);
+          return;
+        }
+        
+        // Handle error messages
+        if (msg.error) {
+          console.error("Flow WS error:", msg.error);
+          return;
+        }
+        
+        // Handle events - they come in various formats
+        if (msg.events && Array.isArray(msg.events)) {
+          console.log(`Received ${msg.events.length} events`);
+          for (const event of msg.events) {
+            await processFlowEvent(event);
+          }
+        } else if (msg.type && msg.payload) {
+          // Single event format
+          await processFlowEvent(msg);
+        } else if (msg.event) {
+          // Another possible format
+          await processFlowEvent(msg.event);
+        }
+      } catch (err) {
+        console.error("Error processing Flow WebSocket message:", err.message, err.stack);
+      }
+    });
+    
+    flowWsConnection.on("error", (err) => {
+      console.error("Flow WebSocket error:", err.message);
+      flowWsConnected = false;
+    });
+    
+    flowWsConnection.on("close", (code, reason) => {
+      console.log(`Flow WebSocket closed: ${code} - ${reason}`);
+      flowWsConnected = false;
+      
+      // Reconnect after 5 seconds
+      if (!flowWsReconnectTimer) {
+        flowWsReconnectTimer = setTimeout(() => {
+          flowWsReconnectTimer = null;
+          connectToFlowWebSocket();
+        }, 5000);
+      }
+    });
+  } catch (err) {
+    console.error("Failed to create Flow WebSocket connection:", err.message);
+    flowWsConnected = false;
+    
+    // Retry connection after 10 seconds
+    if (!flowWsReconnectTimer) {
+      flowWsReconnectTimer = setTimeout(() => {
+        flowWsReconnectTimer = null;
+        connectToFlowWebSocket();
+      }, 10000);
+    }
+  }
+}
+
+async function processFlowEvent(event) {
+  try {
+    // Parse the event data
+    const eventType = event.type ? event.type.split(".").pop() : "Unknown";
+    let payload = {};
+    
+    // Handle different payload formats
+    if (event.payload) {
+      if (typeof event.payload === 'string') {
+        try {
+          // Try base64 decode first
+          payload = JSON.parse(Buffer.from(event.payload, 'base64').toString());
+        } catch {
+          try {
+            payload = JSON.parse(event.payload);
+          } catch {
+            payload = {};
+          }
+        }
+      } else if (typeof event.payload === 'object') {
+        payload = event.payload;
+      }
+    }
+    
+    // Extract NFT ID from payload - Flow events use Cadence value format
+    let nftId = null;
+    if (payload.value && payload.value.fields) {
+      // Cadence JSON-CDC format
+      const idField = payload.value.fields.find(f => f.name === 'id');
+      if (idField && idField.value) {
+        nftId = idField.value.value || idField.value;
+      }
+    } else {
+      nftId = payload.id || payload.nftID || payload.nft_id || null;
+    }
+    
+    // Extract addresses
+    let fromAddr = null;
+    let toAddr = null;
+    if (payload.value && payload.value.fields) {
+      const fromField = payload.value.fields.find(f => f.name === 'from');
+      const toField = payload.value.fields.find(f => f.name === 'to');
+      if (fromField && fromField.value) {
+        fromAddr = (fromField.value.value || fromField.value || '').toString().toLowerCase();
+      }
+      if (toField && toField.value) {
+        toAddr = (toField.value.value || toField.value || '').toString().toLowerCase();
+      }
+    } else {
+      fromAddr = payload.from ? payload.from.toString().toLowerCase() : null;
+      toAddr = payload.to ? payload.to.toString().toLowerCase() : null;
+    }
+    
+    const timestamp = new Date().toISOString(); // Use current time for live events
+    const blockHeight = event.block_height || event.height || 0;
+    const txId = event.transaction_id || event.tx_id || null;
+    
+    // Create the event object
+    const liveEvent = {
+      type: eventType,
+      nftId: nftId ? nftId.toString() : null,
+      from: fromAddr || null,
+      to: toAddr || null,
+      timestamp: timestamp,
+      blockHeight: blockHeight,
+      txId: txId,
+      source: 'live'
+    };
+    
+    console.log(`Live event: ${eventType} NFT=${nftId} from=${fromAddr} to=${toAddr}`);
+    
+    // Try to enrich with wallet names and moment details
+    if (liveEvent.from) {
+      try {
+        const sellerResult = await pgQuery(
+          `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+          [liveEvent.from]
+        );
+        liveEvent.sellerName = sellerResult.rows[0]?.display_name || null;
+      } catch (err) { /* ignore */ }
+    }
+    
+    if (liveEvent.to) {
+      try {
+        const buyerResult = await pgQuery(
+          `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+          [liveEvent.to]
+        );
+        liveEvent.buyerName = buyerResult.rows[0]?.display_name || null;
+      } catch (err) { /* ignore */ }
+    }
+    
+    if (liveEvent.nftId) {
+      try {
+        const momentResult = await pgQuery(
+          `SELECT first_name, last_name, team_name, position, tier, set_name, series_name
+           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+          [liveEvent.nftId]
+        );
+        const moment = momentResult.rows[0];
+        if (moment) {
+          liveEvent.moment = {
+            playerName: moment.first_name && moment.last_name 
+              ? `${moment.first_name} ${moment.last_name}` : null,
+            teamName: moment.team_name,
+            position: moment.position,
+            tier: moment.tier,
+            setName: moment.set_name,
+            seriesName: moment.series_name
+          };
+        }
+      } catch (err) { /* ignore */ }
+    }
+    
+    addLiveEvent(liveEvent);
+  } catch (err) {
+    console.error("Error processing Flow event:", err.message);
+  }
+}
+
+// Start the WebSocket connection when server starts
+setTimeout(() => {
+  connectToFlowWebSocket();
+}, 2000);
 
 // ------------------ Wallet SQL (Snowflake base query) ------------------
 
@@ -1990,12 +2242,12 @@ app.get("/api/test-snowflake-events", async (req, res) => {
 });
 
 // Alternative: Get recent events from Snowflake (more reliable than Flow REST API)
-// Note: Snowflake data is typically delayed by 1-2 hours, so we query a longer time window
+// Note: Snowflake data is typically delayed by 30-90 minutes
 app.get("/api/recent-events-snowflake", async (req, res) => {
   try {
-    const { limit = 50, hours = 3 } = req.query;
-    const limitNum = Math.min(parseInt(limit, 10) || 50, 200);
-    const hoursAgo = parseInt(hours, 10) || 3; // Default to 3 hours to account for Snowflake delay
+    const { limit = 100, hours = 2 } = req.query;
+    const limitNum = Math.min(parseInt(limit, 10) || 100, 500);
+    const hoursAgo = parseInt(hours, 10) || 2; // Default to 2 hours which captures recent activity with typical Snowflake delay
     
     // Calculate timestamp for X hours ago (Snowflake data is delayed)
     const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
@@ -2049,7 +2301,17 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       const eventType = row.EVENT_TYPE || row.event_type;
       const fromAddr = row.FROM_ADDR || row.from_addr || null;
       const toAddr = row.TO_ADDR || row.to_addr || null;
-      const timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
+      // Snowflake timestamps are in UTC but may come as string without 'Z' or as Date object
+      let timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
+      if (timestamp) {
+        if (timestamp instanceof Date) {
+          // Already a Date object - convert to ISO string
+          timestamp = timestamp.toISOString();
+        } else if (typeof timestamp === 'string' && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+          // String without timezone - append 'Z' for proper ISO format
+          timestamp = timestamp.replace(' ', 'T') + 'Z';
+        }
+      }
       const blockHeight = row.BLOCK_HEIGHT || row.block_height;
       const txId = row.TX_ID || row.tx_id;
       const eventIndex = row.EVENT_INDEX || row.event_index;
@@ -2200,6 +2462,15 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       enrichedEvents.push(enriched);
     }
     
+    // Calculate the freshness of the data
+    let newestEventTime = null;
+    let dataAgeHours = null;
+    if (enrichedEvents.length > 0) {
+      newestEventTime = enrichedEvents[0].timestamp; // Already sorted newest first
+      const ageMs = Date.now() - new Date(newestEventTime).getTime();
+      dataAgeHours = Math.round(ageMs / (1000 * 60 * 60) * 10) / 10; // Round to 1 decimal
+    }
+    
     return res.json({
       ok: true,
       events: enrichedEvents,
@@ -2207,7 +2478,11 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       hoursAgo: hoursAgo,
       cutoffTime: cutoffStr,
       currentTime: new Date().toISOString(),
-      note: "Snowflake data is typically delayed by 1-2 hours"
+      newestEventTime: newestEventTime,
+      dataAgeHours: dataAgeHours,
+      note: dataAgeHours !== null 
+        ? `Snowflake data is ${dataAgeHours} hours old (newest event: ${newestEventTime})`
+        : "No events found in the specified time window"
     });
   } catch (err) {
     console.error("GET /api/recent-events-snowflake error:", err);
@@ -2216,6 +2491,369 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       error: "Failed to fetch recent events from Snowflake: " + (err.message || String(err))
     });
   }
+});
+
+// Get events from local Flow Light Node (real-time, ~seconds delay)
+const FLOW_LIGHT_NODE_URL = "http://localhost:8080";
+
+// Cache for latest block height (refreshes every 10 seconds)
+let cachedLatestBlockHeight = null;
+let lastBlockHeightFetch = 0;
+
+async function getLatestBlockHeight() {
+  const now = Date.now();
+  // Cache for 10 seconds
+  if (cachedLatestBlockHeight && (now - lastBlockHeightFetch) < 10000) {
+    return cachedLatestBlockHeight;
+  }
+  
+  try {
+    // Query the public Flow REST API for the latest block
+    const res = await fetch("https://rest-mainnet.onflow.org/v1/blocks?height=sealed");
+    if (res.ok) {
+      const data = await res.json();
+      const block = Array.isArray(data) ? data[0] : data;
+      if (block && block.header && block.header.height) {
+        cachedLatestBlockHeight = parseInt(block.header.height, 10);
+        lastBlockHeightFetch = now;
+        return cachedLatestBlockHeight;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch latest block height:", err.message);
+  }
+  
+  // Fallback to cached or a reasonable estimate
+  return cachedLatestBlockHeight || 134160000;
+}
+
+app.get("/api/lightnode-events", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    
+    // Get the actual latest block height from the network
+    const latestHeight = await getLatestBlockHeight();
+    
+    // Query last ~100 blocks for AllDay events (about 80 seconds of blocks)
+    // The light node will proxy this to the upstream access node
+    const endHeight = latestHeight;
+    const startHeight = latestHeight - 100;
+    
+    // Query both Deposit and Withdraw events
+    // The light node proxies these requests to the upstream access node
+    console.log(`Querying light node for events in blocks ${startHeight}-${endHeight}`);
+    
+    const [depositRes, withdrawRes] = await Promise.all([
+      fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${endHeight}`),
+      fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Withdraw&start_height=${startHeight}&end_height=${endHeight}`)
+    ]);
+    
+    const depositData = depositRes.ok ? await depositRes.json() : [];
+    const withdrawData = withdrawRes.ok ? await withdrawRes.json() : [];
+    
+    // Extract events from the block-grouped response
+    const allEvents = [];
+    
+    for (const block of depositData) {
+      if (block.events && block.events.length > 0) {
+        for (const event of block.events) {
+          allEvents.push({
+            type: 'Deposit',
+            blockHeight: parseInt(block.block_height, 10),
+            blockTimestamp: block.block_timestamp,
+            txId: event.transaction_id,
+            eventIndex: event.event_index,
+            payload: event.payload
+          });
+        }
+      }
+    }
+    
+    for (const block of withdrawData) {
+      if (block.events && block.events.length > 0) {
+        for (const event of block.events) {
+          allEvents.push({
+            type: 'Withdraw',
+            blockHeight: parseInt(block.block_height, 10),
+            blockTimestamp: block.block_timestamp,
+            txId: event.transaction_id,
+            eventIndex: event.event_index,
+            payload: event.payload
+          });
+        }
+      }
+    }
+    
+    // Parse event payloads to extract NFT IDs and addresses
+    const parsedEvents = allEvents.map(event => {
+      let nftId = null;
+      let fromAddr = null;
+      let toAddr = null;
+      
+      if (event.payload) {
+        try {
+          // Flow REST API returns base64-encoded JSON-CDC payloads
+          let payloadStr = event.payload;
+          if (typeof payloadStr === 'string') {
+            // Decode base64
+            try {
+              payloadStr = Buffer.from(payloadStr, 'base64').toString('utf-8');
+            } catch (e) {
+              // Not base64, try as-is
+            }
+          }
+          
+          const payload = typeof payloadStr === 'string' ? JSON.parse(payloadStr) : payloadStr;
+          
+          if (payload.value && payload.value.fields) {
+            for (const field of payload.value.fields) {
+              if (field.name === 'id' && field.value) {
+                // NFT ID: value.value for UInt64
+                nftId = field.value.value || field.value;
+              }
+              if (field.name === 'from' && field.value) {
+                // Address might be nested in Optional: value.value.value
+                if (field.value.value && field.value.value.value) {
+                  fromAddr = field.value.value.value.toString().toLowerCase();
+                } else if (field.value.value) {
+                  fromAddr = field.value.value.toString().toLowerCase();
+                }
+              }
+              if (field.name === 'to' && field.value) {
+                // Address might be nested in Optional: value.value.value
+                if (field.value.value && field.value.value.value) {
+                  toAddr = field.value.value.value.toString().toLowerCase();
+                } else if (field.value.value) {
+                  toAddr = field.value.value.toString().toLowerCase();
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing event payload:", e.message);
+        }
+      }
+      
+      return {
+        type: event.type,
+        nftId: nftId ? nftId.toString() : null,
+        from: fromAddr || null,
+        to: toAddr || null,
+        timestamp: event.blockTimestamp,
+        blockHeight: event.blockHeight,
+        txId: event.txId,
+        source: 'lightnode'
+      };
+    });
+    
+    // Group events by txId+nftId to combine Withdraw/Deposit pairs into "Sold"
+    const eventMap = new Map();
+    for (const event of parsedEvents) {
+      const key = `${event.txId}-${event.nftId}`;
+      if (!eventMap.has(key)) {
+        eventMap.set(key, { withdraw: null, deposit: null, ...event });
+      }
+      const group = eventMap.get(key);
+      if (event.type === 'Withdraw') group.withdraw = event;
+      if (event.type === 'Deposit') group.deposit = event;
+    }
+    
+    // Convert to combined events
+    const combinedEvents = [];
+    for (const group of eventMap.values()) {
+      if (group.withdraw && group.deposit) {
+        combinedEvents.push({
+          type: 'Sold',
+          nftId: group.nftId,
+          from: group.withdraw.from,
+          to: group.deposit.to,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId,
+          source: 'lightnode'
+        });
+      } else if (group.withdraw) {
+        combinedEvents.push({ ...group.withdraw, type: 'Listed' });
+      } else if (group.deposit) {
+        combinedEvents.push({ ...group.deposit, type: 'Purchased' });
+      }
+    }
+    
+    // Sort by timestamp descending
+    combinedEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Enrich with wallet names and moment details (limit to first 20 to avoid slowdown)
+    const enrichedEvents = [];
+    for (const event of combinedEvents.slice(0, Math.min(limit, 20))) {
+      const enriched = { ...event };
+      
+      if (event.from) {
+        try {
+          const result = await pgQuery(`SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`, [event.from]);
+          enriched.sellerName = result.rows[0]?.display_name || null;
+        } catch (e) { /* ignore */ }
+      }
+      
+      if (event.to) {
+        try {
+          const result = await pgQuery(`SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`, [event.to]);
+          enriched.buyerName = result.rows[0]?.display_name || null;
+        } catch (e) { /* ignore */ }
+      }
+      
+      if (event.nftId) {
+        try {
+          const result = await pgQuery(
+            `SELECT first_name, last_name, team_name, position, tier, set_name, series_name FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+            [event.nftId]
+          );
+          const moment = result.rows[0];
+          if (moment) {
+            enriched.moment = {
+              playerName: moment.first_name && moment.last_name ? `${moment.first_name} ${moment.last_name}` : null,
+              teamName: moment.team_name,
+              position: moment.position,
+              tier: moment.tier,
+              setName: moment.set_name,
+              seriesName: moment.series_name
+            };
+          }
+        } catch (e) { /* ignore */ }
+      }
+      
+      enrichedEvents.push(enriched);
+    }
+    
+    return res.json({
+      ok: true,
+      events: enrichedEvents,
+      source: "lightnode",
+      latestBlockHeight: latestHeight,
+      blocksQueried: 100,
+      startHeight: startHeight,
+      endHeight: endHeight,
+      currentTime: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("GET /api/lightnode-events error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to get events from light node: " + (err.message || String(err))
+    });
+  }
+});
+
+// Get live events from WebSocket stream (real-time, ~seconds delay)
+app.get("/api/live-events", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+    const sinceTimestamp = req.query.since ? new Date(req.query.since) : null;
+    
+    let events = liveEventsCache.slice(0, limit);
+    
+    // Filter to events newer than 'since' timestamp if provided
+    if (sinceTimestamp && !isNaN(sinceTimestamp.getTime())) {
+      events = events.filter(e => new Date(e.timestamp) > sinceTimestamp);
+    }
+    
+    // Group Withdraw/Deposit pairs into "Sold" events (same logic as Snowflake)
+    const eventMap = new Map();
+    for (const event of events) {
+      const key = `${event.txId}-${event.nftId}`;
+      if (!eventMap.has(key)) {
+        eventMap.set(key, {
+          withdraw: null,
+          deposit: null,
+          nftId: event.nftId,
+          txId: event.txId,
+          timestamp: event.timestamp,
+          blockHeight: event.blockHeight
+        });
+      }
+      const group = eventMap.get(key);
+      if (event.type === 'Withdraw') {
+        group.withdraw = event;
+      } else if (event.type === 'Deposit') {
+        group.deposit = event;
+      }
+    }
+    
+    // Convert to combined events
+    const combinedEvents = [];
+    for (const group of eventMap.values()) {
+      if (group.withdraw && group.deposit) {
+        combinedEvents.push({
+          type: 'Sold',
+          nftId: group.nftId,
+          from: group.withdraw.from,
+          to: group.deposit.to,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId,
+          sellerName: group.withdraw.sellerName,
+          buyerName: group.deposit.buyerName,
+          moment: group.withdraw.moment || group.deposit.moment,
+          source: 'live'
+        });
+      } else if (group.withdraw) {
+        combinedEvents.push({
+          type: 'Listed',
+          nftId: group.nftId,
+          from: group.withdraw.from,
+          to: null,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId,
+          sellerName: group.withdraw.sellerName,
+          moment: group.withdraw.moment,
+          source: 'live'
+        });
+      } else if (group.deposit) {
+        combinedEvents.push({
+          type: 'Purchased',
+          nftId: group.nftId,
+          from: null,
+          to: group.deposit.to,
+          timestamp: group.timestamp,
+          blockHeight: group.blockHeight,
+          txId: group.txId,
+          buyerName: group.deposit.buyerName,
+          moment: group.deposit.moment,
+          source: 'live'
+        });
+      }
+    }
+    
+    // Sort by timestamp descending
+    combinedEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    return res.json({
+      ok: true,
+      events: combinedEvents,
+      source: "live-websocket",
+      wsConnected: flowWsConnected,
+      cacheSize: liveEventsCache.length,
+      lastEventTime: lastFlowEventTime ? lastFlowEventTime.toISOString() : null,
+      currentTime: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("GET /api/live-events error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to get live events: " + (err.message || String(err))
+    });
+  }
+});
+
+// Get WebSocket connection status
+app.get("/api/live-status", (req, res) => {
+  return res.json({
+    ok: true,
+    wsConnected: flowWsConnected,
+    cacheSize: liveEventsCache.length,
+    lastEventTime: lastFlowEventTime ? lastFlowEventTime.toISOString() : null,
+    currentTime: new Date().toISOString()
+  });
 });
 
 // Get latest block height

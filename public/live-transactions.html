@@ -266,7 +266,7 @@
 
     <main class="app-main">
       <h1 class="page-title">Live NFL All Day Transactions</h1>
-      <p class="page-subtitle">Real-time transactions for NFL All Day moments on the Flow blockchain</p>
+      <p class="page-subtitle">Real-time transactions via local Flow Light Node (seconds delay)</p>
 
       <div class="controls">
         <div class="status-indicator">
@@ -276,10 +276,20 @@
         <button class="btn btn-primary" id="btn-start">Start</button>
         <button class="btn" id="btn-stop">Stop</button>
         <button class="btn" id="btn-clear">Clear</button>
-        <button class="btn" id="btn-toggle-source" title="Toggle between Flow API (live but unreliable) and Snowflake (reliable but ~1 min delay)">Use Snowflake</button>
+        <select class="btn" id="source-select" style="min-width: 180px;">
+          <option value="lightnode" selected>🟢 Light Node (real-time)</option>
+          <option value="snowflake">📊 Snowflake (~45 min delay)</option>
+          <option value="live">🔌 WebSocket (experimental)</option>
+          <option value="flow-rest">⚡ Flow REST (unreliable)</option>
+        </select>
         <span style="color: var(--text-muted); font-size: 0.85rem;">
           Showing <span id="count">0</span> transactions
         </span>
+      </div>
+      
+      <div id="data-freshness-banner" style="display: none; padding: 0.75rem 1rem; background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem;">
+        <span style="color: #fbbf24;">⚠️</span>
+        <span id="freshness-text">Data freshness info</span>
       </div>
 
       <table class="transactions-table">
@@ -305,14 +315,15 @@
     </main>
 
     <script>
-      const POLL_INTERVAL = 3000; // 3 seconds
+      const POLL_INTERVAL = 3000; // 3 seconds - Light node provides real-time data
 
       let isMonitoring = false;
       let pollInterval = null;
       let lastBlockHeight = null;
       let transactions = [];
       const MAX_TRANSACTIONS = 100;
-      let useSnowflake = false; // Toggle to use Snowflake instead of Flow API
+      // Data source: 'lightnode' is real-time via local Flow node
+      let dataSource = 'lightnode';
       let lastEventTimestamp = null;
 
       const statusDot = document.getElementById('status-dot');
@@ -320,9 +331,20 @@
       const btnStart = document.getElementById('btn-start');
       const btnStop = document.getElementById('btn-stop');
       const btnClear = document.getElementById('btn-clear');
-      const btnToggleSource = document.getElementById('btn-toggle-source');
+      const sourceSelect = document.getElementById('source-select');
       const tbody = document.getElementById('transactions-tbody');
       const countEl = document.getElementById('count');
+      const freshnessBanner = document.getElementById('data-freshness-banner');
+      const freshnessText = document.getElementById('freshness-text');
+      
+      function updateFreshnessBanner(show, message) {
+        if (show) {
+          freshnessBanner.style.display = 'block';
+          freshnessText.textContent = message;
+        } else {
+          freshnessBanner.style.display = 'none';
+        }
+      }
 
       function updateStatus(status, text) {
         statusDot.className = 'status-dot ' + status;
@@ -331,7 +353,27 @@
 
       function formatTime(timestamp) {
         const date = new Date(timestamp);
-        return date.toLocaleTimeString();
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        // Show relative time + actual time
+        let relTime;
+        if (diffDays > 0) {
+          relTime = `${diffDays}d ago`;
+        } else if (diffHours > 0) {
+          relTime = `${diffHours}h ago`;
+        } else if (diffMins > 0) {
+          relTime = `${diffMins}m ago`;
+        } else {
+          relTime = 'just now';
+        }
+        
+        const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const dateStr = date.toLocaleDateString([], {month: 'short', day: 'numeric'});
+        return `<span title="${date.toLocaleString()}">${relTime}<br><small style="color:var(--text-muted)">${dateStr} ${timeStr}</small></span>`;
       }
 
       function formatWallet(wallet, walletName) {
@@ -414,10 +456,109 @@
 
       async function fetchLatestEvents() {
         try {
-          if (useSnowflake) {
-            // Use Snowflake for more reliable event fetching
-            // Note: Snowflake data is delayed by 1-2 hours, so we query 3 hours back
-            const hoursAgo = 3; // Get events from last 3 hours to account for delay
+          // Light Node source (real-time via local Flow node)
+          if (dataSource === 'lightnode') {
+            const eventsRes = await fetch('/api/lightnode-events?limit=50');
+            
+            if (!eventsRes.ok) {
+              throw new Error(`Failed to fetch from light node: HTTP ${eventsRes.status}`);
+            }
+            
+            const eventsData = await eventsRes.json();
+            if (!eventsData.ok) {
+              throw new Error(eventsData.error || 'Failed to fetch events');
+            }
+            
+            const events = eventsData.events || [];
+            
+            // Light node proxies to upstream, so no sync delay to worry about
+            updateFreshnessBanner(false);
+            
+            // Filter out events we've already seen
+            const seenTxIds = new Set(transactions.map(t => t.txId).filter(Boolean));
+            const newEvents = events.filter(tx => !tx.txId || !seenTxIds.has(tx.txId));
+            
+            // Process new events - reverse order so newest ends up on top
+            for (let i = newEvents.length - 1; i >= 0; i--) {
+              addTransaction(newEvents[i]);
+            }
+            
+            const blockRange = eventsData.startHeight && eventsData.endHeight 
+              ? `${eventsData.startHeight}-${eventsData.endHeight}` 
+              : eventsData.latestBlockHeight;
+            const statusText = events.length > 0 
+              ? `Light Node: ${events.length} events in blocks ${blockRange}` 
+              : `Light Node: Watching blocks ${blockRange}...`;
+            updateStatus('active', statusText);
+            return;
+          }
+          
+          // Live WebSocket source (real-time, ~seconds delay)
+          // Falls back to Snowflake if no live events
+          if (dataSource === 'live') {
+            const sinceParam = lastEventTimestamp ? `&since=${lastEventTimestamp.toISOString()}` : '';
+            const eventsRes = await fetch(`/api/live-events?limit=100${sinceParam}`);
+            
+            if (!eventsRes.ok) {
+              throw new Error(`Failed to fetch live events: HTTP ${eventsRes.status}`);
+            }
+            
+            const eventsData = await eventsRes.json();
+            if (!eventsData.ok) {
+              throw new Error(eventsData.error || 'Failed to fetch events');
+            }
+            
+            let events = eventsData.events || [];
+            
+            // If no live events and this is the first fetch, bootstrap from Snowflake
+            if (events.length === 0 && transactions.length === 0) {
+              console.log("No live events yet, fetching from Snowflake to bootstrap...");
+              try {
+                const snowflakeRes = await fetch('/api/recent-events-snowflake?limit=50&hours=1');
+                if (snowflakeRes.ok) {
+                  const snowflakeData = await snowflakeRes.json();
+                  if (snowflakeData.ok && snowflakeData.events) {
+                    events = snowflakeData.events;
+                    updateFreshnessBanner(true, `Showing recent Snowflake data while waiting for live events...`);
+                  }
+                }
+              } catch (err) {
+                console.error("Failed to bootstrap from Snowflake:", err);
+              }
+            } else if (eventsData.wsConnected) {
+              updateFreshnessBanner(false);
+            } else {
+              updateFreshnessBanner(true, 'WebSocket disconnected - reconnecting...');
+            }
+            
+            // Filter out events we've already seen
+            const seenTxIds = new Set(transactions.map(t => t.txId).filter(Boolean));
+            const newEvents = events.filter(tx => !tx.txId || !seenTxIds.has(tx.txId));
+            
+            // Process new events - reverse order so newest ends up on top after unshift
+            // (events come sorted newest-first, but unshift reverses that)
+            for (let i = newEvents.length - 1; i >= 0; i--) {
+              addTransaction(newEvents[i]);
+            }
+            
+            // Update last seen timestamp
+            if (events.length > 0) {
+              const latestTime = new Date(Math.max(...events.map(tx => new Date(tx.timestamp).getTime())));
+              if (!lastEventTimestamp || latestTime > lastEventTimestamp) {
+                lastEventTimestamp = latestTime;
+              }
+            }
+            
+            const statusText = eventsData.wsConnected 
+              ? `Live: ${eventsData.cacheSize} cached${transactions.length > 0 ? `, showing ${transactions.length}` : ''}` 
+              : 'Live: Reconnecting...';
+            updateStatus(eventsData.wsConnected ? 'active' : 'error', statusText);
+            return;
+          }
+          
+          // Snowflake source (~30-90 min delay)
+          if (dataSource === 'snowflake') {
+            const hoursAgo = 2; // Get events from last 2 hours 
             const eventsRes = await fetch(`/api/recent-events-snowflake?limit=100&hours=${hoursAgo}`);
             
             if (!eventsRes.ok) {
@@ -431,6 +572,20 @@
             
             const events = eventsData.events || [];
             
+            // Show data freshness banner for Snowflake - only warn if unusually delayed
+            if (eventsData.dataAgeHours !== null && eventsData.dataAgeHours !== undefined) {
+              const ageHours = eventsData.dataAgeHours;
+              const ageMins = Math.round(ageHours * 60);
+              if (ageHours > 2) {
+                updateFreshnessBanner(true, `⚠️ Data is ${ageHours.toFixed(1)} hours old. Snowflake may be experiencing unusual delays.`);
+              } else {
+                // Under 2 hours is normal for Snowflake - no warning needed
+                updateFreshnessBanner(false);
+              }
+            } else if (events.length === 0) {
+              updateFreshnessBanner(true, `No events found in the last ${hoursAgo} hours.`);
+            }
+            
             // Filter out events we've already seen by transaction ID (more reliable than timestamp)
             const seenTxIds = new Set(transactions.map(t => t.txId).filter(Boolean));
             const newEvents = events.filter(tx => {
@@ -443,9 +598,9 @@
               return txTime > lastEventTimestamp;
             });
             
-            // Process new events
-            for (const tx of newEvents) {
-              addTransaction(tx);
+            // Process new events - reverse order so newest ends up on top after unshift
+            for (let i = newEvents.length - 1; i >= 0; i--) {
+              addTransaction(newEvents[i]);
             }
             
             // Update last seen timestamp
@@ -454,13 +609,27 @@
               if (!lastEventTimestamp || latestTime > lastEventTimestamp) {
                 lastEventTimestamp = latestTime;
               }
+              
+              // Calculate how old the most recent event is
+              const ageMs = Date.now() - latestTime.getTime();
+              const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+              const ageMins = Math.floor((ageMs % (1000 * 60 * 60)) / (1000 * 60));
+              const ageStr = ageHours > 0 ? `${ageHours}h ${ageMins}m` : `${ageMins}m`;
+              
+              updateStatus('active', `Snowflake: ${events.length} events (newest: ${ageStr} ago)`);
+            } else {
+              updateStatus('active', `Snowflake: No events found in last ${hoursAgo} hours`);
             }
-            
-            updateStatus('active', `Monitoring via Snowflake (${events.length} events in last ${hoursAgo} hours, ${newEvents.length} new)`);
             return;
           }
           
-          // Original Flow API approach
+          // Flow REST API (live but often unreliable)
+          if (dataSource !== 'flow-rest') return;
+          
+          // Hide freshness banner for Flow API (it's supposed to be live)
+          updateFreshnessBanner(false);
+          
+          // Flow REST API approach
           // Get latest block first using our proxy
           const blockRes = await fetch('/api/flow-latest-block');
           if (!blockRes.ok) {
@@ -512,9 +681,9 @@
 
           const events = eventsData.events || [];
 
-          // Process new events
-          for (const tx of events) {
-            addTransaction(tx);
+          // Process new events - reverse order so newest ends up on top
+          for (let i = events.length - 1; i >= 0; i--) {
+            addTransaction(events[i]);
           }
 
           // Update lastBlockHeight to where we queried
@@ -566,13 +735,15 @@
       btnStop.addEventListener('click', stopMonitoring);
       btnClear.addEventListener('click', clearTransactions);
       
-      if (btnToggleSource) {
-        btnToggleSource.addEventListener('click', () => {
-          useSnowflake = !useSnowflake;
-          btnToggleSource.textContent = useSnowflake ? 'Use Flow API' : 'Use Snowflake';
-          btnToggleSource.title = useSnowflake 
-            ? 'Switch to Flow API (live but unreliable)' 
-            : 'Switch to Snowflake (reliable but ~1 min delay)';
+      if (sourceSelect) {
+        sourceSelect.addEventListener('change', () => {
+          dataSource = sourceSelect.value;
+          // Clear transactions and reset state when switching sources
+          transactions = [];
+          lastEventTimestamp = null;
+          lastBlockHeight = null;
+          renderTransactions();
+          updateFreshnessBanner(false);
           if (isMonitoring) {
             // Restart monitoring with new source
             stopMonitoring();
@@ -584,7 +755,7 @@
       btnStop.disabled = true;
 
       // Auto-start on page load
-      // startMonitoring();
+      startMonitoring();
     </script>
   </body>
 </html>
