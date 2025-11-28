@@ -13,8 +13,7 @@
       '/live-transactions.html': 'nav-live',
       '/faq.html': 'nav-faq',
       '/contact.html': 'nav-contact',
-      '/login.html': 'nav-account-link',
-      '/profiles.html': 'nav-profiles'
+      '/login.html': 'nav-account-link'
     };
 
     // Remove active class from all nav links

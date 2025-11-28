@@ -19,7 +19,6 @@
 
         <nav class="main-nav">
           ${navLink("/", "Wallet")}
-          ${navLink("/profiles.html", "Profiles")}
           ${navLink("/top-holders.html", "Top holders")}
           ${navLink("/explorer.html", "Browse")}
           <a href="/sniper.html" class="${path === '/sniper.html' ? 'active nav-hot' : 'nav-hot'}">🎯 Sniper</a>
