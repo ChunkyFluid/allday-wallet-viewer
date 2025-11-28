@@ -212,15 +212,24 @@
         color: #cbd5f5;
       }
 
-      .pill-tier-rare {
+      /* Override global pill styles for table cells */
+      .table td.pill-tier-common,
+      .table td.pill-tier-uncommon,
+      .table td.pill-tier-rare,
+      .table td.pill-tier-legendary,
+      .table td.pill-tier-ultimate {
+        background: transparent !important;
+      }
+
+      .table td.pill-tier-rare {
         color: #fb923c;
       }
 
-      .pill-tier-legendary {
+      .table td.pill-tier-legendary {
         color: #facc15;
       }
 
-      .pill-tier-ultimate {
+      .table td.pill-tier-ultimate {
         color: #f472b6;
       }
 
