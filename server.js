@@ -1908,9 +1908,30 @@ app.get("/api/teams", async (req, res) => {
   }
 });
 
-// Global insights: aggregate stats across all wallets
-app.get("/api/insights", async (req, res) => {
+// Ensure insights_snapshot table exists
+async function ensureInsightsSnapshotTable() {
   try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS insights_snapshot (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT single_row CHECK (id = 1)
+      );
+    `);
+  } catch (err) {
+    console.error("Error ensuring insights_snapshot table:", err);
+  }
+}
+
+// Refresh insights snapshot (runs all queries and caches result)
+app.post("/api/insights/refresh", async (req, res) => {
+  try {
+    await ensureInsightsSnapshotTable();
+    
+    console.log("Refreshing insights snapshot...");
+    const startTime = Date.now();
+    
     // Run all queries in parallel for speed
     const [
       statsResult,
@@ -1923,7 +1944,6 @@ app.get("/api/insights", async (req, res) => {
       positionResult,
       marketResult,
       medianResult,
-      // NEW STATS
       whaleStatsResult,
       seriesResult,
       jerseyResult,
@@ -1934,29 +1954,29 @@ app.get("/api/insights", async (req, res) => {
     ] = await Promise.all([
       // Basic stats
       pool.query(`
-      SELECT
-        COUNT(*)::bigint AS total_wallets,
-        SUM(total_moments)::bigint AS total_moments,
-        AVG(total_moments)::numeric AS avg_collection_size,
-        SUM(unlocked_moments)::bigint AS total_unlocked,
-        SUM(locked_moments)::bigint AS total_locked,
-        SUM(tier_common)::bigint AS tier_common_total,
-        SUM(tier_uncommon)::bigint AS tier_uncommon_total,
-        SUM(tier_rare)::bigint AS tier_rare_total,
-        SUM(tier_legendary)::bigint AS tier_legendary_total,
-        SUM(tier_ultimate)::bigint AS tier_ultimate_total
-      FROM top_wallets_snapshot
+        SELECT
+          COUNT(*)::bigint AS total_wallets,
+          SUM(total_moments)::bigint AS total_moments,
+          AVG(total_moments)::numeric AS avg_collection_size,
+          SUM(unlocked_moments)::bigint AS total_unlocked,
+          SUM(locked_moments)::bigint AS total_locked,
+          SUM(tier_common)::bigint AS tier_common_total,
+          SUM(tier_uncommon)::bigint AS tier_uncommon_total,
+          SUM(tier_rare)::bigint AS tier_rare_total,
+          SUM(tier_legendary)::bigint AS tier_legendary_total,
+          SUM(tier_ultimate)::bigint AS tier_ultimate_total
+        FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
       
       // Size distribution
       pool.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
-        COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
-      FROM top_wallets_snapshot
+        SELECT
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
+          COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
+        FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
       
@@ -2043,7 +2063,7 @@ app.get("/api/insights", async (req, res) => {
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
       
-      // 🐳 Whale stats - what do top collectors hold?
+      // 🐳 Whale stats
       pool.query(`
         WITH ranked AS (
           SELECT total_moments,
@@ -2091,7 +2111,7 @@ app.get("/api/insights", async (req, res) => {
         WHERE max_mint_size IS NOT NULL AND max_mint_size > 0;
       `),
       
-      // 🔥 Most valuable editions (by floor price)
+      // 🔥 Most valuable editions
       pool.query(`
         SELECT 
           e.edition_id,
@@ -2107,7 +2127,7 @@ app.get("/api/insights", async (req, res) => {
         LIMIT 5;
       `),
       
-      // 🎯 Serial distribution - are low serials more common or rare?
+      // 🎯 Serial distribution
       pool.query(`
         SELECT
           COUNT(*) FILTER (WHERE serial_number <= 10)::bigint AS tier_1_10,
@@ -2119,7 +2139,7 @@ app.get("/api/insights", async (req, res) => {
         WHERE serial_number IS NOT NULL;
       `),
       
-      // 🏆 Richest collections by floor value (top 5)
+      // 🏆 Richest collections
       pool.query(`
         SELECT 
           h.wallet_address,
@@ -2165,10 +2185,10 @@ app.get("/api/insights", async (req, res) => {
       top1pct: ((Number(whaleStats.top_1pct_moments) / allMoments) * 100).toFixed(1)
     };
 
-    // Calculate challenge engagement (locked %)
+    // Calculate challenge engagement
     const challengeEngagement = ((Number(stats.total_locked) / totalMoments) * 100).toFixed(1);
 
-    return res.json({
+    const snapshotData = {
       ok: true,
       stats: {
         totalWallets: Number(stats.total_wallets) || 0,
@@ -2216,7 +2236,6 @@ app.get("/api/insights", async (req, res) => {
         highestFloor: Number(market.highest_floor) || 0,
         avgSale: Number(market.avg_sale) || 0
       },
-      // NEW STATS
       whales: {
         top10Moments: Number(whaleStats.top_10_moments) || 0,
         top100Moments: Number(whaleStats.top_100_moments) || 0,
@@ -2252,12 +2271,67 @@ app.get("/api/insights", async (req, res) => {
         moments: Number(r.moment_count) || 0,
         floorValue: Number(r.floor_value) || 0
       }))
+    };
+
+    // Upsert snapshot
+    await pool.query(`
+      INSERT INTO insights_snapshot (id, data, updated_at)
+      VALUES (1, $1, now())
+      ON CONFLICT (id) DO UPDATE
+      SET data = $1, updated_at = now();
+    `, [JSON.stringify(snapshotData)]);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Insights snapshot refreshed in ${duration}s`);
+
+    return res.json({
+      ok: true,
+      message: `Snapshot refreshed in ${duration}s`,
+      updated_at: new Date().toISOString()
     });
+  } catch (err) {
+    console.error("POST /api/insights/refresh error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to refresh insights snapshot: " + (err.message || String(err))
+    });
+  }
+});
+
+// Global insights: aggregate stats across all wallets (now returns cached snapshot)
+app.get("/api/insights", async (req, res) => {
+  try {
+    await ensureInsightsSnapshotTable();
+    
+    // Fetch cached snapshot
+    const result = await pool.query(`
+      SELECT data, updated_at
+      FROM insights_snapshot
+      WHERE id = 1;
+    `);
+
+    if (!result.rows.length) {
+      // No snapshot exists yet - return error suggesting refresh
+      return res.status(503).json({
+        ok: false,
+        error: "Insights snapshot not available. Please refresh first.",
+        needsRefresh: true
+      });
+    }
+
+    const snapshot = result.rows[0];
+    const data = typeof snapshot.data === 'string' ? JSON.parse(snapshot.data) : snapshot.data;
+    
+    // Add metadata about freshness
+    data.snapshotUpdatedAt = snapshot.updated_at;
+    data.fromCache = true;
+
+    return res.json(data);
   } catch (err) {
     console.error("GET /api/insights error:", err);
     return res.status(500).json({
       ok: false,
-      error: "Failed to load insights"
+      error: "Failed to load insights: " + (err.message || String(err))
     });
   }
 });
@@ -4356,6 +4430,64 @@ app.get("/api/health", async (req, res) => {
 // ------------------ Start server ------------------
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+
+// Auto-refresh insights snapshot on startup if missing, then every 6 hours
+async function setupInsightsRefresh() {
+  try {
+    await ensureInsightsSnapshotTable();
+    
+    // Check if snapshot exists
+    const check = await pool.query(`SELECT id FROM insights_snapshot WHERE id = 1;`);
+    
+    if (!check.rows.length) {
+      console.log("📊 No insights snapshot found. Refreshing on startup...");
+      // Trigger refresh via internal fetch
+      try {
+        const response = await fetch(`http://localhost:${port}/api/insights/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          console.log("✅ Initial insights snapshot created");
+        }
+      } catch (err) {
+        console.log("⚠️  Could not auto-refresh insights on startup (server not ready yet). Run POST /api/insights/refresh manually.");
+      }
+    } else {
+      const age = await pool.query(`SELECT EXTRACT(EPOCH FROM (now() - updated_at)) / 3600 AS hours_old FROM insights_snapshot WHERE id = 1;`);
+      const hoursOld = age.rows[0]?.hours_old || 0;
+      console.log(`📊 Insights snapshot exists (${hoursOld.toFixed(1)} hours old). Will auto-refresh every 6 hours.`);
+    }
+    
+    // Set up periodic refresh (every 6 hours)
+    setInterval(async () => {
+      try {
+        console.log("🔄 Auto-refreshing insights snapshot...");
+        const response = await fetch(`http://localhost:${port}/api/insights/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Insights snapshot auto-refreshed: ${result.message}`);
+        } else {
+          console.error("❌ Failed to auto-refresh insights snapshot");
+        }
+      } catch (err) {
+        console.error("❌ Error auto-refreshing insights snapshot:", err.message);
+      }
+    }, 6 * 60 * 60 * 1000); // 6 hours
+    
+  } catch (err) {
+    console.error("Error setting up insights refresh:", err);
+  }
+}
+
+app.listen(port, async () => {
   console.log(`NFL ALL DAY collection viewer running on http://localhost:${port}`);
+  
+  // Set up insights refresh after server starts
+  setTimeout(() => {
+    setupInsightsRefresh();
+  }, 2000); // Wait 2 seconds for server to be fully ready
 });
