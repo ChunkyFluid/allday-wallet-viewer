@@ -89,7 +89,7 @@
       }
 
       .histogram-label {
-        min-width: 80px;
+        min-width: 90px;
         font-size: 0.75rem;
         color: var(--text-muted);
       }
@@ -123,6 +123,11 @@
       .bar-rb { background: linear-gradient(90deg, #22c55e, #4ade80); }
       .bar-te { background: linear-gradient(90deg, #a855f7, #c084fc); }
       .bar-def { background: linear-gradient(90deg, #64748b, #94a3b8); }
+
+      /* Special gradients */
+      .bar-whale { background: linear-gradient(90deg, #0ea5e9, #06b6d4); }
+      .bar-gold { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+      .bar-fire { background: linear-gradient(90deg, #ef4444, #f97316); }
 
       .leaderboard-item {
         display: flex;
@@ -178,6 +183,16 @@
         border-color: #22c55e;
       }
 
+      .insight-card.whale {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(6, 182, 212, 0.1));
+        border-color: #0ea5e9;
+      }
+
+      .insight-card.fire {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(249, 115, 22, 0.1));
+        border-color: #ef4444;
+      }
+
       .crown-icon {
         color: #fbbf24;
         font-size: 1.5rem;
@@ -231,12 +246,137 @@
         background-clip: text;
       }
 
+      /* Whale stat boxes */
+      .whale-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+      }
+
+      .whale-item {
+        text-align: center;
+        padding: 0.75rem 0.5rem;
+        background: rgba(14, 165, 233, 0.1);
+        border-radius: 8px;
+      }
+
+      .whale-label {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+      }
+
+      .whale-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #0ea5e9;
+      }
+
+      .whale-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      /* Jersey number grid */
+      .jersey-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .jersey-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.6rem;
+        background: rgba(255,255,255,0.05);
+        border-radius: 6px;
+        font-size: 0.8rem;
+      }
+
+      .jersey-number {
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .jersey-count {
+        color: var(--text-muted);
+        font-size: 0.7rem;
+      }
+
+      /* Valuable moments */
+      .valuable-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .valuable-item:last-child {
+        border-bottom: none;
+      }
+
+      .valuable-player {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .valuable-details {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .valuable-price {
+        font-weight: 700;
+        color: #22c55e;
+        font-size: 0.9rem;
+      }
+
+      .tier-badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-weight: 600;
+      }
+
+      .tier-badge.legendary { background: linear-gradient(135deg, #ffd54f, #ffb300); color: #111; }
+      .tier-badge.ultimate { background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff); color: #fff; }
+      .tier-badge.rare { background: #ff8800; color: #111; }
+
+      /* Challenge engagement */
+      .engagement-bar {
+        height: 24px;
+        background: var(--bg);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+      }
+
+      .engagement-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #f59e0b, #ef4444);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      }
+
       @media (max-width: 768px) {
         .insights-grid {
           grid-template-columns: 1fr;
         }
         
         .rarity-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        
+        .whale-grid {
           grid-template-columns: repeat(3, 1fr);
         }
         
@@ -253,7 +393,7 @@
 
     <main class="app-main">
       <div class="page-title" style="margin-bottom: 0.5rem;">📈 Insights</div>
-      <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Fun stats from the NFL All Day ecosystem</p>
+      <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">Deep dive into the NFL All Day ecosystem</p>
 
       <div id="insights-loading" style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <div style="font-size: 2rem; margin-bottom: 1rem;">🏈</div>
@@ -304,11 +444,32 @@
           </div>
         </div>
 
+        <!-- 🐳 Whale Watch -->
+        <div class="insight-card whale">
+          <h3><span class="emoji">🐳</span> Whale Watch</h3>
+          <div class="stat-label">How much do top collectors hold?</div>
+          <div class="whale-grid" id="whale-grid"></div>
+        </div>
+
+        <!-- 🏆 Richest Collections -->
+        <div class="insight-card market">
+          <h3><span class="emoji">💰</span> Richest Collections</h3>
+          <div class="stat-label" style="margin-bottom: 0.5rem;">By total floor value</div>
+          <div id="richest-list"></div>
+        </div>
+
         <!-- Low Serials -->
         <div class="insight-card">
           <h3><span class="emoji">🎯</span> Low Serials</h3>
-          <div class="stat-label" style="margin-bottom: 0.5rem;">How many rare serials exist?</div>
+          <div class="stat-label" style="margin-bottom: 0.5rem;">Rare serial counts</div>
           <div id="low-serials-content"></div>
+        </div>
+
+        <!-- 🎯 Serial Distribution -->
+        <div class="insight-card">
+          <h3><span class="emoji">📊</span> Serial Distribution</h3>
+          <div class="stat-label" style="margin-bottom: 0.25rem;">Where do serials fall?</div>
+          <div class="histogram" id="histogram-serials"></div>
         </div>
 
         <!-- Rarity Spotlight -->
@@ -318,22 +479,49 @@
           <div class="rarity-grid" id="rarity-grid"></div>
         </div>
 
+        <!-- 🔥 Most Valuable -->
+        <div class="insight-card fire">
+          <h3><span class="emoji">🔥</span> Most Valuable</h3>
+          <div class="stat-label" style="margin-bottom: 0.25rem;">Highest floor prices</div>
+          <div id="most-valuable-list"></div>
+        </div>
+
         <!-- Market Stats -->
         <div class="insight-card market">
-          <h3><span class="emoji">💰</span> Market Snapshot</h3>
+          <h3><span class="emoji">💵</span> Market Snapshot</h3>
           <div id="market-stats"></div>
         </div>
 
-        <!-- Locked vs Unlocked -->
+        <!-- 🏈 Challenge Engagement -->
         <div class="insight-card">
-          <h3><span class="emoji">🔒</span> Locked vs Unlocked</h3>
-          <div class="histogram" id="histogram-locked"></div>
+          <h3><span class="emoji">🔒</span> Challenge Engagement</h3>
+          <div class="stat-label">What % of moments are locked in challenges?</div>
+          <div class="engagement-bar">
+            <div class="engagement-fill" id="engagement-fill" style="width: 0%;">0%</div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem;">
+            <span style="color: var(--text-muted);">🔓 <span id="unlocked-count">0</span> unlocked</span>
+            <span style="color: var(--text-muted);">🔒 <span id="locked-count">0</span> locked</span>
+          </div>
+        </div>
+
+        <!-- 📦 Edition Sizes -->
+        <div class="insight-card">
+          <h3><span class="emoji">📦</span> Edition Sizes</h3>
+          <div class="stat-label" style="margin-bottom: 0.25rem;">Distribution by mint size</div>
+          <div class="histogram" id="histogram-editions"></div>
         </div>
 
         <!-- Collection Sizes -->
         <div class="insight-card">
           <h3><span class="emoji">📈</span> Collection Sizes</h3>
           <div class="histogram" id="histogram-sizes"></div>
+        </div>
+
+        <!-- 📅 Series Breakdown -->
+        <div class="insight-card">
+          <h3><span class="emoji">📅</span> By Series</h3>
+          <div class="histogram" id="histogram-series"></div>
         </div>
 
         <!-- Top Teams -->
@@ -352,6 +540,13 @@
         <div class="insight-card">
           <h3><span class="emoji">📦</span> Popular Sets</h3>
           <div id="top-sets-list"></div>
+        </div>
+
+        <!-- 🔢 Popular Jerseys -->
+        <div class="insight-card">
+          <h3><span class="emoji">🔢</span> Popular Jerseys</h3>
+          <div class="stat-label" style="margin-bottom: 0.25rem;">Most common jersey numbers</div>
+          <div class="jersey-grid" id="jersey-grid"></div>
         </div>
 
         <!-- Position Breakdown -->
@@ -391,6 +586,15 @@
             const positions = data.positions || {};
             const market = data.market || {};
             const tierPercents = stats.tierPercents || {};
+            
+            // New data
+            const whales = data.whales || {};
+            const series = data.series || [];
+            const jerseys = data.jerseys || [];
+            const editionSizes = data.editionSizes || {};
+            const mostValuable = data.mostValuable || [];
+            const serialDist = data.serialDistribution || {};
+            const richest = data.richestCollections || [];
 
             // Big numbers
             document.getElementById("stat-total-wallets").textContent = (stats.totalWallets || 0).toLocaleString();
@@ -403,21 +607,44 @@
             document.getElementById("biggest-collector-count").textContent = (biggestCollector.moments || 0).toLocaleString();
             document.getElementById("biggest-collector-link").href = "/?wallet=" + (biggestCollector.wallet || "");
 
+            // Whale stats
+            renderWhaleGrid(whales);
+
+            // Richest collections
+            renderRichestList(richest);
+
             // Low serials
             renderStatRows("low-serials-content", lowSerials);
+
+            // Serial distribution
+            renderHistogram("histogram-serials", serialDist, (v) => v.toLocaleString(), "bar-default");
 
             // Rarity breakdown
             renderRarityGrid(tierPercents);
 
+            // Most valuable
+            renderMostValuable(mostValuable);
+
             // Market stats
             renderMarketStats(market);
 
-            // Histograms
+            // Challenge engagement
+            const engagementPct = parseFloat(stats.challengeEngagement) || 0;
+            document.getElementById("engagement-fill").style.width = engagementPct + "%";
+            document.getElementById("engagement-fill").textContent = engagementPct + "%";
+            document.getElementById("unlocked-count").textContent = (stats.totalUnlocked || 0).toLocaleString();
+            document.getElementById("locked-count").textContent = (stats.totalLocked || 0).toLocaleString();
+
+            // Edition sizes
+            renderHistogram("histogram-editions", editionSizes, (v) => v.toLocaleString(), "bar-gold");
+
+            // Collection sizes
             renderHistogram("histogram-sizes", sizeDist, (v) => v.toLocaleString(), "bar-default");
-            renderHistogram("histogram-locked", {
-              "🔓 Unlocked": stats.totalUnlocked || 0,
-              "🔒 Locked": stats.totalLocked || 0
-            }, (v) => v.toLocaleString(), "bar-default");
+
+            // Series
+            const seriesData = {};
+            series.forEach(s => seriesData[s.name] = s.count);
+            renderHistogram("histogram-series", seriesData, (v) => v.toLocaleString(), "bar-default");
 
             // Tier histogram with colors
             renderTierHistogram("histogram-tiers", {
@@ -430,6 +657,9 @@
 
             // Position histogram
             renderPositionHistogram("histogram-positions", positions);
+
+            // Jerseys
+            renderJerseyGrid(jerseys);
 
             // Leaderboards
             renderLeaderboard("top-teams-list", topTeams.map((t, i) => ({
@@ -459,6 +689,81 @@
             console.error("loadInsights error:", err);
             loadingEl.innerHTML = '<div style="color: #ef4444;">⚠️ Failed to load insights</div>';
           }
+        }
+
+        function renderWhaleGrid(whales) {
+          const grid = document.getElementById("whale-grid");
+          if (!grid) return;
+          
+          const percents = whales.percents || {};
+          grid.innerHTML = `
+            <div class="whale-item">
+              <div class="whale-label">Top 10</div>
+              <div class="whale-value">${percents.top10 || 0}%</div>
+              <div class="whale-sub">${(whales.top10Moments || 0).toLocaleString()}</div>
+            </div>
+            <div class="whale-item">
+              <div class="whale-label">Top 100</div>
+              <div class="whale-value">${percents.top100 || 0}%</div>
+              <div class="whale-sub">${(whales.top100Moments || 0).toLocaleString()}</div>
+            </div>
+            <div class="whale-item">
+              <div class="whale-label">Top 1%</div>
+              <div class="whale-value">${percents.top1pct || 0}%</div>
+              <div class="whale-sub">${(whales.top1pctMoments || 0).toLocaleString()}</div>
+            </div>
+          `;
+        }
+
+        function renderRichestList(richest) {
+          const container = document.getElementById("richest-list");
+          if (!container) return;
+          
+          const medals = ["🥇", "🥈", "🥉", "4", "5"];
+          container.innerHTML = richest.map((r, i) => `
+            <div class="leaderboard-item">
+              <span class="leaderboard-rank">${medals[i] || i + 1}</span>
+              <div class="leaderboard-info">
+                <div class="leaderboard-name">${r.name}</div>
+                <div class="leaderboard-sub">${r.moments.toLocaleString()} moments</div>
+              </div>
+              <span class="leaderboard-count" style="color: #22c55e;">$${r.floorValue.toLocaleString()}</span>
+            </div>
+          `).join("");
+        }
+
+        function renderMostValuable(items) {
+          const container = document.getElementById("most-valuable-list");
+          if (!container) return;
+          
+          container.innerHTML = items.map(item => {
+            const tierClass = (item.tier || "").toLowerCase();
+            return `
+              <div class="valuable-item">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span class="valuable-player">${item.player || "Unknown"}</span>
+                  <span class="valuable-price">$${(item.floor || 0).toLocaleString()}</span>
+                </div>
+                <div class="valuable-details">
+                  <span>${item.team || ""}</span>
+                  ${item.tier ? `<span class="tier-badge ${tierClass}">${item.tier}</span>` : ""}
+                  <span>${item.set || ""}</span>
+                </div>
+              </div>
+            `;
+          }).join("");
+        }
+
+        function renderJerseyGrid(jerseys) {
+          const grid = document.getElementById("jersey-grid");
+          if (!grid) return;
+          
+          grid.innerHTML = jerseys.map(j => `
+            <div class="jersey-item">
+              <span class="jersey-number">#${j.number}</span>
+              <span class="jersey-count">${(j.count || 0).toLocaleString()}</span>
+            </div>
+          `).join("");
         }
 
         function renderStatRows(containerId, data) {
@@ -524,15 +829,15 @@
           const maxValue = Math.max(...entries.map(([, v]) => Number(v) || 0));
 
           container.innerHTML = entries.map(([label, value]) => {
-            const num = Number(value) || 0;
+              const num = Number(value) || 0;
             const width = maxValue > 0 ? Math.max((num / maxValue) * 100, 2) : 2;
-            return `
-              <div class="histogram-bar">
-                <div class="histogram-label">${label}</div>
+              return `
+                <div class="histogram-bar">
+                  <div class="histogram-label">${label}</div>
                 <div class="histogram-bar-fill ${barClass}" style="width: ${width}%;"></div>
-                <div class="histogram-value">${formatValue(num)}</div>
-              </div>
-            `;
+                  <div class="histogram-value">${formatValue(num)}</div>
+                </div>
+              `;
           }).join("");
         }
 
