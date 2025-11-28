@@ -25,8 +25,70 @@ function getEls() {
         filterPosition: document.getElementById("filter-position"),
         filterLocked: document.getElementById("filter-locked"),
         resetFilters: document.getElementById("reset-filters"),
-        table: document.getElementById("wallet-table")
+        table: document.getElementById("wallet-table"),
+        mobileCards: document.getElementById("wallet-mobile-cards")
     };
+}
+
+function showLoadingAnimation() {
+    const els = getEls();
+    
+    // Show loading in table
+    if (els.tbody) {
+        els.tbody.innerHTML = `
+            <tr class="skeleton-row">
+                <td class="skeleton-cell" colspan="14">
+                    <div class="wallet-loading">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text">
+                            Loading wallet data
+                            <span class="loading-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </span>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Show loading in mobile cards
+    if (els.mobileCards) {
+        els.mobileCards.innerHTML = `
+            <div class="wallet-loading">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">
+                    Loading wallet data
+                    <span class="loading-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Update title
+    if (els.title) {
+        els.title.innerHTML = `
+            <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                <span class="loading-spinner" style="width: 20px; height: 20px; border-width: 2px; margin: 0;"></span>
+                Loading wallet...
+            </span>
+        `;
+    }
+}
+
+function hideLoadingAnimation() {
+    const els = getEls();
+    
+    // Title will be updated by renderPage, so just clear loading state
+    if (els.title && els.title.textContent.includes("Loading")) {
+        els.title.textContent = "Moments";
+    }
 }
 
 function tierToClass(tier) {
@@ -412,8 +474,14 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
     const els = getEls();
     if (!els.summaryCard) return;
 
-    els.summaryCard.style.display = "none";
-    els.summaryCard.innerHTML = "";
+    // Show loading state in summary card
+    els.summaryCard.style.display = "flex";
+    els.summaryCard.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 1rem; width: 100%;">
+            <div class="loading-spinner" style="width: 24px; height: 24px; border-width: 3px; margin: 0;"></div>
+            <span style="color: var(--text-muted);">Loading wallet summary...</span>
+        </div>
+    `;
 
     try {
         const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`);
@@ -805,12 +873,9 @@ window.runQuery = async function runQuery(walletRaw) {
     const wallet = (walletRaw || "").trim().toLowerCase();
     if (!wallet) return;
 
-    if (els.title) {
-        els.title.textContent = "Loading wallet…";
-    }
-    if (els.tbody) {
-        els.tbody.innerHTML = "";
-    }
+    // Show loading animation
+    showLoadingAnimation();
+    
     if (els.pagerInfo) {
         els.pagerInfo.textContent = "";
     }
@@ -833,10 +898,16 @@ window.runQuery = async function runQuery(walletRaw) {
         buildFilterOptions();
         applyFilters();
         applySort();
+        
+        // Hide loading animation before rendering
+        hideLoadingAnimation();
         renderPage(1);
     } catch (err) {
         console.error("runQuery error", err);
         const errorMsg = err.message || String(err);
+        
+        // Hide loading animation on error
+        hideLoadingAnimation();
         
         if (els.title) {
             els.title.textContent = "Failed to load wallet";
@@ -853,6 +924,16 @@ window.runQuery = async function runQuery(walletRaw) {
                 <button class="btn-primary" onclick="window.runQuery('${wallet}')" style="margin-top: 0.5rem;">Retry</button>
             `;
             els.tbody.appendChild(errorDiv);
+        }
+        
+        // Also show error in mobile cards
+        if (els.mobileCards) {
+            els.mobileCards.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+                    <div style="margin-bottom: 1rem; color: var(--danger);">❌ ${errorMsg}</div>
+                    <button class="btn-primary" onclick="window.runQuery('${wallet}')" style="margin-top: 0.5rem;">Retry</button>
+                </div>
+            `;
         }
     }
 };
