@@ -1955,13 +1955,12 @@ app.get("/api/insights", async (req, res) => {
       // Biggest collector
       pool.query(`
         SELECT 
-          t.wallet_address,
-          t.total_moments,
-          COALESCE(w.display_name, w.username, t.wallet_address) AS name
-        FROM top_wallets_snapshot t
-        LEFT JOIN wallet_profiles w ON w.wallet_address = t.wallet_address
-        WHERE t.wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b')
-        ORDER BY t.total_moments DESC
+          wallet_address,
+          total_moments,
+          COALESCE(display_name, wallet_address) AS name
+        FROM top_wallets_snapshot
+        WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b')
+        ORDER BY total_moments DESC
         LIMIT 1;
       `),
       
