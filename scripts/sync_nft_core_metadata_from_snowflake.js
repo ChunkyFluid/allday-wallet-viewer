@@ -97,33 +97,32 @@ async function syncMetadata() {
         let whereClause = "";
         if (lastNftId) {
             const nftLit = `'${escapeLiteral(lastNftId)}'`;
-            whereClause = `
-      WHERE m.nft_id > ${nftLit}`;
+            whereClause = `WHERE m.NFT_ID > ${nftLit}`;
         }
 
         const sql = `
       SELECT
-        m.nft_id                             AS nft_id,
-        m.editionID                          AS edition_id,
-        m.playID                             AS play_id,
-        m.seriesID                           AS series_id,
-        m.setID                              AS set_id,
-        m.tier                               AS tier,
-        TRY_TO_NUMBER(m.serialNumber)        AS serial_number,
-        TRY_TO_NUMBER(m.maxMintSize)         AS max_mint_size,
-        m.firstName                          AS first_name,
-        m.lastName                           AS last_name,
-        m.teamName                           AS team_name,
-        m.position                           AS position,
-        TRY_TO_NUMBER(m.jerseyNumber)        AS jersey_number,
-        m.seriesName                         AS series_name,
-        m.setName                            AS set_name
+        m.NFT_ID                             AS nft_id,
+        m.EDITION_ID                         AS edition_id,
+        m.PLAY_ID                            AS play_id,
+        m.SERIES_ID                          AS series_id,
+        m.SET_ID                             AS set_id,
+        m.TIER                               AS tier,
+        TRY_TO_NUMBER(m.SERIAL_NUMBER)       AS serial_number,
+        TRY_TO_NUMBER(m.MAX_MINT_SIZE)       AS max_mint_size,
+        m.FIRST_NAME                         AS first_name,
+        m.LAST_NAME                          AS last_name,
+        m.TEAM_NAME                          AS team_name,
+        m.POSITION                           AS position,
+        TRY_TO_NUMBER(m.JERSEY_NUMBER)       AS jersey_number,
+        m.SERIES_NAME                        AS series_name,
+        m.SET_NAME                           AS set_name
       FROM ${db}.${schema}.ALLDAY_CORE_NFT_METADATA m
       JOIN ${db}.${schema}.ALLDAY_WALLET_HOLDINGS_CURRENT h
-        ON m.nft_id = h.nft_id
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY m.nft_id ORDER BY m.nft_id) = 1
+        ON m.NFT_ID = h.NFT_ID
       ${whereClause}
-      ORDER BY m.nft_id
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY m.NFT_ID ORDER BY m.NFT_ID) = 1
+      ORDER BY m.NFT_ID
       LIMIT ${BATCH_SIZE};
     `;
 

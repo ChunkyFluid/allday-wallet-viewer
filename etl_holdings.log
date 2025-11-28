@@ -1,0 +1,41 @@
+Postgres config: {
+  host: 'ep-bitter-tooth-a4tly49h-pooler.us-east-1.aws.neon.tech',
+  database: 'allday_analytics',
+  ssl: true
+}
+{"level":"INFO","message":"[9:00:17.611 AM]: Creating new connection object"}
+{"level":"INFO","message":"[9:00:17.622 AM]: Creating Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] with host: WBFEERF-YXC83821.snowflakecomputing.com, account: WBFEERF-YXC83821, accessUrl: https://WBFEERF-YXC83821.snowflakecomputing.com, user: CHUNK, password is provided, role: ACCOUNTADMIN, database: NFL_ALLDAY, schema: ANALYTICS, warehouse: COMPUTE_WH, region: undefined, authenticator: SNOWFLAKE, ocsp mode: FAIL_OPEN, os: darwin, os version: 23.5.0"}
+{"level":"INFO","message":"[9:00:17.623 AM]: Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] additional details: passcode in password is provided, passcode is not provided, private key is not provided, application: undefined, client name: snowflake-sdk, client version: 1.15.0, retry timeout: 300, private key path: undefined, private key pass is not provided, client store temporary credential: false, browser response timeout: 120000"}
+{"level":"INFO","message":"[9:00:17.623 AM]: Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] - connection object created successfully."}
+{"level":"INFO","message":"[9:00:17.624 AM]: Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] - connecting. Associated Snowflake domain: GLOBAL"}
+{"level":"INFO","message":"[9:00:17.625 AM]: Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] - authentication successful using: SNOWFLAKE"}
+{"level":"INFO","message":"[9:00:17.625 AM]: Trying to initialize Easy Logging"}
+{"level":"INFO","message":"[9:00:17.628 AM]: No client config detected."}
+{"level":"INFO","message":"[9:00:17.628 AM]: No config file path found. Client config will not be used."}
+{"level":"INFO","message":"[9:00:17.628 AM]: Easy Logging is disabled as no config has been found"}
+{"level":"INFO","message":"[9:00:17.631 AM]: Connection[id: f075a069-bc2f-4662-a3d4-5fd086c6ed40] - connected successfully after 7.286334000000011 milliseconds"}
+Connected to Snowflake as f075a069-bc2f-4662-a3d4-5fd086c6ed40
+Running holdings snapshot query in Snowflake...
+
+<--- Last few GCs --->
+ 0[37704:0x7fc130008000]   452200 ms: Mark-Compact (reduce) 4050.4 (4079.9) -> 4050.4 (4078.9) MB, pooled: 0.0 MB, 1331.18 / 0.00 ms (+ 0.0 ms in 0 steps since start of marking, biggest step 0.0 ms, walltime since start of marking 1338 ms) (average mu = 0.1[37704:0x7fc130008000]   453719 ms: Mark-Compact (reduce) 4058.7 (4087.2) -> 4058.7 (4087.2) MB, pooled: 0.0 MB, 1208.40 / 0.00 ms (+ 0.0 ms in 0 steps since start of marking, biggest step 0.0 ms, walltime since start of marking 1215 ms) (average mu = 0.1
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x10d70f29c node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 2: 0x10c46dc9b v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 3: 0x10c46dc5c v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 4: 0x10c63ecdd v8::internal::Heap::FatalProcessOutOfMemory(char const*) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 5: 0x10c64151a v8::internal::Heap::OldGenerationConsumedBytes() const [/usr/local/Cellar/node/25.2.1/bin/node]
+ 6: 0x10c6413af v8::internal::Heap::RecomputeLimits(v8::internal::GarbageCollector, v8::base::TimeTicks) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 7: 0x10c6501fd v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags, v8::internal::PerformHeapLimitCheck)::$_1::operator()() const [/usr/local/Cellar/node/25.2.1/bin/node]
+ 8: 0x10c64fe8d void heap::base::Stack::SetMarkerAndCallbackImpl<v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags, v8::internal::PerformHeapLimitCheck)::$_1>(heap::base::Stack*, void*, void const*) [/usr/local/Cellar/node/25.2.1/bin/node]
+ 9: 0x10cdcafa2 PushAllRegistersAndIterateStack [/usr/local/Cellar/node/25.2.1/bin/node]
+10: 0x10c63d17f v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags, v8::internal::PerformHeapLimitCheck) [/usr/local/Cellar/node/25.2.1/bin/node]
+11: 0x10c634c46 std::__1::__invoke_result_impl<void, v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment, v8::internal::AllocationHint)::$_0&>::type v8::internal::HeapAllocator::CollectGarbageAndRetryAllocation<v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment, v8::internal::AllocationHint)::$_0&>(v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment, v8::internal::AllocationHint)::$_0&, v8::internal::AllocationType) [/usr/local/Cellar/node/25.2.1/bin/node]
+12: 0x10c632bc6 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment, v8::internal::AllocationHint) [/usr/local/Cellar/node/25.2.1/bin/node]
+13: 0x10c61a695 v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [/usr/local/Cellar/node/25.2.1/bin/node]
+14: 0x10c999339 v8::internal::Runtime_AllocateInOldGeneration(int, unsigned long*, v8::internal::Isolate*) [/usr/local/Cellar/node/25.2.1/bin/node]
+15: 0x10ce9c9f6 Builtins_CEntry_Return1_ArgvOnStack_NoBuiltinExit [/usr/local/Cellar/node/25.2.1/bin/node]
+16: 0x12db57a79 
+17: 0x12daad527 

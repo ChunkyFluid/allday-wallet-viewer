@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Top holders – Chunky's NFLAD Viewer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/header.css" />
     <style>
       :root {
@@ -251,18 +252,13 @@
     <script src="/layout.js"></script>
 
     <main class="app-main">
-      <div class="page-title">Top wallet holders</div>
-      <div class="page-subtitle">
-        See the biggest NFL ALL DAY stacks in your local Neon snapshot, ranked by total moments held.
-      </div>
+      <div class="page-title">🏆 Leaderboard</div>
 
       <section class="top-card">
         <div class="top-header">
           <div class="top-header-left">
-            <div class="top-header-title">Leaderboard</div>
-            <div class="top-header-subtitle" id="top-subtitle">
-              Ranked by total moments, including locked and unlocked counts and tier breakdowns.
-            </div>
+            <div class="top-header-title">Top Collectors</div>
+            <div class="top-header-subtitle" id="top-subtitle"></div>
           </div>
           <div class="top-header-controls">
             <div>
@@ -319,6 +315,9 @@
               <tbody id="top-tbody"></tbody>
             </table>
           </div>
+
+          <!-- Mobile Card View -->
+          <div class="mobile-cards" id="top-mobile-cards"></div>
         </div>
       </section>
     </main>
@@ -505,6 +504,10 @@
             else statusText += " by total moments";
             statusEl.textContent = statusText + ".";
 
+            // Mobile cards container
+            const mobileCards = document.getElementById("top-mobile-cards");
+            if (mobileCards) mobileCards.innerHTML = "";
+
             wallets.forEach((w, idx) => {
               const tr = document.createElement("tr");
 
@@ -543,6 +546,33 @@
 
               tr.innerHTML = rowHtml;
               tbodyEl.appendChild(tr);
+
+              // Mobile card
+              if (mobileCards) {
+                const rank = idx + 1;
+                const isTop3 = rank <= 3;
+                const card = document.createElement("a");
+                card.href = "/?wallet=" + encodeURIComponent(addr);
+                card.className = "mobile-card";
+                card.innerHTML = `
+                  <div class="mobile-card-rank ${isTop3 ? 'top3' : ''}">${rank}</div>
+                  <div class="mobile-card-main">
+                    <div class="mobile-card-header">
+                      <span class="mobile-card-title">${displayName}</span>
+                    </div>
+                    <div class="mobile-card-details">
+                      <span>${shortAddr(addr)}</span>
+                      <span style="color: #4ade80;">✓${formatNumber(unlocked)}</span>
+                      <span style="color: #fbbf24;">🔒${formatNumber(locked)}</span>
+                    </div>
+                  </div>
+                  <div class="mobile-card-right">
+                    <div class="mobile-card-value">${formatNumber(total)}</div>
+                    <div class="mobile-card-sub">${view === "value" ? formatCurrency(floorValue) : "moments"}</div>
+                  </div>
+                `;
+                mobileCards.appendChild(card);
+              }
             });
 
             tableEl.style.display = "table";

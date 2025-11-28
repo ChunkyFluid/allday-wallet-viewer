@@ -12,30 +12,30 @@
 
         return `
       <header class="app-header">
-        <div class="brand">
+        <a href="/" class="brand">
           <div class="brand-logo">🐱</div>
-          <div class="brand-title">CHUNKY'S NFLAD VIEWER</div>
-        </div>
+          <div class="brand-title desktop-only">CHUNKY'S NFLAD VIEWER</div>
+          <div class="brand-title mobile-only">Chunky Viewer</div>
+        </a>
 
-        <nav class="main-nav">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button>
+
+        <nav class="main-nav" id="main-nav">
           ${navLink("/", "Wallet")}
-          ${navLink("/top-holders.html", "Top holders")}
+          ${navLink("/top-holders.html", "Leaderboard")}
           ${navLink("/explorer.html", "Browse")}
           <a href="/sniper.html" class="${path === '/sniper.html' ? 'active nav-hot' : 'nav-hot'}">🎯 Sniper</a>
-          ${navLink("/live-transactions.html", "Live")}
           ${navLink("/insights.html", "Insights")}
           ${navLink("/faq.html", "FAQ")}
           ${navLink("/contact.html", "Contact")}
           ${navLink("/login.html", "Login", { id: "nav-account-link" })}
         </nav>
-
       </header>
     `;
     }
 
     function normalizePath(path) {
         if (!path) return "/";
-        // Treat /index.html as /
         if (path === "/index.html") return "/";
         return path;
     }
@@ -48,9 +48,10 @@
             const res = await fetch("/api/me");
             const data = await res.json();
 
-            if (data && data.user) {
+            if (data && data.ok && data.user) {
                 link.href = "/login.html";
-                link.textContent = data.user.email;
+                link.textContent = "⚙️ Account";
+                link.title = data.user.email;
             } else {
                 link.href = "/login.html";
                 link.textContent = "Login";
@@ -60,14 +61,49 @@
         }
     }
 
+    function initMobileMenu() {
+        const toggle = document.getElementById("menu-toggle");
+        const nav = document.getElementById("main-nav");
+        
+        if (!toggle || !nav) return;
+
+        toggle.addEventListener("click", () => {
+            const isOpen = nav.classList.toggle("open");
+            toggle.textContent = isOpen ? "✕" : "☰";
+            toggle.setAttribute("aria-expanded", isOpen);
+            
+            // Prevent body scroll when menu is open
+            document.body.style.overflow = isOpen ? "hidden" : "";
+        });
+
+        // Close menu when clicking a link
+        nav.querySelectorAll("a").forEach(link => {
+            link.addEventListener("click", () => {
+                nav.classList.remove("open");
+                toggle.textContent = "☰";
+                document.body.style.overflow = "";
+            });
+        });
+
+        // Close menu on escape key
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && nav.classList.contains("open")) {
+                nav.classList.remove("open");
+                toggle.textContent = "☰";
+                document.body.style.overflow = "";
+            }
+        });
+    }
+
     function initHeader() {
         const container = document.getElementById("app-header");
         if (!container) return;
 
         container.innerHTML = buildHeaderHTML();
         updateNavAccount();
+        initMobileMenu();
     }
 
-    // Run immediately (scripts are loaded at end of body)
+    // Run immediately
     initHeader();
 })();

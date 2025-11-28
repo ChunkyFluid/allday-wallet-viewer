@@ -261,6 +261,20 @@ function applySort() {
     });
 }
 
+function getTeamAbbrev(teamName) {
+    const abbrevs = {
+        "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
+        "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
+        "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+        "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC",
+        "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA",
+        "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+        "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF",
+        "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"
+    };
+    return abbrevs[teamName] || teamName?.substring(0, 3).toUpperCase() || '???';
+}
+
 function renderPage(page) {
     const els = getEls();
     if (!els.tbody) return;
@@ -275,6 +289,12 @@ function renderPage(page) {
     const slice = filteredMoments.slice(start, end);
 
     els.tbody.innerHTML = "";
+
+    // Also render mobile cards
+    const mobileCards = document.getElementById("wallet-mobile-cards");
+    if (mobileCards) {
+        mobileCards.innerHTML = "";
+    }
 
     for (const r of slice) {
         const tr = document.createElement("tr");
@@ -317,6 +337,39 @@ function renderPage(page) {
       </td>
     `;
         els.tbody.appendChild(tr);
+
+        // Mobile card
+        if (mobileCards) {
+            const tierLower = (r.tier || "common").toLowerCase();
+            const teamAbbrev = getTeamAbbrev(r.team_name);
+            const cardUrl = marketUrl || momentUrl || "#";
+            const lockedClass = r.is_locked ? "locked" : "unlocked";
+            
+            const card = document.createElement("a");
+            card.href = cardUrl;
+            card.target = "_blank";
+            card.className = `mobile-card ${lockedClass}`;
+            card.innerHTML = `
+                <div class="mobile-card-icon ${tierLower}">🏈</div>
+                <div class="mobile-card-main">
+                    <div class="mobile-card-header">
+                        <span class="mobile-card-title">${playerName || "Unknown"}</span>
+                        <span class="mobile-card-badge">${teamAbbrev}</span>
+                        <span class="mobile-card-badge tier ${tierLower}">${r.tier || "?"}</span>
+                    </div>
+                    <div class="mobile-card-details">
+                        <span>${r.set_name || "Unknown Set"}</span>
+                        <span>#${serial || "?"}</span>
+                        <span>${r.is_locked ? "🔒" : "✓"}</span>
+                    </div>
+                </div>
+                <div class="mobile-card-right">
+                    <div class="mobile-card-value">${lowAsk || "—"}</div>
+                    <div class="mobile-card-sub">${r.position || ""}</div>
+                </div>
+            `;
+            mobileCards.appendChild(card);
+        }
     }
 
     if (els.title) {
@@ -419,22 +472,27 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
 
         els.summaryCard.innerHTML = `
       <div class="wallet-summary-main">
-        <div class="wallet-summary-label">Wallet overview</div>
+        <div class="wallet-summary-label mobile-hidden">Wallet overview</div>
         <div class="wallet-summary-address">${addressLabel}</div>
-        <div class="wallet-summary-chips">
+        <div class="wallet-summary-chips mobile-hidden">
           <span class="chip">Total: ${stats.momentsTotal ?? 0}</span>
           <span class="chip">Unlocked: ${stats.unlockedCount ?? 0}</span>
           <span class="chip">Locked: ${stats.lockedCount ?? 0}</span>
-          <span class="chip" title="Sum of per-edition lowest asks from edition_price_scrape across all copies in this wallet.">Floor value: $${floorText}</span>
-          <span class="chip" title="Sum of per-edition average sale prices (ASP) from edition_price_scrape across all copies.">ASP value: $${aspText}</span>
+          <span class="chip" title="Sum of per-edition lowest asks">Floor value: $${floorText}</span>
+          <span class="chip" title="Sum of per-edition average sale prices">ASP value: $${aspText}</span>
         </div>
-        <div class="wallet-summary-chips">
+        <!-- Mobile-only simplified stats -->
+        <div class="wallet-summary-chips mobile-show" style="display: none;">
+          <span class="chip">💰 $${floorText}</span>
+          <span class="chip">📊 $${aspText}</span>
+        </div>
+        <div class="wallet-summary-chips mobile-hidden">
           <span class="chip">Holdings last sync: ${holdingsSyncText}</span>
           <span class="chip">Prices last scrape: ${pricesSyncText}</span>
         </div>
-        ${setDefaultButtonHtml}
+        <div class="mobile-hidden">${setDefaultButtonHtml}</div>
       </div>
-      <div class="wallet-summary-chips">
+      <div class="wallet-summary-chips" style="flex-wrap: wrap;">
         <span class="chip-pill-tier chip-common" style="cursor: pointer;" onclick="filterByTier('Common')" title="Click to filter by Common tier">Common: ${byTier.Common ?? 0}</span>
         <span class="chip-pill-tier chip-uncommon" style="cursor: pointer;" onclick="filterByTier('Uncommon')" title="Click to filter by Uncommon tier">Uncommon: ${byTier.Uncommon ?? 0}</span>
         <span class="chip-pill-tier chip-rare" style="cursor: pointer;" onclick="filterByTier('Rare')" title="Click to filter by Rare tier">Rare: ${byTier.Rare ?? 0}</span>
@@ -503,10 +561,10 @@ function updateSummaryWithStats(wallet) {
     const existingStats = mainDiv.querySelectorAll(".wallet-stats-extra");
     existingStats.forEach(el => el.remove());
 
-    // Add new stats
+    // Add new stats (hidden on mobile)
     if (topSets.length > 0 || topPlayers.length > 0) {
         const statsDiv = document.createElement("div");
-        statsDiv.className = "wallet-stats-extra";
+        statsDiv.className = "wallet-stats-extra mobile-hidden";
         statsDiv.style.cssText = "margin-top: 0.5rem;";
         
         if (topSets.length > 0) {

@@ -63,16 +63,15 @@ async function run() {
     console.log('Running holdings snapshot query in Snowflake...');
     const rows = await sfQuery(HOLDINGS_SQL);
 
-    // TEMP LIMIT so this stays light while we test
-    const limitedRows = rows.slice(0, 20000);
-    console.log('Holdings rows to upsert:', limitedRows.length);
+    // Process all rows (no limit)
+    console.log('Holdings rows to upsert:', rows.length);
 
     await pgQuery('BEGIN');
 
     // For now, rebuild the table from scratch each run
     await pgQuery('DELETE FROM wallet_holdings');
 
-    for (const row of limitedRows) {
+    for (const row of rows) {
       const { nft_id, wallet_address, block_timestamp } = row;
 
       if (!nft_id || !wallet_address) continue;

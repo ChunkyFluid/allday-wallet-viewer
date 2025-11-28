@@ -75,10 +75,7 @@
     <script src="/layout.js"></script>
 
     <main class="app-main">
-      <div class="page-title">Global Insights</div>
-      <div class="page-subtitle">
-        Distribution and statistics across all wallets in the snapshot.
-      </div>
+      <div class="page-title" style="margin-bottom: 1rem;">📈 Insights</div>
 
       <div id="insights-loading" style="text-align: center; padding: 2rem; color: var(--text-muted);">
         Loading insights...
@@ -86,35 +83,35 @@
 
       <div id="insights-content" class="insights-grid" style="display: none;">
         <div class="insight-card">
-          <h3>Total Wallets</h3>
+          <h3>👥 Total Wallets</h3>
           <div class="stat" id="stat-total-wallets">-</div>
-          <div class="stat-label">Unique wallet addresses</div>
+          <div class="stat-label">Collectors</div>
         </div>
 
         <div class="insight-card">
-          <h3>Total Moments</h3>
+          <h3>🏈 Total Moments</h3>
           <div class="stat" id="stat-total-moments">-</div>
-          <div class="stat-label">Across all wallets</div>
+          <div class="stat-label">In circulation</div>
         </div>
 
         <div class="insight-card">
-          <h3>Average Collection Size</h3>
+          <h3>📊 Avg Collection</h3>
           <div class="stat" id="stat-avg-size">-</div>
-          <div class="stat-label">Moments per wallet</div>
+          <div class="stat-label">Per wallet</div>
         </div>
 
         <div class="insight-card">
-          <h3>Wallet Size Distribution</h3>
+          <h3>📈 Collection Sizes</h3>
           <div class="histogram" id="histogram-sizes"></div>
         </div>
 
         <div class="insight-card">
-          <h3>Tier Distribution</h3>
+          <h3>💎 By Tier</h3>
           <div class="histogram" id="histogram-tiers"></div>
         </div>
 
         <div class="insight-card">
-          <h3>Locked vs Unlocked</h3>
+          <h3>🔒 Locked vs Unlocked</h3>
           <div class="histogram" id="histogram-locked"></div>
         </div>
       </div>

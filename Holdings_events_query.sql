@@ -39,6 +39,4 @@ SELECT
 FROM latest
 WHERE "rn" = 1
   AND "event_type" = 'Deposit'
-  AND "to_addr" IS NOT NULL
-ORDER BY "block_timestamp" DESC
-LIMIT 50000;
+  AND "to_addr" IS NOT NULL;

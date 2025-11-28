@@ -682,6 +682,31 @@
       margin-bottom: 1rem;
     }
 
+    /* Mobile filter toggle button */
+    .filters-toggle {
+      display: none;
+      width: 100%;
+      background: var(--sniper-card);
+      border: 1px solid var(--sniper-border);
+      border-radius: 12px;
+      padding: 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .filters-toggle .toggle-icon {
+      transition: transform 0.2s;
+    }
+
+    .filters-toggle.open .toggle-icon {
+      transform: rotate(180deg);
+    }
+
     /* Responsive */
     @media (max-width: 1024px) {
       .layout-two-column {
@@ -701,10 +726,301 @@
     }
 
     @media (max-width: 768px) {
-      .page-header h1 { font-size: 1.25rem; }
-      .listings-grid { grid-template-columns: 1fr; }
-      .stat-card { min-width: 80px; padding: 10px 14px; }
-      .stat-card .stat-value { font-size: 1.2rem; }
+      .sniper-container {
+        padding: 1rem 0.75rem;
+      }
+      
+      .page-header h1 { font-size: 1.1rem; }
+      
+      .page-header-left {
+        width: 100%;
+      }
+      
+      .stats-bar {
+        gap: 8px;
+      }
+      
+      .stat-card { 
+        min-width: 70px; 
+        padding: 8px 12px;
+        flex: 1;
+      }
+      .stat-card .stat-value { font-size: 1.1rem; }
+      .stat-card .stat-label { font-size: 0.6rem; }
+      
+      /* Show filter toggle on mobile */
+      .filters-toggle {
+        display: flex;
+      }
+      
+      /* Hide filters by default on mobile */
+      .filters-card {
+        display: none;
+        margin-bottom: 1rem;
+      }
+      
+      .filters-card.open {
+        display: block;
+      }
+      
+      .layout-two-column {
+        gap: 0;
+      }
+      
+      /* Table improvements */
+      .results-card {
+        border-radius: 12px;
+      }
+      
+      .results-header {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: stretch;
+      }
+      
+      .results-info {
+        font-size: 0.8rem;
+        text-align: center;
+      }
+      
+      .view-toggle {
+        justify-content: center;
+      }
+      
+      /* Make table scrollable horizontally */
+      .listings-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .listings-table thead,
+      .listings-table tbody,
+      .listings-table tr {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+      }
+      
+      .listings-table {
+        min-width: 800px;
+      }
+      
+      .listings-table th,
+      .listings-table td {
+        padding: 10px 8px;
+        font-size: 0.75rem;
+      }
+      
+      .listings-grid { 
+        grid-template-columns: 1fr;
+        padding: 1rem;
+        gap: 12px;
+      }
+      
+      .listing-card {
+        border-radius: 10px;
+      }
+      
+      .card-image {
+        height: 140px;
+      }
+      
+      .card-body {
+        padding: 12px;
+      }
+      
+      .player-name {
+        font-size: 1rem;
+      }
+      
+      .btn-snipe {
+        padding: 14px;
+        font-size: 0.85rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .sniper-container {
+        padding: 0.75rem 0.5rem;
+      }
+      
+      .page-header h1 { font-size: 1rem; }
+      
+      .stat-card { 
+        padding: 6px 10px;
+      }
+      .stat-card .stat-value { font-size: 1rem; }
+      
+      .listings-table th,
+      .listings-table td {
+        padding: 8px 6px;
+        font-size: 0.7rem;
+      }
+    }
+
+    /* ========== MOBILE CARD LIST ========== */
+    .mobile-listings {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .listings-table {
+        display: none !important;
+      }
+      
+      .mobile-listings {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .mobile-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
+        border: 1px solid var(--sniper-border);
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.15s, border-color 0.15s;
+      }
+      
+      .mobile-card:hover {
+        transform: translateX(4px);
+        border-color: #3b82f6;
+      }
+      
+      .mobile-card.is-deal {
+        border-left: 3px solid #22c55e;
+      }
+      
+      .mobile-card.is-hot-deal {
+        border-left: 3px solid #22c55e;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(15, 23, 42, 0.9));
+      }
+      
+      .mobile-card-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+      }
+      
+      .mobile-card-icon.common { background: #4b5563; }
+      .mobile-card-icon.uncommon { background: #6b7280; }
+      .mobile-card-icon.rare { background: #f97316; }
+      .mobile-card-icon.legendary { background: linear-gradient(135deg, #ffd54f, #ffb300); }
+      .mobile-card-icon.ultimate { background: linear-gradient(135deg, #ff5b81, #6f42c1); }
+      
+      .mobile-card-main {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      .mobile-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 2px;
+      }
+      
+      .mobile-card-player {
+        font-weight: 600;
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      .mobile-card-team {
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+      
+      .mobile-card-tier {
+        font-size: 0.6rem;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+      
+      .mobile-card-tier.common { background: #4b5563; color: #e5e7eb; }
+      .mobile-card-tier.uncommon { background: #6b7280; color: #e5e7eb; }
+      .mobile-card-tier.rare { background: #f97316; color: #111; }
+      .mobile-card-tier.legendary { background: linear-gradient(135deg, #ffd54f, #ffb300); color: #111; }
+      .mobile-card-tier.ultimate { background: linear-gradient(135deg, #ff5b81, #6f42c1); color: #fff; }
+      
+      .mobile-card-details {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      
+      .mobile-card-set {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+      }
+      
+      .mobile-card-right {
+        text-align: right;
+        flex-shrink: 0;
+      }
+      
+      .mobile-card-price {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #3b82f6;
+      }
+      
+      .mobile-card.is-deal .mobile-card-price,
+      .mobile-card.is-hot-deal .mobile-card-price {
+        color: #22c55e;
+      }
+      
+      .mobile-card-deal {
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+      
+      .mobile-card-deal.positive { color: #22c55e; }
+      .mobile-card-deal.negative { color: #ef4444; }
+      .mobile-card-deal.neutral { color: #6b7280; }
+      
+      .mobile-card-serial {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+      
+      .mobile-card-serial.low-serial {
+        color: #fbbf24;
+        font-weight: 600;
+      }
+      
+      .view-toggle {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -738,10 +1054,16 @@
       </div>
     </div>
 
+    <!-- Mobile Filter Toggle -->
+    <button class="filters-toggle" id="filters-toggle">
+      <span>🎚️ Filters</span>
+      <span class="toggle-icon">▼</span>
+    </button>
+
     <!-- Two Column Layout -->
     <div class="layout-two-column">
       <!-- Left: Filters -->
-      <aside class="filters-card">
+      <aside class="filters-card" id="filters-card">
         <div class="filters-title">
           Filters
           <span class="cache-info" id="cache-status">0 floors</span>
@@ -838,7 +1160,7 @@
         <!-- Grid View -->
         <div class="listings-grid" id="listings-grid"></div>
 
-        <!-- Table View -->
+        <!-- Table View (Desktop) -->
         <table class="listings-table active" id="listings-table">
           <thead>
             <tr>
@@ -855,6 +1177,9 @@
           </thead>
           <tbody id="table-body"></tbody>
         </table>
+
+        <!-- Mobile Card View -->
+        <div class="mobile-listings" id="mobile-listings"></div>
       </div>
     </div>
   </div>
@@ -1102,9 +1427,25 @@
       return filtered;
     }
 
+    // Get team abbreviation
+    function getTeamAbbrev(teamName) {
+      const abbrevs = {
+        "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
+        "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
+        "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+        "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC",
+        "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA",
+        "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+        "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF",
+        "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"
+      };
+      return abbrevs[teamName] || teamName?.substring(0, 3).toUpperCase() || '???';
+    }
+
     // Render listings
     function renderListings() {
       const filtered = getFilteredListings();
+      const mobileListings = document.getElementById('mobile-listings');
 
       if (filtered.length === 0) {
         listingsGrid.innerHTML = `
@@ -1115,9 +1456,14 @@
           </div>
         `;
         tableBody.innerHTML = `
-          <tr><td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
+          <tr><td colspan="9" style="text-align: center; padding: 40px; color: #6b7280;">
             No listings match your filters
           </td></tr>
+        `;
+        mobileListings.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #6b7280;">
+            🔍 No listings match your filters
+          </div>
         `;
         return;
       }
@@ -1170,7 +1516,7 @@
         `;
       }).join('');
 
-      // Table view - all listings with deal highlighting
+      // Table view - all listings with deal highlighting (Desktop)
       tableBody.innerHTML = filtered.map(l => {
         const isDeal = l.dealPercent > 0;
         const isHotDeal = l.dealPercent >= 15;
@@ -1224,6 +1570,52 @@
               </a>
             </td>
           </tr>
+        `;
+      }).join('');
+
+      // Mobile card view
+      mobileListings.innerHTML = filtered.map(l => {
+        const isDeal = l.dealPercent > 0;
+        const isHotDeal = l.dealPercent >= 15;
+        const isLowSerial = (l.serialNumber || 999999) <= 100;
+        const tierClass = getTierClass(l.tier);
+        const teamAbbrev = getTeamAbbrev(l.teamName);
+        
+        // Deal display
+        let dealDisplay = '';
+        let dealClass = 'neutral';
+        if (l.dealPercent > 0) {
+          dealDisplay = `↓${l.dealPercent.toFixed(0)}%`;
+          dealClass = 'positive';
+        } else if (l.dealPercent < 0) {
+          dealDisplay = `↑${Math.abs(l.dealPercent).toFixed(0)}%`;
+          dealClass = 'negative';
+        }
+        
+        // Card class
+        let cardClass = 'mobile-card';
+        if (isHotDeal) cardClass += ' is-hot-deal';
+        else if (isDeal) cardClass += ' is-deal';
+        
+        return `
+          <a href="${l.listingUrl || '#'}" target="_blank" class="${cardClass}">
+            <div class="mobile-card-icon ${tierClass}">🏈</div>
+            <div class="mobile-card-main">
+              <div class="mobile-card-header">
+                <span class="mobile-card-player">${l.playerName || 'Unknown'}</span>
+                <span class="mobile-card-team">${teamAbbrev}</span>
+                <span class="mobile-card-tier ${tierClass}">${l.tier || '?'}</span>
+              </div>
+              <div class="mobile-card-details">
+                <span class="mobile-card-set">${l.setName || 'Unknown Set'}</span>
+                <span class="mobile-card-serial ${isLowSerial ? 'low-serial' : ''}">#${l.serialNumber || '?'}</span>
+              </div>
+            </div>
+            <div class="mobile-card-right">
+              <div class="mobile-card-price">${formatPrice(l.listingPrice)}</div>
+              ${dealDisplay ? `<div class="mobile-card-deal ${dealClass}">${dealDisplay}</div>` : ''}
+            </div>
+          </a>
         `;
       }).join('');
     }
@@ -1294,6 +1686,17 @@
         }
       });
     });
+
+    // Mobile filter toggle
+    const filtersToggle = document.getElementById('filters-toggle');
+    const filtersCard = document.getElementById('filters-card');
+    
+    if (filtersToggle && filtersCard) {
+      filtersToggle.addEventListener('click', () => {
+        filtersCard.classList.toggle('open');
+        filtersToggle.classList.toggle('open');
+      });
+    }
 
     // Initialize
     fetchListings();

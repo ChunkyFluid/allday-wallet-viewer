@@ -2,46 +2,11 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>Login – Chunky's NFLAD Viewer</title>
+        <title>Account – Chunky's NFLAD Viewer</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="stylesheet" href="/header.css" />
+        <link rel="stylesheet" href="/styles.css" />
         <style>
-            :root {
-                --bg-main: #050816;
-                --bg-card: #101322;
-                --border-subtle: rgba(255, 255, 255, 0.06);
-                --text-main: #f9fafb;
-                --text-muted: #9ca3af;
-                --accent-purple: #6f42c1;
-                --accent-blue: #007bff;
-                --accent-cyan: #0dcaf0;
-            }
-
-            * {
-                box-sizing: border-box;
-            }
-
-            body {
-                margin: 0;
-                font-family:
-                    system-ui,
-                    -apple-system,
-                    BlinkMacSystemFont,
-                    "Segoe UI",
-                    sans-serif;
-                background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
-                color: var(--text-main);
-            }
-
-            a {
-                color: var(--accent-cyan);
-                text-decoration: none;
-            }
-
-            a:hover {
-                text-decoration: underline;
-            }
-
             .app-shell {
                 max-width: 95%;
                 margin: 0 auto;
@@ -54,22 +19,25 @@
 
             .login-wrapper {
                 width: 100%;
-                max-width: 420px;
+                max-width: 480px;
             }
 
             .login-card {
-                background: var(--bg-card);
-                border: 1px solid var(--border-subtle);
-                border-radius: 12px;
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px;
                 padding: 2rem;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             }
 
             .login-title {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
                 font-weight: 700;
                 margin-bottom: 0.5rem;
-                color: var(--text-main);
+                background: linear-gradient(135deg, #fbbf24, #ec4899, #6366f1);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
             }
 
             .login-subtitle {
@@ -79,12 +47,18 @@
                 line-height: 1.5;
             }
 
+            .page-icon {
+                text-align: center;
+                font-size: 2.5rem;
+                margin-bottom: 0.5rem;
+            }
+
             .btn-primary {
-                background: linear-gradient(135deg, var(--accent-blue) 0%, #0056b3 100%);
+                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
                 color: white;
                 border: none;
                 padding: 0.75rem 1.5rem;
-                border-radius: 8px;
+                border-radius: 12px;
                 font-size: 1rem;
                 font-weight: 600;
                 cursor: pointer;
@@ -94,25 +68,41 @@
 
             .btn-primary:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
-            }
-
-            .btn-primary:active {
-                transform: translateY(0);
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
             }
 
             .btn-secondary {
                 background: transparent;
-                border: 1px solid var(--border-subtle);
-                color: var(--text-main);
-                border-radius: 999px;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                color: var(--text);
+                padding: 0.75rem 1.5rem;
+                border-radius: 12px;
+                font-size: 0.9rem;
                 cursor: pointer;
                 transition: all 0.15s ease;
+                width: 100%;
             }
 
             .btn-secondary:hover {
                 background: rgba(255, 255, 255, 0.05);
-                border-color: var(--accent-blue);
+                border-color: #6366f1;
+            }
+
+            .btn-danger {
+                background: transparent;
+                border: 1px solid rgba(239, 68, 68, 0.5);
+                color: #ef4444;
+                padding: 0.75rem 1.5rem;
+                border-radius: 12px;
+                font-size: 0.9rem;
+                cursor: pointer;
+                transition: all 0.15s ease;
+                width: 100%;
+            }
+
+            .btn-danger:hover {
+                background: rgba(239, 68, 68, 0.1);
+                border-color: #ef4444;
             }
 
             .btn-google {
@@ -120,7 +110,7 @@
                 color: #333;
                 border: 1px solid #dadce0;
                 padding: 0.75rem 1.5rem;
-                border-radius: 8px;
+                border-radius: 12px;
                 font-size: 1rem;
                 font-weight: 500;
                 cursor: pointer;
@@ -128,6 +118,7 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                width: 100%;
             }
 
             .btn-google:hover {
@@ -137,406 +128,588 @@
 
             .status {
                 margin-top: 1rem;
-                font-size: 0.8rem;
+                font-size: 0.85rem;
                 color: var(--text-muted);
                 min-height: 1.2em;
+                text-align: center;
             }
 
             .status.error {
-                color: #f97373;
+                color: #f87171;
             }
 
             .status.success {
                 color: #4ade80;
             }
 
-            input[type="email"],
-            input[type="password"] {
+            .form-group {
+                margin-bottom: 1rem;
+            }
+
+            .form-group label {
+                display: block;
+                margin-bottom: 0.5rem;
+                font-size: 0.85rem;
+                color: var(--text-muted);
+            }
+
+            .form-group input {
                 width: 100%;
-                padding: 0.75rem;
-                background: var(--bg-main);
-                border: 1px solid var(--border-subtle);
-                border-radius: 6px;
-                color: var(--text-main);
+                padding: 0.75rem 1rem;
+                background: rgba(5, 8, 22, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: var(--text);
                 font-size: 1rem;
             }
 
-            input[type="email"]:focus,
-            input[type="password"]:focus {
+            .form-group input:focus {
                 outline: none;
-                border-color: var(--accent-blue);
+                border-color: #6366f1;
             }
 
-            label {
-                display: block;
-                margin-bottom: 0.5rem;
-                font-size: 0.9rem;
+            .form-group input::placeholder {
                 color: var(--text-muted);
             }
+
+            .divider {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin: 1.5rem 0;
+                color: var(--text-muted);
+                font-size: 0.8rem;
+            }
+
+            .divider::before,
+            .divider::after {
+                content: '';
+                flex: 1;
+                height: 1px;
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            /* Account Settings Styles */
+            .settings-section {
+                background: rgba(5, 8, 22, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 12px;
+                padding: 1.25rem;
+                margin-bottom: 1rem;
+            }
+
+            .settings-section h3 {
+                font-size: 0.9rem;
+                font-weight: 600;
+                margin: 0 0 0.75rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .settings-section .current-value {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                margin-bottom: 0.75rem;
+                padding: 0.5rem 0.75rem;
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 8px;
+                word-break: break-all;
+            }
+
+            .settings-section .current-value.empty {
+                font-style: italic;
+                color: rgba(255, 255, 255, 0.3);
+            }
+
+            .settings-row {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .settings-row input {
+                flex: 1;
+                padding: 0.6rem 0.75rem;
+                background: rgba(5, 8, 22, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                color: var(--text);
+                font-size: 0.9rem;
+            }
+
+            .settings-row input:focus {
+                outline: none;
+                border-color: #6366f1;
+            }
+
+            .settings-row button {
+                padding: 0.6rem 1rem;
+                border-radius: 8px;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+
+            .user-info {
+                text-align: center;
+                margin-bottom: 1.5rem;
+                padding-bottom: 1.5rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .user-avatar {
+                width: 64px;
+                height: 64px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                margin: 0 auto 0.75rem;
+            }
+
+            .user-email {
+                font-size: 1rem;
+                font-weight: 500;
+            }
+
+            .user-since {
+                font-size: 0.8rem;
+                color: var(--text-muted);
+            }
+
+            @media (max-width: 480px) {
+                .login-card {
+                    padding: 1.5rem;
+                }
+
+                .settings-row {
+                    flex-direction: column;
+                }
+
+                .settings-row button {
+                    width: 100%;
+                }
+            }
         </style>
-        <link rel="stylesheet" href="/header.css" />
     </head>
     <body>
-        <link rel="stylesheet" href="/header.css" />
         <div id="app-header"></div>
         <script src="/layout.js"></script>
+        
         <div class="app-shell">
-
             <div class="login-wrapper">
-                <section class="login-card">
-                    <div class="login-title">Sign In</div>
-                    <div class="login-subtitle">
-                        Sign in to save your default wallet and access your personalized view.
+                <!-- Login View -->
+                <section id="login-view" class="login-card" style="display: none;">
+                    <div class="page-icon">🔐</div>
+                    <div class="login-title" style="text-align: center;">Sign In</div>
+                    <div class="login-subtitle" style="text-align: center;">
+                        Access your personalized view
                     </div>
 
-                    <!-- Email/Password Login Form -->
-                    <form id="login-form" style="display: none;">
-                        <div style="margin-bottom: 1rem;">
+                    <form id="login-form">
+                        <div class="form-group">
                             <label for="email">Email</label>
-                            <input 
-                                type="email" 
-                                id="email" 
-                                name="email" 
-                                required 
-                                placeholder="your@email.com"
-                            />
+                            <input type="email" id="email" name="email" required placeholder="your@email.com" />
                         </div>
-                        <div style="margin-bottom: 1rem;">
+                        <div class="form-group">
                             <label for="password">Password</label>
-                            <input 
-                                type="password" 
-                                id="password" 
-                                name="password" 
-                                required 
-                                placeholder="••••••••"
-                            />
+                            <input type="password" id="password" name="password" required placeholder="••••••••" />
                         </div>
-                        <div style="margin-bottom: 1rem;">
-                            <label for="login-wallet">Default Wallet Address (optional)</label>
-                            <input 
-                                type="text" 
-                                id="login-wallet" 
-                                name="wallet" 
-                                placeholder="0x..."
-                                pattern="^0x[a-fA-F0-9]{16,64}$"
-                                title="Flow wallet address starting with 0x"
-                            />
-                            <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
-                                Your wallet will auto-load when you visit the page
-                            </small>
-                        </div>
-                        <button type="submit" class="btn-primary" style="width: 100%; margin-bottom: 0.75rem;">
+                        <button type="submit" class="btn-primary" style="margin-bottom: 0.75rem;">
                             Sign In
                         </button>
-                        <button type="button" id="btn-show-signup" class="btn-secondary" style="width: 100%; font-size: 0.9rem;">
-                            Don't have an account? Sign up
+                        <button type="button" id="btn-show-signup" class="btn-secondary">
+                            Create an account
                         </button>
                     </form>
 
-                    <!-- Signup Form -->
-                    <form id="signup-form" style="display: none;">
-                        <div style="margin-bottom: 1rem;">
+                    <div class="divider">or</div>
+
+                    <button id="btn-google-login" class="btn-google" type="button">
+                        <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 0.5rem;">
+                            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.96-2.184l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.35 0-4.34-1.587-5.052-3.72H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+                            <path fill="#FBBC05" d="M3.948 10.718c-.18-.54-.282-1.117-.282-1.718 0-.601.102-1.178.282-1.718V4.95H.957C.348 6.174 0 7.55 0 9c0 1.45.348 2.826.957 4.05l2.991-2.332z"/>
+                            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.95L3.948 7.282C4.66 5.147 6.65 3.58 9 3.58z"/>
+                        </svg>
+                        Continue with Google
+                    </button>
+
+                    <div id="login-status" class="status"></div>
+                </section>
+
+                <!-- Signup View -->
+                <section id="signup-view" class="login-card" style="display: none;">
+                    <div class="page-icon">✨</div>
+                    <div class="login-title" style="text-align: center;">Create Account</div>
+                    <div class="login-subtitle" style="text-align: center;">
+                        Join the community
+                    </div>
+
+                    <form id="signup-form">
+                        <div class="form-group">
                             <label for="signup-email">Email</label>
-                            <input 
-                                type="email" 
-                                id="signup-email" 
-                                name="email" 
-                                required 
-                                placeholder="your@email.com"
-                            />
+                            <input type="email" id="signup-email" name="email" required placeholder="your@email.com" />
                         </div>
-                        <div style="margin-bottom: 1rem;">
+                        <div class="form-group">
                             <label for="signup-password">Password (min 8 characters)</label>
-                            <input 
-                                type="password" 
-                                id="signup-password" 
-                                name="password" 
-                                required 
-                                minlength="8"
-                                placeholder="••••••••"
-                            />
+                            <input type="password" id="signup-password" name="password" required minlength="8" placeholder="••••••••" />
                         </div>
-                        <div style="margin-bottom: 1rem;">
-                            <label for="signup-wallet">Default Wallet Address (optional)</label>
-                            <input 
-                                type="text" 
-                                id="signup-wallet" 
-                                name="wallet" 
-                                placeholder="0x..."
-                                pattern="^0x[a-fA-F0-9]{16,64}$"
-                                title="Flow wallet address starting with 0x"
-                            />
-                            <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
-                                Your wallet will auto-load when you visit the page
-                            </small>
-                        </div>
-                        <button type="submit" class="btn-primary" style="width: 100%; margin-bottom: 0.75rem;">
+                        <button type="submit" class="btn-primary" style="margin-bottom: 0.75rem;">
                             Create Account
                         </button>
-                        <button type="button" id="btn-show-login" class="btn-secondary" style="width: 100%; font-size: 0.9rem;">
+                        <button type="button" id="btn-show-login" class="btn-secondary">
                             Already have an account? Sign in
                         </button>
                     </form>
 
-                    <!-- Google OAuth Button -->
-                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle);">
-                        <button id="btn-google-login" class="btn-google" type="button" style="width: 100%;">
-                            <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 0.5rem;">
-                                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
-                                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.96-2.184l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.35 0-4.34-1.587-5.052-3.72H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
-                                <path fill="#FBBC05" d="M3.948 10.718c-.18-.54-.282-1.117-.282-1.718 0-.601.102-1.178.282-1.718V4.95H.957C.348 6.174 0 7.55 0 9c0 1.45.348 2.826.957 4.05l2.991-2.332z"/>
-                                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.95L3.948 7.282C4.66 5.147 6.65 3.58 9 3.58z"/>
-                            </svg>
-                            Sign in with Google
-                        </button>
+                    <div id="signup-status" class="status"></div>
+                </section>
+
+                <!-- Account Settings View (shown when logged in) -->
+                <section id="settings-view" class="login-card" style="display: none;">
+                    <div class="page-icon">⚙️</div>
+                    <div class="login-title" style="text-align: center;">Account Settings</div>
+
+                    <div class="user-info">
+                        <div class="user-avatar">👤</div>
+                        <div class="user-email" id="settings-email">user@example.com</div>
+                        <div class="user-since" id="settings-since">Member since Nov 2025</div>
                     </div>
 
-                    <button id="btn-logout" class="btn-secondary" type="button" style="display: none; width: 100%; margin-top: 0.5rem; padding: 0.6rem 1rem; font-size: 0.9rem;">
-                        <span>Logout</span>
-                    </button>
+                    <!-- Default Wallet -->
+                    <div class="settings-section">
+                        <h3>🏈 Default Wallet</h3>
+                        <div class="current-value" id="current-wallet">Not set</div>
+                        <div class="settings-row">
+                            <input type="text" id="wallet-input" placeholder="0x..." />
+                            <button type="button" id="btn-save-wallet" class="btn-primary">Save</button>
+                        </div>
+                        <div id="wallet-status" class="status" style="margin-top: 0.5rem;"></div>
+                    </div>
 
-                    <div id="login-status" class="status"></div>
+                    <!-- Display Name -->
+                    <div class="settings-section">
+                        <h3>👤 Display Name</h3>
+                        <div class="current-value" id="current-name">Not set</div>
+                        <div class="settings-row">
+                            <input type="text" id="name-input" placeholder="Your display name" maxlength="50" />
+                            <button type="button" id="btn-save-name" class="btn-primary">Save</button>
+                        </div>
+                        <div id="name-status" class="status" style="margin-top: 0.5rem;"></div>
+                    </div>
+
+                    <!-- Change Password -->
+                    <div class="settings-section">
+                        <h3>🔒 Change Password</h3>
+                        <div class="form-group" style="margin-bottom: 0.5rem;">
+                            <input type="password" id="current-password" placeholder="Current password" />
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0.5rem;">
+                            <input type="password" id="new-password" placeholder="New password (min 8 chars)" minlength="8" />
+                        </div>
+                        <button type="button" id="btn-change-password" class="btn-secondary">Update Password</button>
+                        <div id="password-status" class="status" style="margin-top: 0.5rem;"></div>
+                    </div>
+
+                    <!-- Logout -->
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                        <button id="btn-logout" class="btn-danger" type="button">
+                            🚪 Sign Out
+                        </button>
+                    </div>
                 </section>
             </div>
         </div>
 
         <script>
-            const statusEl = document.getElementById("login-status");
+            const loginView = document.getElementById("login-view");
+            const signupView = document.getElementById("signup-view");
+            const settingsView = document.getElementById("settings-view");
             const loginForm = document.getElementById("login-form");
             const signupForm = document.getElementById("signup-form");
-            const btnShowSignup = document.getElementById("btn-show-signup");
-            const btnShowLogin = document.getElementById("btn-show-login");
-            const btnLogout = document.getElementById("btn-logout");
-            const btnGoogle = document.getElementById("btn-google-login");
+            const loginStatus = document.getElementById("login-status");
+            const signupStatus = document.getElementById("signup-status");
 
-            function setStatus(msg, type) {
-                if (!statusEl) return;
-                statusEl.textContent = msg || "";
-                statusEl.classList.remove("error", "success");
-                if (type) statusEl.classList.add(type);
+            function setStatus(el, msg, type) {
+                if (!el) return;
+                el.textContent = msg || "";
+                el.classList.remove("error", "success");
+                if (type) el.classList.add(type);
             }
 
-            // Check if user is already logged in
+            // Check if user is logged in and show appropriate view
             async function checkLoginStatus() {
                 try {
                     const res = await fetch("/api/me", { credentials: "include" });
                     const data = await res.json();
+                    
                     if (data.ok && data.user) {
-                        // User is logged in
-                        loginForm.style.display = "none";
-                        signupForm.style.display = "none";
-                        btnGoogle.style.display = "none";
-                        if (btnLogout) btnLogout.style.display = "block";
-                        setStatus(`Logged in as ${data.user.email}`, "success");
+                        showSettingsView(data.user);
                         return true;
                     } else {
-                        // User is not logged in - show login form
-                        loginForm.style.display = "block";
-                        signupForm.style.display = "none";
-                        if (btnLogout) btnLogout.style.display = "none";
+                        showLoginView();
                         return false;
                     }
                 } catch (err) {
                     console.error("Error checking login status:", err);
-                    loginForm.style.display = "block";
+                    showLoginView();
                     return false;
                 }
             }
 
-            // Toggle between login and signup forms
-            if (btnShowSignup) {
-                btnShowSignup.addEventListener("click", () => {
-                    loginForm.style.display = "none";
-                    signupForm.style.display = "block";
-                });
+            function showLoginView() {
+                loginView.style.display = "block";
+                signupView.style.display = "none";
+                settingsView.style.display = "none";
             }
 
-            if (btnShowLogin) {
-                btnShowLogin.addEventListener("click", () => {
-                    signupForm.style.display = "none";
-                    loginForm.style.display = "block";
-                });
+            function showSignupView() {
+                loginView.style.display = "none";
+                signupView.style.display = "block";
+                settingsView.style.display = "none";
             }
+
+            function showSettingsView(user) {
+                loginView.style.display = "none";
+                signupView.style.display = "none";
+                settingsView.style.display = "block";
+
+                // Populate user info
+                document.getElementById("settings-email").textContent = user.email || "Unknown";
+                
+                const createdAt = user.created_at ? new Date(user.created_at) : new Date();
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                document.getElementById("settings-since").textContent = `Member since ${monthNames[createdAt.getMonth()]} ${createdAt.getFullYear()}`;
+
+                // Populate current values
+                const walletEl = document.getElementById("current-wallet");
+                if (user.default_wallet_address) {
+                    walletEl.textContent = user.default_wallet_address;
+                    walletEl.classList.remove("empty");
+                    document.getElementById("wallet-input").value = user.default_wallet_address;
+                } else {
+                    walletEl.textContent = "Not set";
+                    walletEl.classList.add("empty");
+                }
+
+                const nameEl = document.getElementById("current-name");
+                if (user.display_name) {
+                    nameEl.textContent = user.display_name;
+                    nameEl.classList.remove("empty");
+                    document.getElementById("name-input").value = user.display_name;
+                } else {
+                    nameEl.textContent = "Not set";
+                    nameEl.classList.add("empty");
+                }
+            }
+
+            // Toggle between login and signup
+            document.getElementById("btn-show-signup").addEventListener("click", showSignupView);
+            document.getElementById("btn-show-login").addEventListener("click", showLoginView);
 
             // Login form submission
-            if (loginForm) {
-                loginForm.addEventListener("submit", async (e) => {
-                    e.preventDefault();
-                    setStatus("Signing in...", null);
+            loginForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                setStatus(loginStatus, "Signing in...", null);
 
-                    const email = document.getElementById("email").value;
-                    const password = document.getElementById("password").value;
-                    const wallet = (document.getElementById("login-wallet").value || "").trim();
+                const email = document.getElementById("email").value;
+                const password = document.getElementById("password").value;
 
-                    try {
-                        const res = await fetch("/api/login", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ email, password })
-                        });
+                try {
+                    const res = await fetch("/api/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ email, password })
+                    });
 
-                        const data = await res.json();
-                        if (res.ok && data.ok) {
-                            // If wallet address provided, set it as default
-                            if (wallet) {
-                                try {
-                                    // Normalize wallet address
-                                    let walletAddr = wallet.toLowerCase().trim();
-                                    if (!walletAddr.startsWith("0x")) {
-                                        walletAddr = "0x" + walletAddr;
-                                    }
-                                    
-                                    // Validate format
-                                    if (!/^0x[a-f0-9]{16,64}$/.test(walletAddr)) {
-                                        setStatus("Invalid wallet address format. Login successful but wallet not set.", "error");
-                                        setTimeout(() => {
-                                            window.location.href = "/";
-                                        }, 2000);
-                                        return;
-                                    }
-                                    
-                                    const walletRes = await fetch("/api/me/wallet", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        credentials: "include",
-                                        body: JSON.stringify({ wallet_address: walletAddr })
-                                    });
-                                    
-                                    const walletData = await walletRes.json();
-                                    if (walletRes.ok && walletData.ok) {
-                                        setStatus("Login successful! Default wallet set. Redirecting...", "success");
-                                    } else {
-                                        setStatus("Login successful! Redirecting...", "success");
-                                    }
-                                } catch (walletErr) {
-                                    console.error("Failed to set default wallet:", walletErr);
-                                    setStatus("Login successful! Redirecting...", "success");
-                                }
-                            } else {
-                                setStatus("Login successful! Redirecting...", "success");
-                            }
-                            
-                            setTimeout(() => {
-                                window.location.href = "/";
-                            }, 500);
-                        } else {
-                            setStatus(data.error || "Login failed", "error");
-                        }
-                    } catch (err) {
-                        console.error("Login error:", err);
-                        setStatus("Failed to sign in. Please try again.", "error");
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        setStatus(loginStatus, "Welcome back! ✨", "success");
+                        setTimeout(() => checkLoginStatus(), 500);
+                    } else {
+                        setStatus(loginStatus, data.error || "Login failed", "error");
                     }
-                });
-            }
+                } catch (err) {
+                    console.error("Login error:", err);
+                    setStatus(loginStatus, "Failed to sign in", "error");
+                }
+            });
 
             // Signup form submission
-            if (signupForm) {
-                signupForm.addEventListener("submit", async (e) => {
-                    e.preventDefault();
-                    setStatus("Creating account...", null);
+            signupForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                setStatus(signupStatus, "Creating account...", null);
 
-                    const email = document.getElementById("signup-email").value;
-                    const password = document.getElementById("signup-password").value;
-                    const wallet = (document.getElementById("signup-wallet").value || "").trim();
+                const email = document.getElementById("signup-email").value;
+                const password = document.getElementById("signup-password").value;
 
-                    try {
-                        const res = await fetch("/api/signup", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ email, password })
-                        });
+                try {
+                    const res = await fetch("/api/signup", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ email, password })
+                    });
 
-                        const data = await res.json();
-                        if (res.ok && data.ok) {
-                            // If wallet address provided, set it as default
-                            if (wallet) {
-                                try {
-                                    // Normalize wallet address
-                                    let walletAddr = wallet.toLowerCase().trim();
-                                    if (!walletAddr.startsWith("0x")) {
-                                        walletAddr = "0x" + walletAddr;
-                                    }
-                                    
-                                    // Validate format
-                                    if (!/^0x[a-f0-9]{16,64}$/.test(walletAddr)) {
-                                        setStatus("Invalid wallet address format. Account created but wallet not set.", "error");
-                                        setTimeout(() => {
-                                            window.location.href = "/";
-                                        }, 2000);
-                                        return;
-                                    }
-                                    
-                                    const walletRes = await fetch("/api/me/wallet", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        credentials: "include",
-                                        body: JSON.stringify({ wallet_address: walletAddr })
-                                    });
-                                    
-                                    const walletData = await walletRes.json();
-                                    if (walletRes.ok && walletData.ok) {
-                                        setStatus("Account created! Default wallet set. Redirecting...", "success");
-                                    } else {
-                                        setStatus("Account created! Redirecting...", "success");
-                                    }
-                                } catch (walletErr) {
-                                    console.error("Failed to set default wallet:", walletErr);
-                                    setStatus("Account created! Redirecting...", "success");
-                                }
-                            } else {
-                                setStatus("Account created! Redirecting...", "success");
-                            }
-                            
-                            setTimeout(() => {
-                                window.location.href = "/";
-                            }, 500);
-                        } else {
-                            setStatus(data.error || "Signup failed", "error");
-                        }
-                    } catch (err) {
-                        console.error("Signup error:", err);
-                        setStatus("Failed to create account. Please try again.", "error");
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        setStatus(signupStatus, "Account created! 🎉", "success");
+                        setTimeout(() => checkLoginStatus(), 500);
+                    } else {
+                        setStatus(signupStatus, data.error || "Signup failed", "error");
                     }
-                });
-            }
+                } catch (err) {
+                    console.error("Signup error:", err);
+                    setStatus(signupStatus, "Failed to create account", "error");
+                }
+            });
 
-            // Google OAuth (placeholder - requires Google Cloud setup)
-            if (btnGoogle) {
-                btnGoogle.addEventListener("click", () => {
-                    setStatus("Google OAuth not yet configured. Please use email/password for now.", "error");
-                    // TODO: Implement Google OAuth
-                    // This requires setting up Google OAuth credentials in Google Cloud Console
-                });
-            }
+            // Google OAuth
+            document.getElementById("btn-google-login").addEventListener("click", () => {
+                setStatus(loginStatus, "Google Sign-In coming soon!", "error");
+            });
+
+            // Save wallet
+            document.getElementById("btn-save-wallet").addEventListener("click", async () => {
+                const statusEl = document.getElementById("wallet-status");
+                const input = document.getElementById("wallet-input");
+                let wallet = (input.value || "").trim().toLowerCase();
+
+                if (!wallet) {
+                    setStatus(statusEl, "Enter a wallet address", "error");
+                    return;
+                }
+
+                if (!wallet.startsWith("0x")) {
+                    wallet = "0x" + wallet;
+                }
+
+                if (!/^0x[a-f0-9]{16}$/.test(wallet)) {
+                    setStatus(statusEl, "Invalid wallet format", "error");
+                    return;
+                }
+
+                setStatus(statusEl, "Saving...", null);
+
+                try {
+                    const res = await fetch("/api/me/wallet", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ wallet_address: wallet })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        setStatus(statusEl, "Saved! ✓", "success");
+                        document.getElementById("current-wallet").textContent = wallet;
+                        document.getElementById("current-wallet").classList.remove("empty");
+                    } else {
+                        setStatus(statusEl, data.error || "Failed to save", "error");
+                    }
+                } catch (err) {
+                    setStatus(statusEl, "Error saving wallet", "error");
+                }
+            });
+
+            // Save display name
+            document.getElementById("btn-save-name").addEventListener("click", async () => {
+                const statusEl = document.getElementById("name-status");
+                const input = document.getElementById("name-input");
+                const name = (input.value || "").trim();
+
+                if (!name) {
+                    setStatus(statusEl, "Enter a display name", "error");
+                    return;
+                }
+
+                if (name.length > 50) {
+                    setStatus(statusEl, "Name too long (max 50 chars)", "error");
+                    return;
+                }
+
+                setStatus(statusEl, "Saving...", null);
+
+                try {
+                    const res = await fetch("/api/me/name", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ display_name: name })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        setStatus(statusEl, "Saved! ✓", "success");
+                        document.getElementById("current-name").textContent = name;
+                        document.getElementById("current-name").classList.remove("empty");
+                    } else {
+                        setStatus(statusEl, data.error || "Failed to save", "error");
+                    }
+                } catch (err) {
+                    setStatus(statusEl, "Error saving name", "error");
+                }
+            });
+
+            // Change password
+            document.getElementById("btn-change-password").addEventListener("click", async () => {
+                const statusEl = document.getElementById("password-status");
+                const currentPass = document.getElementById("current-password").value;
+                const newPass = document.getElementById("new-password").value;
+
+                if (!currentPass || !newPass) {
+                    setStatus(statusEl, "Fill in both fields", "error");
+                    return;
+                }
+
+                if (newPass.length < 8) {
+                    setStatus(statusEl, "New password must be 8+ chars", "error");
+                    return;
+                }
+
+                setStatus(statusEl, "Updating...", null);
+
+                try {
+                    const res = await fetch("/api/me/password", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ current_password: currentPass, new_password: newPass })
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        setStatus(statusEl, "Password updated! ✓", "success");
+                        document.getElementById("current-password").value = "";
+                        document.getElementById("new-password").value = "";
+                    } else {
+                        setStatus(statusEl, data.error || "Failed to update", "error");
+                    }
+                } catch (err) {
+                    setStatus(statusEl, "Error updating password", "error");
+                }
+            });
 
             // Logout
-            if (btnLogout) {
-                btnLogout.addEventListener("click", async () => {
-                    try {
-                        setStatus("Logging out...", null);
-                        const res = await fetch("/api/logout", {
-                            method: "POST",
-                            credentials: "include"
-                        });
+            document.getElementById("btn-logout").addEventListener("click", async () => {
+                try {
+                    const res = await fetch("/api/logout", {
+                        method: "POST",
+                        credentials: "include"
+                    });
 
-                        if (res.ok) {
-                            setStatus("Logged out successfully.", "success");
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 500);
-                        } else {
-                            setStatus("Failed to logout.", "error");
-                        }
-                    } catch (err) {
-                        console.error("Logout error:", err);
-                        setStatus("Error during logout.", "error");
+                    if (res.ok) {
+                        showLoginView();
                     }
-                });
-            }
+                } catch (err) {
+                    console.error("Logout error:", err);
+                }
+            });
 
-            // Initialize on page load
+            // Initialize
             checkLoginStatus();
         </script>
     </body>

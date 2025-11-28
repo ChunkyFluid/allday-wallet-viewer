@@ -545,6 +545,102 @@ app.post("/api/me/wallet", async (req, res) => {
   }
 });
 
+// POST /api/me/name  { display_name }
+app.post("/api/me/name", async (req, res) => {
+  try {
+    const sessUser = req.session?.user;
+    if (!sessUser || !sessUser.id) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    let { display_name } = req.body || {};
+
+    if (display_name && typeof display_name === "string") {
+      display_name = display_name.trim().slice(0, 50);
+    } else {
+      display_name = null;
+    }
+
+    const { rows } = await pool.query(
+      `
+      UPDATE public.users
+      SET display_name = $1
+      WHERE id = $2
+      RETURNING id, email, display_name, default_wallet_address;
+      `,
+      [display_name, sessUser.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ ok: false, error: "User not found" });
+    }
+
+    const u = rows[0];
+
+    // Update session
+    req.session.user = {
+      id: u.id,
+      email: u.email,
+      display_name: u.display_name,
+      default_wallet_address: u.default_wallet_address
+    };
+
+    return res.json({ ok: true, display_name: u.display_name });
+  } catch (err) {
+    console.error("POST /api/me/name error", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
+  }
+});
+
+// POST /api/me/password  { current_password, new_password }
+app.post("/api/me/password", async (req, res) => {
+  try {
+    const sessUser = req.session?.user;
+    if (!sessUser || !sessUser.id) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const { current_password, new_password } = req.body || {};
+
+    if (!current_password || !new_password) {
+      return res.status(400).json({ ok: false, error: "Missing password fields" });
+    }
+
+    if (new_password.length < 8) {
+      return res.status(400).json({ ok: false, error: "New password must be at least 8 characters" });
+    }
+
+    // Get current password hash
+    const { rows: userRows } = await pool.query(
+      `SELECT password_hash FROM public.users WHERE id = $1`,
+      [sessUser.id]
+    );
+
+    if (!userRows.length) {
+      return res.status(404).json({ ok: false, error: "User not found" });
+    }
+
+    // Verify current password
+    const bcrypt = require("bcrypt");
+    const valid = await bcrypt.compare(current_password, userRows[0].password_hash);
+    if (!valid) {
+      return res.status(400).json({ ok: false, error: "Current password is incorrect" });
+    }
+
+    // Hash new password and update
+    const newHash = await bcrypt.hash(new_password, 10);
+    await pool.query(
+      `UPDATE public.users SET password_hash = $1 WHERE id = $2`,
+      [newHash, sessUser.id]
+    );
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("POST /api/me/password error", err);
+    return res.status(500).json({ ok: false, error: "Server error" });
+  }
+});
+
 // ------------------ Existing API routes ------------------
 
 // Snowflake collection endpoint
@@ -1100,10 +1196,43 @@ app.get("/api/explorer-filters", async (req, res) => {
   }
 });
 
-// Wallet summary
+// ============================================================
+// LIVE WALLET DATA - Fetch directly from Flow blockchain
+// ============================================================
+
+// Cadence script to get AllDay NFT IDs from a wallet (Cadence 1.0 syntax)
+// Using NonFungibleToken standard interface
+const GET_ALLDAY_NFTS_SCRIPT = `
+import NonFungibleToken from 0x1d7e57aa55817448
+import AllDay from 0xe4cf4bdc1751c65d
+
+access(all) fun main(address: Address): [UInt64] {
+    let account = getAccount(address)
+    
+    // Try the standard AllDay collection path
+    if let collectionRef = account.capabilities.borrow<&{NonFungibleToken.CollectionPublic}>(
+        /public/AllDayNFTCollection
+    ) {
+        return collectionRef.getIDs()
+    }
+    
+    return []
+}
+`;
+
+// Fetch wallet's AllDay NFTs - use database snapshot (fast) 
+// Live blockchain queries are too slow for real-time use
+async function fetchLiveWalletNFTs(walletAddress) {
+  // For now, return null to use database - live queries are too slow
+  // TODO: Set up a background job to keep wallet_holdings updated
+  return null;
+}
+
+// Wallet summary - NOW WITH LIVE DATA!
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    const useLive = req.query.live !== 'false'; // Default to live data
 
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
@@ -1112,6 +1241,21 @@ app.get("/api/wallet-summary", async (req, res) => {
     // Basic Flow/Dapper-style address check
     if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+    }
+
+    // Try to fetch live data from blockchain
+    let liveNftIds = null;
+    let dataSource = 'database';
+    
+    if (useLive) {
+      console.log(`[LiveWallet] Fetching live data for ${wallet}...`);
+      liveNftIds = await fetchLiveWalletNFTs(wallet);
+      if (liveNftIds !== null) {
+        dataSource = 'blockchain';
+        console.log(`[LiveWallet] Got ${liveNftIds.length} NFTs from blockchain`);
+      } else {
+        console.log(`[LiveWallet] Falling back to database`);
+      }
     }
 
     // 1) Display name (from wallet_profiles)
@@ -1126,63 +1270,96 @@ app.get("/api/wallet-summary", async (req, res) => {
     );
     const profileRow = profileResult.rows[0] || null;
 
-    // 2) Stats + value based on edition_price_scrape (same source used by /api/prices)
-    //
-    // - We JOIN wallet_holdings -> nft_core_metadata on nft_id
-    // - LEFT JOIN edition_price_scrape on edition_id
-    // - Each row in wallet_holdings is ONE copy, so summing lowest_ask_usd/avg_sale_usd
-    //   across rows naturally multiplies by number of copies.
-    const statsResult = await pgQuery(
-      `
-      SELECT
-        h.wallet_address,
+    // 2) Stats + value based on edition_price_scrape
+    let statsResult;
+    
+    if (liveNftIds !== null && liveNftIds.length > 0) {
+      // Use LIVE blockchain data - query metadata for the NFT IDs we got from chain
+      statsResult = await pgQuery(
+        `
+        SELECT
+          $1 AS wallet_address,
 
-        COUNT(*)::int AS moments_total,
-        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
-        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+          COUNT(*)::int AS moments_total,
+          0::int AS locked_count,
+          COUNT(*)::int AS unlocked_count,
 
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
 
-        -- floor_value = sum of lowest_ask_usd per *copy* (unknown prices treated as 0)
-        COALESCE(
-          SUM(
-            CASE
-              WHEN eps.lowest_ask_usd IS NOT NULL THEN eps.lowest_ask_usd
-              ELSE 0
-            END
-          ),
-          0
-        )::numeric AS floor_value,
+          COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
+          COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
+          COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
 
-        -- asp_value = sum of avg_sale_usd per *copy*
-        COALESCE(
-          SUM(
-            CASE
-              WHEN eps.avg_sale_usd IS NOT NULL THEN eps.avg_sale_usd
-              ELSE 0
-            END
-          ),
-          0
-        )::numeric AS asp_value,
+        FROM nft_core_metadata m
+        LEFT JOIN public.edition_price_scrape eps
+          ON eps.edition_id = m.edition_id
+        WHERE m.nft_id = ANY($2::text[]);
+        `,
+        [wallet, liveNftIds]
+      );
+    } else if (liveNftIds !== null && liveNftIds.length === 0) {
+      // Live data returned empty wallet
+      statsResult = { rows: [{ 
+        wallet_address: wallet,
+        moments_total: 0, locked_count: 0, unlocked_count: 0,
+        common_count: 0, uncommon_count: 0, rare_count: 0, legendary_count: 0, ultimate_count: 0,
+        floor_value: 0, asp_value: 0, priced_moments: 0
+      }] };
+    } else {
+      // Fall back to database snapshot
+      statsResult = await pgQuery(
+        `
+        SELECT
+          h.wallet_address,
 
-        -- how many of your moments have a price row at all
-        COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int
-          AS priced_moments
+          COUNT(*)::int AS moments_total,
+          COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+          COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
 
-      FROM wallet_holdings h
-      JOIN nft_core_metadata m
-        ON m.nft_id = h.nft_id
-      LEFT JOIN public.edition_price_scrape eps
-        ON eps.edition_id = m.edition_id
-      WHERE h.wallet_address = $1
-      GROUP BY h.wallet_address;
-      `,
-      [wallet]
-    );
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
+
+          COALESCE(
+            SUM(
+              CASE
+                WHEN eps.lowest_ask_usd IS NOT NULL THEN eps.lowest_ask_usd
+                ELSE 0
+              END
+            ),
+            0
+          )::numeric AS floor_value,
+
+          COALESCE(
+            SUM(
+              CASE
+                WHEN eps.avg_sale_usd IS NOT NULL THEN eps.avg_sale_usd
+                ELSE 0
+              END
+            ),
+            0
+          )::numeric AS asp_value,
+
+          COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int
+            AS priced_moments
+
+        FROM wallet_holdings h
+        JOIN nft_core_metadata m
+          ON m.nft_id = h.nft_id
+        LEFT JOIN public.edition_price_scrape eps
+          ON eps.edition_id = m.edition_id
+        WHERE h.wallet_address = $1
+        GROUP BY h.wallet_address;
+        `,
+        [wallet]
+      );
+    }
 
     // 3) Holdings + price freshness metadata
     const holdingsMetaResult = await pgQuery(
@@ -1244,6 +1421,8 @@ app.get("/api/wallet-summary", async (req, res) => {
       wallet,
       displayName: profileRow ? profileRow.display_name : null,
       stats,
+      dataSource, // 'blockchain' = live, 'database' = snapshot
+      liveNftCount: liveNftIds ? liveNftIds.length : null,
       holdingsLastEventTs: holdingsMetaRow ? holdingsMetaRow.last_event_ts : null,
       holdingsLastSyncedAt: holdingsMetaRow ? holdingsMetaRow.last_synced_at : null,
       pricesLastScrapedAt: pricesMetaRow ? pricesMetaRow.last_scraped_at : null
@@ -1882,9 +2061,9 @@ app.get("/api/me", async (req, res) => {
   }
 
   try {
-    // Fetch fresh default_wallet_address from database
+    // Fetch fresh user data from database
     const { rows } = await pool.query(
-      `SELECT id, email, default_wallet_address FROM public.users WHERE id = $1`,
+      `SELECT id, email, default_wallet_address, display_name, created_at FROM public.users WHERE id = $1`,
       [req.session.user.id]
     );
 
@@ -1894,7 +2073,9 @@ app.get("/api/me", async (req, res) => {
       req.session.user = {
         id: user.id,
         email: user.email,
-        default_wallet_address: user.default_wallet_address
+        default_wallet_address: user.default_wallet_address,
+        display_name: user.display_name,
+        created_at: user.created_at
       };
     }
 
