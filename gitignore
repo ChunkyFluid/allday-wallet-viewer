@@ -1,5 +1,0 @@
-data/*.csv
-# Big local data files – never track these
-data/moments.csv
-data/wallet_holdings.csv
-data/*.csv

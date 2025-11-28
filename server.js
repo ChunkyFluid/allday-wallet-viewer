@@ -2493,8 +2493,8 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
   }
 });
 
-// Get events from local Flow Light Node (real-time, ~seconds delay)
-const FLOW_LIGHT_NODE_URL = "http://localhost:8080";
+// Flow REST API - free public endpoint (no Light Node needed!)
+const FLOW_LIGHT_NODE_URL = "https://rest-mainnet.onflow.org";
 
 // Cache for latest block height (refreshes every 10 seconds)
 let cachedLatestBlockHeight = null;
@@ -2905,6 +2905,965 @@ app.get("/api/flow-latest-block", async (req, res) => {
     return res.status(500).json({
       ok: false,
       error: "Failed to fetch latest block: " + (err.message || String(err))
+    });
+  }
+});
+
+// ============================================================
+// SNIPER TOOL - Real-time marketplace deals
+// ============================================================
+
+// NFTStorefrontV2 contract for marketplace events
+const STOREFRONT_CONTRACT = "A.4eb8a10cb9f87357.NFTStorefrontV2";
+
+// ============================================================
+// FLOOR PRICE CACHE - Stores known floor prices for editions
+// ============================================================
+
+const floorPriceCache = new Map(); // editionId -> { floor, updatedAt }
+const FLOOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes before refreshing
+
+// Scrape floor price from NFL All Day website
+async function scrapeFloorPrice(editionId) {
+  try {
+    const url = `https://nflallday.com/listing/moment/${editionId}`;
+    const res = await fetch(url, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml"
+      }
+    });
+    
+    if (!res.ok) return null;
+    
+    const html = await res.text();
+    
+    // Parse "Lowest Ask $X.XX" from the page
+    const lowAskMatch = html.match(/Lowest\s+Ask[^$]*\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i);
+    if (!lowAskMatch) return null;
+    
+    const floor = Number(lowAskMatch[1].replace(/,/g, ''));
+    return isNaN(floor) ? null : floor;
+  } catch (err) {
+    console.error(`[Scrape] Error for edition ${editionId}:`, err.message);
+    return null;
+  }
+}
+
+// Get cached floor, or scrape if stale/missing
+async function getCachedFloor(editionId) {
+  const cached = floorPriceCache.get(editionId);
+  if (cached && Date.now() - cached.updatedAt < FLOOR_CACHE_TTL) {
+    return cached.floor;
+  }
+  
+  const floor = await scrapeFloorPrice(editionId);
+  if (floor !== null) {
+    floorPriceCache.set(editionId, { floor, updatedAt: Date.now() });
+  }
+  return floor;
+}
+
+// Get floor without updating cache (for comparison)
+function getStoredFloor(editionId) {
+  const cached = floorPriceCache.get(editionId);
+  return cached ? cached.floor : null;
+}
+
+// Update floor in cache
+function updateFloorCache(editionId, newFloor) {
+  const existing = floorPriceCache.get(editionId);
+  // Only update if we don't have a floor OR if it's been a while
+  if (!existing || Date.now() - existing.updatedAt > 60000) { // 1 min
+    floorPriceCache.set(editionId, { floor: newFloor, updatedAt: Date.now() });
+  }
+}
+
+// ============================================================
+// LIVE SNIPER - Watch for listings below floor
+// ============================================================
+
+const sniperListings = []; // Array of ALL listings
+const seenListingNfts = new Set(); // Track seen nftIds to prevent duplicates
+const MAX_SNIPER_LISTINGS = 500;
+
+function addSniperListing(listing) {
+  // Dedupe by nftId - same NFT can't be listed twice
+  if (seenListingNfts.has(listing.nftId)) return;
+  seenListingNfts.add(listing.nftId);
+  
+  // Add to front of array
+  sniperListings.unshift(listing);
+  
+  // Keep only last N listings
+  if (sniperListings.length > MAX_SNIPER_LISTINGS) {
+    const removed = sniperListings.pop();
+    if (removed) seenListingNfts.delete(removed.nftId);
+  }
+  
+  // Log deals (below floor)
+  if (listing.dealPercent > 0) {
+    console.log(`[SNIPER] 🎯 DEAL: ${listing.playerName} #${listing.serialNumber || '?'} - $${listing.listingPrice} (floor $${listing.floor}) - ${listing.dealPercent.toFixed(1)}% off!`);
+  }
+}
+
+// Process a new listing event from the Light Node
+async function processListingEvent(event) {
+  try {
+    const { nftId, listingPrice, sellerAddr, timestamp, editionId: eventEditionId } = event;
+    
+    if (!nftId || !listingPrice) return;
+    
+    // Get edition info from our database
+    let editionId = eventEditionId;
+    let momentData = null;
+    
+    if (!editionId) {
+      try {
+        const result = await pgQuery(
+          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name
+           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+          [nftId]
+        );
+        if (result.rows[0]) {
+          momentData = result.rows[0];
+          editionId = momentData.edition_id;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    
+    if (!editionId) return;
+    
+    // Get the PREVIOUS floor price (before this listing)
+    let previousFloor = getStoredFloor(editionId);
+    
+    // If we don't have a cached floor, scrape it now
+    if (previousFloor === null) {
+      previousFloor = await getCachedFloor(editionId);
+    }
+    
+    if (!previousFloor) return;
+    
+    // Skip non-whole-dollar listings (likely from Flowty, not official NFL All Day)
+    // NFL All Day only allows whole dollar amounts ($1 minimum)
+    if (listingPrice < 1 || listingPrice !== Math.floor(listingPrice)) {
+      return; // Skip fractional/sub-$1 listings
+    }
+    
+    // Calculate deal percent (positive = below floor = deal!)
+    let dealPercent = 0;
+    if (previousFloor && previousFloor > 0) {
+      dealPercent = ((previousFloor - listingPrice) / previousFloor) * 100;
+    }
+    
+    // Get moment metadata if we don't have it
+    if (!momentData) {
+      try {
+        const result = await pgQuery(
+          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, position
+           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+          [nftId]
+        );
+        momentData = result.rows[0] || {};
+      } catch (e) { momentData = {}; }
+    }
+    
+    // Get seller name
+    let sellerName = sellerAddr;
+    if (sellerAddr) {
+      try {
+        const result = await pgQuery(
+          `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+          [sellerAddr]
+        );
+        sellerName = result.rows[0]?.display_name || sellerAddr;
+      } catch (e) { /* ignore */ }
+    }
+    
+    const listing = {
+      nftId,
+      editionId,
+      serialNumber: momentData?.serial_number,
+      listingPrice,
+      floor: previousFloor,
+      dealPercent: Math.round(dealPercent * 10) / 10,
+      playerName: momentData?.first_name && momentData?.last_name 
+        ? `${momentData.first_name} ${momentData.last_name}` : null,
+      teamName: momentData?.team_name,
+      tier: momentData?.tier,
+      setName: momentData?.set_name,
+      position: momentData?.position,
+      sellerName,
+      sellerAddr,
+      isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
+      listedAt: timestamp || new Date().toISOString(),
+      listingUrl: `https://nflallday.com/listing/moment/${editionId}`
+    };
+    
+    addSniperListing(listing);
+    
+    // Update our floor cache with new floor (this listing might be the new floor)
+    if (listingPrice < (previousFloor || Infinity)) {
+      updateFloorCache(editionId, listingPrice);
+    }
+    
+  } catch (err) {
+    console.error("[Sniper] Error processing listing event:", err.message);
+  }
+}
+
+// ============================================================
+// LIVE WATCHER - Poll Flow REST API for new listing events
+// ============================================================
+
+const FLOW_REST_API = "https://rest-mainnet.onflow.org";
+let lastCheckedBlock = 0;
+let isWatchingListings = false;
+
+async function watchForListings() {
+  if (isWatchingListings) return;
+  isWatchingListings = true;
+  
+  console.log("[Sniper] 🔴 Starting LIVE listing watcher (using Flow REST API)...");
+  
+  const checkForNewListings = async () => {
+    try {
+      // Get latest block height from Flow REST API
+      const heightRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=sealed`);
+      if (!heightRes.ok) return;
+      
+      const heightData = await heightRes.json();
+      const latestHeight = parseInt(heightData[0]?.header?.height || 0);
+      
+      if (lastCheckedBlock === 0) {
+        lastCheckedBlock = latestHeight - 5; // Start from 5 blocks ago
+        console.log(`[Sniper] Starting from block ${lastCheckedBlock}`);
+      }
+      
+      if (latestHeight <= lastCheckedBlock) return;
+      
+      // Query for ListingAvailable events in new blocks
+      const startHeight = lastCheckedBlock + 1;
+      const endHeight = Math.min(latestHeight, startHeight + 50); // Max 50 blocks at a time
+      
+      const eventUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`;
+      
+      const eventRes = await fetch(eventUrl);
+      if (!eventRes.ok) {
+        lastCheckedBlock = endHeight;
+        return;
+      }
+      
+      const eventData = await eventRes.json();
+      
+      let newListingCount = 0;
+      let alldayCount = 0;
+      
+      for (const block of eventData) {
+        if (!block.events) continue;
+        
+        for (const event of block.events) {
+          try {
+            // Decode the payload
+            let payload = event.payload;
+            if (typeof payload === 'string') {
+              payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+            }
+            
+            if (!payload?.value?.fields) continue;
+            
+            const fields = payload.value.fields;
+            const getField = (name) => {
+              const f = fields.find(x => x.name === name);
+              if (!f) return null;
+              if (f.value?.value?.value) return f.value.value.value;
+              if (f.value?.value) return f.value.value;
+              return f.value;
+            };
+            
+            // Check if this is an AllDay NFT
+            const nftType = fields.find(f => f.name === 'nftType');
+            const typeId = nftType?.value?.staticType?.typeID || 
+                          nftType?.value?.value?.staticType?.typeID || '';
+            
+            if (!typeId.includes('AllDay')) continue;
+            
+            const nftId = getField('nftID')?.toString();
+            const priceStr = getField('price');
+            const listingPrice = priceStr ? parseFloat(priceStr) : null;
+            const sellerAddr = getField('storefrontAddress')?.toString()?.toLowerCase();
+            
+            if (!nftId || !listingPrice) continue;
+            
+            alldayCount++;
+            
+            // Process this listing
+            await processListingEvent({
+              nftId,
+              listingPrice,
+              sellerAddr,
+              timestamp: block.block_timestamp
+            });
+            
+            newListingCount++;
+            
+          } catch (e) {
+            // Skip malformed events
+          }
+        }
+      }
+      
+      if (alldayCount > 0) {
+        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} AllDay listings`);
+      }
+      
+      lastCheckedBlock = endHeight;
+      
+    } catch (err) {
+      console.error("[Sniper] Error checking for listings:", err.message);
+    }
+  };
+  
+  // Check every 2 seconds for real-time sniping
+  setInterval(checkForNewListings, 2000);
+  checkForNewListings(); // Run immediately
+}
+
+// Start watching after server is ready
+setTimeout(() => {
+  watchForListings();
+}, 5000);
+
+// API endpoint to get sniper listings with filtering
+app.get("/api/sniper-deals", async (req, res) => {
+  try {
+    // Get filter params
+    const { team, player, tier, minDiscount, maxPrice, maxSerial, dealsOnly } = req.query;
+    
+    let filtered = [...sniperListings];
+    
+    // Apply filters
+    if (team) {
+      const teamLower = team.toLowerCase();
+      filtered = filtered.filter(l => l.teamName?.toLowerCase().includes(teamLower));
+    }
+    
+    if (player) {
+      const playerLower = player.toLowerCase();
+      filtered = filtered.filter(l => l.playerName?.toLowerCase().includes(playerLower));
+    }
+    
+    if (tier) {
+      const tierUpper = tier.toUpperCase();
+      filtered = filtered.filter(l => l.tier === tierUpper);
+    }
+    
+    if (minDiscount) {
+      const minDisc = parseFloat(minDiscount);
+      filtered = filtered.filter(l => l.dealPercent >= minDisc);
+    }
+    
+    if (maxPrice) {
+      const maxP = parseFloat(maxPrice);
+      filtered = filtered.filter(l => l.listingPrice <= maxP);
+    }
+    
+    if (maxSerial) {
+      const maxS = parseInt(maxSerial);
+      filtered = filtered.filter(l => l.serialNumber && l.serialNumber <= maxS);
+    }
+    
+    if (dealsOnly === 'true') {
+      filtered = filtered.filter(l => l.dealPercent > 0);
+    }
+    
+    // Get unique teams and tiers for filter dropdowns
+    const allTeams = [...new Set(sniperListings.map(l => l.teamName).filter(Boolean))].sort();
+    const allTiers = [...new Set(sniperListings.map(l => l.tier).filter(Boolean))];
+    
+    // Count deals
+    const dealsCount = filtered.filter(l => l.dealPercent > 0).length;
+    
+    return res.json({
+      ok: true,
+      listings: filtered,
+      total: sniperListings.length,
+      filtered: filtered.length,
+      dealsCount,
+      watching: isWatchingListings,
+      lastCheckedBlock,
+      floorCacheSize: floorPriceCache.size,
+      availableTeams: allTeams,
+      availableTiers: allTiers,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error("[Sniper] Error getting listings:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Pre-populate floor cache for active editions
+app.get("/api/sniper-warmup", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    
+    // Get editions with recent activity from Snowflake
+    await ensureSnowflakeConnected();
+    
+    const sql = `
+      SELECT DISTINCT EVENT_DATA:nftID::STRING AS nft_id
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+        AND EVENT_TYPE = 'ListingAvailable'
+        AND EVENT_DATA:nftType:typeID::STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
+        AND TX_SUCCEEDED = TRUE
+        AND BLOCK_TIMESTAMP >= DATEADD(hour, -24, CURRENT_TIMESTAMP())
+      LIMIT ${limit}
+    `;
+    
+    const result = await executeSql(sql);
+    const nftIds = result.map(r => r.NFT_ID || r.nft_id).filter(Boolean);
+    
+    // Get edition IDs
+    let editionIds = [];
+    if (nftIds.length > 0) {
+      const metaResult = await pgQuery(
+        `SELECT DISTINCT edition_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+        [nftIds]
+      );
+      editionIds = metaResult.rows.map(r => r.edition_id).filter(Boolean);
+    }
+    
+    console.log(`[Sniper Warmup] Scraping floors for ${editionIds.length} editions...`);
+    
+    // Scrape floors in parallel
+    let scraped = 0;
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < editionIds.length; i += BATCH_SIZE) {
+      const batch = editionIds.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(async (editionId) => {
+        const floor = await getCachedFloor(editionId);
+        if (floor) scraped++;
+      }));
+    }
+    
+    console.log(`[Sniper Warmup] Cached ${scraped} floor prices`);
+    
+    return res.json({
+      ok: true,
+      editionsFound: editionIds.length,
+      floorsCached: scraped,
+      cacheSize: floorPriceCache.size
+    });
+    
+  } catch (err) {
+    console.error("[Sniper Warmup] Error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Debug endpoint to find marketplace events with prices
+app.get("/api/debug-marketplace-events", async (req, res) => {
+  try {
+    await ensureSnowflakeConnected();
+    
+    // Find event types that have price data
+    const sql = `
+      SELECT DISTINCT
+        EVENT_CONTRACT,
+        EVENT_TYPE,
+        COUNT(*) as event_count
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE (
+        EVENT_DATA:price IS NOT NULL 
+        OR EVENT_DATA:salePrice IS NOT NULL
+        OR EVENT_TYPE ILIKE '%listing%'
+        OR EVENT_TYPE ILIKE '%sale%'
+        OR EVENT_TYPE ILIKE '%purchase%'
+        OR EVENT_TYPE ILIKE '%order%'
+      )
+      AND TX_SUCCEEDED = TRUE
+      AND BLOCK_TIMESTAMP >= DATEADD(day, -3, CURRENT_TIMESTAMP())
+      GROUP BY EVENT_CONTRACT, EVENT_TYPE
+      ORDER BY event_count DESC
+      LIMIT 50
+    `;
+    
+    const result = await executeSql(sql);
+    
+    return res.json({
+      ok: true,
+      eventTypes: result
+    });
+  } catch (err) {
+    console.error("Debug marketplace events error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Get sample event data for a specific event type
+app.get("/api/debug-event-sample", async (req, res) => {
+  try {
+    const { contract, type } = req.query;
+    if (!contract || !type) {
+      return res.status(400).json({ ok: false, error: "Need ?contract=X&type=Y" });
+    }
+    
+    await ensureSnowflakeConnected();
+    
+    const sql = `
+      SELECT 
+        EVENT_DATA,
+        BLOCK_TIMESTAMP,
+        TX_ID
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE EVENT_CONTRACT = '${contract}'
+        AND EVENT_TYPE = '${type}'
+        AND TX_SUCCEEDED = TRUE
+      ORDER BY BLOCK_TIMESTAMP DESC
+      LIMIT 5
+    `;
+    
+    const result = await executeSql(sql);
+    
+    return res.json({
+      ok: true,
+      samples: result
+    });
+  } catch (err) {
+    console.error("Debug event sample error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/sniper-listings", async (req, res) => {
+  try {
+    const limitNum = Math.min(parseInt(req.query.limit, 10) || 100, 200);
+    const hoursAgo = parseInt(req.query.hours, 10) || 1; // Last 1 hour of listings by default
+    
+    await ensureSnowflakeConnected();
+    
+    const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
+    
+    // Query ListingAvailable events for NFL All Day NFTs
+    // Filter for nftType containing AllDay contract
+    // Also get ListingCompleted to filter out sold listings
+    const eventsSql = `
+      WITH listings AS (
+        SELECT
+          EVENT_DATA:nftID::STRING AS nft_id,
+          EVENT_DATA:listingResourceID::STRING AS listing_id,
+          TRY_TO_DOUBLE(EVENT_DATA:price::STRING) AS listing_price,
+          LOWER(EVENT_DATA:storefrontAddress::STRING) AS seller_addr,
+          BLOCK_TIMESTAMP AS block_timestamp,
+          BLOCK_HEIGHT AS block_height,
+          TX_ID AS tx_id
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+        WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND EVENT_TYPE = 'ListingAvailable'
+          AND EVENT_DATA:nftType:typeID::STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
+          AND TX_SUCCEEDED = TRUE
+          AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+      ),
+      completed AS (
+        SELECT DISTINCT
+          EVENT_DATA:listingResourceID::STRING AS listing_id
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+        WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND EVENT_TYPE = 'ListingCompleted'
+          AND TX_SUCCEEDED = TRUE
+          AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+      )
+      SELECT 
+        l.nft_id,
+        l.listing_id,
+        l.listing_price,
+        l.seller_addr,
+        l.block_timestamp,
+        l.block_height,
+        l.tx_id,
+        CASE WHEN c.listing_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_sold
+      FROM listings l
+      LEFT JOIN completed c ON l.listing_id = c.listing_id
+      WHERE c.listing_id IS NULL  -- Only show unsold listings
+      ORDER BY l.block_timestamp DESC
+      LIMIT ${limitNum}
+    `;
+    
+    console.log(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
+    
+    const salesResult = await executeSql(eventsSql);
+    console.log(`[Sniper] Found ${salesResult?.length || 0} active listings`);
+    
+    if (!salesResult || salesResult.length === 0) {
+      return res.json({
+        ok: true,
+        listings: [],
+        message: "No active listings found"
+      });
+    }
+    
+    // Get NFT IDs for metadata lookup
+    const nftIds = salesResult.map(r => r.NFT_ID || r.nft_id).filter(Boolean);
+    
+    // Get moment metadata by NFT ID
+    let momentData = {}; // keyed by nft_id
+    let editionIds = new Set();
+    
+    if (nftIds.length > 0) {
+      try {
+        const metaResult = await pgQuery(
+          `SELECT nft_id, edition_id, serial_number, first_name, last_name, 
+                  team_name, position, tier, set_name, series_name
+           FROM nft_core_metadata 
+           WHERE nft_id = ANY($1::text[])`,
+          [nftIds]
+        );
+        for (const row of metaResult.rows) {
+          momentData[row.nft_id] = row;
+          if (row.edition_id) editionIds.add(row.edition_id);
+        }
+      } catch (err) {
+        console.error("[Sniper] Error fetching moment metadata:", err.message);
+      }
+    }
+    
+    // Scrape REAL-TIME prices from NFL All Day website
+    // This is the key to accurate sniper data!
+    let scrapedData = {};
+    const editionList = [...editionIds];
+    
+    if (editionList.length > 0) {
+      console.log(`[Sniper] Scraping real-time prices for ${editionList.length} editions...`);
+      
+      // Scrape in parallel batches of 5 to avoid overwhelming the server
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < editionList.length; i += BATCH_SIZE) {
+        const batch = editionList.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(async (editionId) => {
+            const data = await getCachedEditionData(editionId);
+            return { editionId, data };
+          })
+        );
+        
+        for (const { editionId, data } of results) {
+          if (data) {
+            scrapedData[editionId] = data;
+          }
+        }
+      }
+      
+      console.log(`[Sniper] Got real-time prices for ${Object.keys(scrapedData).length} editions`);
+    }
+    
+    // Get average sale prices from our database to compare with scraped low asks
+    let avgSalePrices = {};
+    if (editionList.length > 0) {
+      try {
+        const priceResult = await pgQuery(
+          `SELECT edition_id, avg_sale_usd 
+           FROM public.edition_price_scrape 
+           WHERE edition_id = ANY($1::text[])`,
+          [editionList]
+        );
+        for (const row of priceResult.rows) {
+          avgSalePrices[row.edition_id] = row.avg_sale_usd ? Number(row.avg_sale_usd) : null;
+        }
+      } catch (err) {
+        console.error("[Sniper] Error fetching avg sale prices:", err.message);
+      }
+    }
+    
+    // Build floorPrices from scraped data, with avgSale for deal comparison
+    const floorPrices = {};
+    for (const [editionId, data] of Object.entries(scrapedData)) {
+      if (data && data.lowAsk) {
+        floorPrices[editionId] = { 
+          floor: data.lowAsk,
+          avgSale: avgSalePrices[editionId] || null
+        };
+      }
+    }
+    
+    // Get wallet names for sellers
+    const sellerAddrs = [...new Set(salesResult.map(r => r.SELLER_ADDR || r.seller_addr).filter(Boolean))];
+    
+    let walletNames = {};
+    if (sellerAddrs.length > 0) {
+      try {
+        const nameResult = await pgQuery(
+          `SELECT wallet_address, display_name FROM wallet_profiles WHERE wallet_address = ANY($1::text[])`,
+          [sellerAddrs]
+        );
+        for (const row of nameResult.rows) {
+          walletNames[row.wallet_address] = row.display_name;
+        }
+      } catch (err) { /* ignore */ }
+    }
+    
+    // Build listing objects showing NEW LISTING PRICE vs CURRENT FLOOR
+    const listings = [];
+    
+    for (const row of salesResult) {
+      const nftId = row.NFT_ID || row.nft_id;
+      const snowflakeListingPrice = row.LISTING_PRICE || row.listing_price; // Price from Snowflake event
+      const sellerAddr = row.SELLER_ADDR || row.seller_addr;
+      
+      // Get moment data
+      const moment = momentData[nftId] || {};
+      const editionId = moment.edition_id;
+      if (!editionId) continue;
+      
+      const prices = floorPrices[editionId] || {};
+      const currentFloor = prices.floor; // REAL-TIME scraped floor
+      
+      if (!currentFloor || !snowflakeListingPrice) continue;
+      
+      // Deal % = how much below CURRENT FLOOR this listing is
+      // If floor is $40 and this was listed at $35, that's 12.5% below = DEAL!
+      let dealPercent = null;
+      if (currentFloor > 0) {
+        dealPercent = Math.round(((currentFloor - snowflakeListingPrice) / currentFloor) * 1000) / 10;
+      }
+      
+      const serialNumber = moment.serial_number;
+      const isLowSerial = serialNumber && serialNumber <= 100;
+      
+      // Parse timestamp
+      let timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
+      if (timestamp) {
+        if (timestamp instanceof Date) {
+          timestamp = timestamp.toISOString();
+        } else if (typeof timestamp === 'string' && !timestamp.endsWith('Z')) {
+          timestamp = timestamp.replace(' ', 'T') + 'Z';
+        }
+      }
+      
+      listings.push({
+        nftId,
+        editionId,
+        serialNumber,
+        listingPrice: snowflakeListingPrice, // What this was listed for (from Snowflake)
+        currentFloor,                         // Current floor price (scraped)
+        dealPercent,                          // % below floor (positive = deal!)
+        
+        playerName: moment.first_name && moment.last_name 
+          ? `${moment.first_name} ${moment.last_name}` 
+          : null,
+        teamName: moment.team_name,
+        tier: moment.tier,
+        setName: moment.set_name,
+        seriesName: moment.series_name,
+        position: moment.position,
+        
+        sellerName: walletNames[sellerAddr] || sellerAddr,
+        sellerAddr,
+        isLowSerial,
+        listedAt: timestamp,
+        
+        // Direct link to buy
+        listingUrl: `https://nflallday.com/listing/moment/${editionId}`
+      });
+    }
+    
+    // Sort by deal percentage (best deals first - highest positive %)
+    listings.sort((a, b) => {
+      const aDeal = a.dealPercent ?? -999;
+      const bDeal = b.dealPercent ?? -999;
+      if (bDeal !== aDeal) return bDeal - aDeal;
+      return new Date(b.listedAt) - new Date(a.listedAt);
+    });
+    
+    // Count deals (listings below floor)
+    const dealsCount = listings.filter(l => l.dealPercent && l.dealPercent > 0).length;
+    
+    return res.json({
+      ok: true,
+      listings,
+      count: listings.length,
+      dealsCount,
+      hoursQueried: hoursAgo,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (err) {
+    console.error("[Sniper] Error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch sniper listings: " + (err.message || String(err))
+    });
+  }
+});
+
+// Get active NFTStorefront listings (real-time from Light Node)
+app.get("/api/sniper-active-listings", async (req, res) => {
+  try {
+    const limitNum = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    
+    // Get latest block height from Flow
+    const latestHeight = await getLatestBlockHeight();
+    const endHeight = latestHeight;
+    const startHeight = latestHeight - 500; // ~6-7 minutes of blocks
+    
+    console.log(`[Sniper Active] Querying blocks ${startHeight}-${endHeight} for listing events...`);
+    
+    // Query NFTStorefront ListingAvailable events
+    // These fire when someone creates a new marketplace listing
+    const listingUrl = `${FLOW_LIGHT_NODE_URL}/v1/events?type=${STOREFRONT_CONTRACT}.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`;
+    
+    const listingRes = await fetch(listingUrl);
+    const listingData = listingRes.ok ? await listingRes.json() : [];
+    
+    // Also query for ListingCompleted to filter out sold items
+    const completedUrl = `${FLOW_LIGHT_NODE_URL}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`;
+    const completedRes = await fetch(completedUrl);
+    const completedData = completedRes.ok ? await completedRes.json() : [];
+    
+    // Build set of completed listing IDs
+    const completedListingIds = new Set();
+    for (const block of completedData) {
+      if (block.events) {
+        for (const event of block.events) {
+          try {
+            const payload = typeof event.payload === 'string' 
+              ? JSON.parse(Buffer.from(event.payload, 'base64').toString())
+              : event.payload;
+            if (payload?.value?.fields) {
+              const listingId = payload.value.fields.find(f => f.name === 'listingResourceID')?.value?.value;
+              if (listingId) completedListingIds.add(listingId.toString());
+            }
+          } catch (e) { /* ignore parse errors */ }
+        }
+      }
+    }
+    
+    // Parse listing events
+    const activeListings = [];
+    
+    for (const block of listingData) {
+      if (!block.events) continue;
+      
+      for (const event of block.events) {
+        try {
+          const payload = typeof event.payload === 'string'
+            ? JSON.parse(Buffer.from(event.payload, 'base64').toString())
+            : event.payload;
+          
+          if (!payload?.value?.fields) continue;
+          
+          const fields = payload.value.fields;
+          const getField = (name) => {
+            const f = fields.find(x => x.name === name);
+            return f?.value?.value || f?.value;
+          };
+          
+          const listingId = getField('listingResourceID')?.toString();
+          
+          // Skip if already sold
+          if (listingId && completedListingIds.has(listingId)) continue;
+          
+          // Extract listing data
+          const nftId = getField('nftID')?.toString();
+          const price = getField('salePrice');
+          const seller = getField('storefrontAddress')?.toString()?.toLowerCase();
+          
+          if (!nftId || !price) continue;
+          
+          activeListings.push({
+            listingId,
+            nftId,
+            listingPrice: parseFloat(price),
+            seller,
+            blockHeight: parseInt(block.block_height, 10),
+            blockTimestamp: block.block_timestamp
+          });
+          
+        } catch (e) {
+          console.error("[Sniper Active] Parse error:", e.message);
+        }
+      }
+    }
+    
+    // Enrich with metadata and floor prices
+    const nftIds = activeListings.map(l => l.nftId).filter(Boolean);
+    let momentData = {};
+    let editionPrices = {};
+    
+    if (nftIds.length > 0) {
+      try {
+        const metaResult = await pgQuery(
+          `SELECT nft_id, edition_id, serial_number, first_name, last_name,
+                  team_name, position, tier, set_name
+           FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+          [nftIds]
+        );
+        
+        const editionIds = [];
+        for (const row of metaResult.rows) {
+          momentData[row.nft_id] = row;
+          if (row.edition_id) editionIds.push(row.edition_id);
+        }
+        
+        if (editionIds.length > 0) {
+          const priceResult = await pgQuery(
+            `SELECT edition_id, lowest_ask_usd FROM edition_price_scrape 
+             WHERE edition_id = ANY($1::text[])`,
+            [[...new Set(editionIds)]]
+          );
+          for (const row of priceResult.rows) {
+            editionPrices[row.edition_id] = Number(row.lowest_ask_usd);
+          }
+        }
+      } catch (e) {
+        console.error("[Sniper Active] Metadata error:", e.message);
+      }
+    }
+    
+    // Enrich listings
+    const enrichedListings = activeListings.map(listing => {
+      const moment = momentData[listing.nftId] || {};
+      const floorPrice = editionPrices[moment.edition_id];
+      
+      let dealPercent = null;
+      if (floorPrice && listing.listingPrice && floorPrice > 0) {
+        dealPercent = ((floorPrice - listing.listingPrice) / floorPrice) * 100;
+      }
+      
+      return {
+        ...listing,
+        editionId: moment.edition_id,
+        serialNumber: moment.serial_number,
+        playerName: moment.first_name && moment.last_name 
+          ? `${moment.first_name} ${moment.last_name}` : null,
+        teamName: moment.team_name,
+        tier: moment.tier,
+        setName: moment.set_name,
+        floorPrice,
+        dealPercent: dealPercent ? Math.round(dealPercent * 10) / 10 : null,
+        listingUrl: moment.edition_id 
+          ? `https://nflallday.com/listing/moment/${moment.edition_id}` : null
+      };
+    });
+    
+    // Sort by deal %
+    enrichedListings.sort((a, b) => (b.dealPercent ?? -999) - (a.dealPercent ?? -999));
+    
+    return res.json({
+      ok: true,
+      listings: enrichedListings.slice(0, limitNum),
+      count: enrichedListings.length,
+      blocksQueried: endHeight - startHeight,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (err) {
+    console.error("[Sniper Active] Error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to fetch active listings: " + (err.message || String(err))
     });
   }
 });

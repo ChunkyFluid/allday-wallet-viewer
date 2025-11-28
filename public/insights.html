@@ -71,25 +71,8 @@
   </head>
   <body>
     <link rel="stylesheet" href="/header.css" />
-    <header class="app-header">
-      <div class="brand">
-        <div class="brand-logo">🐱</div>
-        <div>
-          <div class="brand-title">Chunky's NFLAD Viewer</div>
-        </div>
-      </div>
-      <nav class="main-nav">
-        <a href="/" id="nav-wallet">Wallet</a>
-        <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
-        <a href="/explorer.html" id="nav-explorer">Browse</a>
-        <a href="/insights.html" id="nav-insights" class="active">Insights</a>
-        <a href="/live-transactions.html" id="nav-live">Live</a>
-        <a href="/faq.html" id="nav-faq">FAQ</a>
-        <a href="/contact.html" id="nav-contact">Contact</a>
-        <a href="/login.html" id="nav-account-link">Login</a>
-      </nav>
-    </header>
-    <script src="/header.js"></script>
+    <div id="app-header"></div>
+    <script src="/layout.js"></script>
 
     <main class="app-main">
       <div class="page-title">Global Insights</div>
@@ -139,28 +122,6 @@
 
     <script>
       (function () {
-        async function updateNavAccount() {
-          const link = document.getElementById("nav-account-link");
-          if (!link) return;
-
-          try {
-            const res = await fetch("/api/me");
-            const data = await res.json();
-
-            if (data && data.user) {
-              link.href = "/login.html";
-              link.textContent = data.user.email;
-            } else {
-              link.href = "/login.html";
-              link.textContent = "Login";
-            }
-          } catch (err) {
-            console.error("updateNavAccount error:", err);
-          }
-        }
-
-        updateNavAccount();
-
         async function loadInsights() {
           const loadingEl = document.getElementById("insights-loading");
           const contentEl = document.getElementById("insights-content");

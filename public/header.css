@@ -69,6 +69,20 @@
   background: rgba(37, 99, 235, 0.3);
 }
 
+/* Highlighted nav items */
+.main-nav a.nav-hot {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(249, 115, 22, 0.15));
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.main-nav a.nav-hot:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(249, 115, 22, 0.25));
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fef3c7;
+}
+
 .wallet-form {
   display: flex;
   gap: 0.5rem;

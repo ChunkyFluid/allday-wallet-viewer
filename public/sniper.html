@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moment Sniper | NFL All Day</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="header.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sniper-bg: #050815;
+      --sniper-card: #0b1020;
+      --sniper-border: #1b2236;
+      --deal-hot: #ef4444;
+      --deal-warm: #f97316;
+      --deal-good: #22c55e;
+      --deal-neutral: #6b7280;
+      --gold: #fbbf24;
+      --text: #f8f9ff;
+      --text-muted: #8c95b8;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #101526 0, #050815 55%);
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .sniper-container {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* Page Header - Title left, Stats right */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .page-header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-header h1::before {
+      content: "🎯";
+      -webkit-text-fill-color: initial;
+    }
+
+    .page-subtitle {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Stats Bar - right side of header */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: var(--sniper-card);
+      border: 1px solid var(--sniper-border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+
+    .stat-card.deals .stat-value { color: #22c55e; }
+    .stat-card.listings .stat-value { color: #3b82f6; }
+
+    /* Two Column Layout */
+    .layout-two-column {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+
+    /* Filters Sidebar */
+    .filters-card {
+      background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+      border-radius: 16px;
+      border: 1px solid var(--sniper-border);
+      padding: 1.2rem;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+      position: sticky;
+      top: 1rem;
+    }
+
+    .filters-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .filters-title .cache-info {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .filter-group {
+      margin-bottom: 0.75rem;
+    }
+
+    .filter-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .filter-select,
+    .filter-input {
+      width: 100%;
+      background: #050a18;
+      border-radius: 10px;
+      border: 1px solid var(--sniper-border);
+      padding: 0.5rem 0.65rem;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .filter-select:focus,
+    .filter-input:focus {
+      border-color: #6f42c1;
+    }
+
+    .filters-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--sniper-border);
+    }
+
+    .btn-refresh {
+      background: linear-gradient(135deg, #6f42c1, #007bff);
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      transition: transform 0.15s, box-shadow 0.15s;
+      width: 100%;
+    }
+
+    .btn-refresh:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
+    }
+
+    .btn-refresh.loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .btn-refresh.loading .refresh-icon {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .auto-refresh-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .auto-refresh-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .countdown {
+      font-family: 'JetBrains Mono', monospace;
+      color: #22c55e;
+      font-size: 0.75rem;
+    }
+
+    /* Results Card */
+    .results-card {
+      background: #050915;
+      border-radius: 16px;
+      border: 1px solid var(--sniper-border);
+      overflow: hidden;
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--sniper-border);
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .results-info {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+      background: #1f2937;
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .view-toggle button {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+
+    .view-toggle button.active {
+      background: #374151;
+      color: var(--text);
+    }
+
+    /* Listings Grid */
+    .listings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .listing-card {
+      background: var(--sniper-card);
+      border: 1px solid var(--sniper-border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+
+    .listing-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .listing-card.hot-deal {
+      border-color: var(--deal-hot);
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    }
+
+    .listing-card.good-deal {
+      border-color: var(--deal-good);
+    }
+
+    /* Deal Badge */
+    .deal-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      z-index: 10;
+    }
+
+    .deal-badge.hot {
+      background: var(--deal-hot);
+      color: white;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .deal-badge.warm {
+      background: var(--deal-warm);
+      color: white;
+    }
+
+    .deal-badge.good {
+      background: var(--deal-good);
+      color: white;
+    }
+
+    .deal-badge.neutral {
+      background: var(--deal-neutral);
+      color: white;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    /* Card Content */
+    .card-image {
+      height: 180px;
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-image img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+    }
+
+    .card-image .tier-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tier-badge.legendary { background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f2937; }
+    .tier-badge.rare { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
+    .tier-badge.uncommon { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .tier-badge.common { background: #4b5563; color: white; }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .player-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f3f4f6;
+      margin: 0 0 4px 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .play-info {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin: 0 0 12px 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .play-info span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Price Section */
+    .price-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--sniper-border);
+    }
+
+    .price-box {
+      text-align: center;
+    }
+
+    .price-box .price-label {
+      font-size: 0.65rem;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .price-box .price-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .price-box.listing .price-value {
+      color: #3b82f6;
+    }
+
+    .price-box.floor .price-value {
+      color: #9ca3af;
+    }
+
+    /* Serial Badge */
+    .serial-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #e5e7eb;
+    }
+
+    .serial-badge.low-serial {
+      background: linear-gradient(135deg, var(--gold), #d97706);
+      color: #1f2937;
+    }
+
+    /* Action Button */
+    .btn-snipe {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-snipe:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Time Badge */
+    .time-badge {
+      font-size: 0.7rem;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+
+    .empty-state .icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+    }
+
+    .empty-state h3 {
+      font-size: 1.25rem;
+      color: #9ca3af;
+      margin: 0 0 8px 0;
+    }
+
+    .empty-state p {
+      margin: 0;
+    }
+
+    /* Status */
+    #status {
+      text-align: center;
+      padding: 12px;
+      color: #9ca3af;
+      font-size: 0.875rem;
+    }
+
+    #status.error { color: var(--deal-hot); }
+    #status.success { color: var(--deal-good); }
+
+    /* Loading skeleton */
+    .skeleton {
+      background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* View toggle */
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+      background: #1f2937;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .view-toggle button {
+      background: transparent;
+      border: none;
+      color: #6b7280;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.15s;
+    }
+
+    .view-toggle button.active {
+      background: #374151;
+      color: #f3f4f6;
+    }
+
+    /* Table View */
+    .listings-table {
+      width: 100%;
+      border-collapse: collapse;
+      display: none;
+    }
+
+    .listings-table.active {
+      display: table;
+    }
+
+    .listings-grid.active {
+      display: grid;
+    }
+
+    .listings-grid:not(.active) {
+      display: none;
+    }
+
+    .listings-table th,
+    .listings-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--sniper-border);
+    }
+
+    .listings-table th {
+      background: var(--sniper-card);
+      color: #9ca3af;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .listings-table th:hover {
+      color: #e5e7eb;
+    }
+
+    .listings-table th.sorted-asc::after { content: " ▲"; }
+    .listings-table th.sorted-desc::after { content: " ▼"; }
+
+    .listings-table tr {
+      background: var(--sniper-card);
+      transition: background 0.15s;
+    }
+
+    .listings-table tr:hover {
+      background: #1f2937;
+    }
+
+    .listings-table .deal-cell {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+    }
+
+    .listings-table .deal-cell.hot { color: var(--deal-hot); }
+    .listings-table .deal-cell.warm { color: var(--deal-warm); }
+    .listings-table .deal-cell.good { color: var(--deal-good); }
+    .listings-table .deal-cell.neutral { color: var(--deal-neutral); }
+
+    .listings-table th {
+      background: rgba(15, 23, 42, 0.8);
+      position: sticky;
+      top: 0;
+    }
+
+    .listings-table tr {
+      background: transparent;
+    }
+
+    .listings-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .listings-table tr:hover {
+      background: rgba(111, 66, 193, 0.1);
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state .icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .layout-two-column {
+        grid-template-columns: 1fr;
+      }
+      .filters-card {
+        position: static;
+      }
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .stats-bar {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .page-header h1 { font-size: 1.25rem; }
+      .listings-grid { grid-template-columns: 1fr; }
+      .stat-card { min-width: 80px; padding: 10px 14px; }
+      .stat-card .stat-value { font-size: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+  
+  <div class="sniper-container">
+    <!-- Page Header: Title left, Stats right -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Moment Sniper</h1>
+        <div class="page-subtitle">
+          <span class="live-dot" id="live-dot"></span>
+          <span id="live-status">Connecting...</span>
+        </div>
+      </div>
+      
+      <div class="stats-bar">
+        <div class="stat-card deals">
+          <div class="stat-value" id="stat-deals">0</div>
+          <div class="stat-label">🔥 Deals</div>
+        </div>
+        <div class="stat-card listings">
+          <div class="stat-value" id="stat-listings">0</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-filtered" style="color: #9ca3af;">0</div>
+          <div class="stat-label">Showing</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="layout-two-column">
+      <!-- Left: Filters -->
+      <aside class="filters-card">
+        <div class="filters-title">
+          Filters
+          <span class="cache-info" id="cache-status">0 floors</span>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Show</label>
+          <select class="filter-select" id="filter-deals-only">
+            <option value="">All Listings</option>
+            <option value="deals">Deals Only</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Min Discount</label>
+          <select class="filter-select" id="filter-min-discount">
+            <option value="">Any</option>
+            <option value="5">5%+ off</option>
+            <option value="10">10%+ off</option>
+            <option value="15">15%+ off</option>
+            <option value="20">20%+ off</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Tier</label>
+          <select class="filter-select" id="filter-tier">
+            <option value="">All Tiers</option>
+            <option value="LEGENDARY">Legendary</option>
+            <option value="RARE">Rare</option>
+            <option value="UNCOMMON">Uncommon</option>
+            <option value="COMMON">Common</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Max Price</label>
+          <input type="number" class="filter-input" id="filter-max-price" placeholder="Any" min="0" />
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Max Serial</label>
+          <input type="number" class="filter-input" id="filter-max-serial" placeholder="Any" min="1" />
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Player</label>
+          <input type="text" class="filter-input" id="filter-player" placeholder="Search..." />
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Team</label>
+          <select class="filter-select" id="filter-team">
+            <option value="">All Teams</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Sort By</label>
+          <select class="filter-select" id="sort-by">
+            <option value="time-desc">Most Recent</option>
+            <option value="deal-desc">Best Deals First</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="serial-asc">Serial: Low to High</option>
+          </select>
+        </div>
+
+        <div class="filters-actions">
+          <button class="btn-refresh" id="btn-refresh">
+            <span class="refresh-icon">↻</span>
+            Refresh
+          </button>
+          <div class="auto-refresh-row">
+            <label>
+              <input type="checkbox" id="auto-refresh" checked />
+              Auto-refresh
+            </label>
+            <span class="countdown" id="countdown">3s</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Right: Results -->
+      <div class="results-card">
+        <div class="results-header">
+          <div class="results-info" id="status">Loading marketplace data...</div>
+          <div class="view-toggle">
+            <button id="view-grid" title="Grid View">▦</button>
+            <button id="view-table" class="active" title="Table View">☰</button>
+          </div>
+        </div>
+
+        <!-- Grid View -->
+        <div class="listings-grid" id="listings-grid"></div>
+
+        <!-- Table View -->
+        <table class="listings-table active" id="listings-table">
+          <thead>
+            <tr>
+              <th data-sort="player">Player</th>
+              <th data-sort="tier">Tier</th>
+              <th data-sort="serial">Serial</th>
+              <th data-sort="price">Listed</th>
+              <th data-sort="floor">Floor</th>
+              <th data-sort="deal">vs Floor</th>
+              <th>Seller</th>
+              <th data-sort="time">When</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="layout.js"></script>
+  <script>
+    // NFL Teams for filter
+    const NFL_TEAMS = [
+      "Arizona Cardinals", "Atlanta Falcons", "Baltimore Ravens", "Buffalo Bills",
+      "Carolina Panthers", "Chicago Bears", "Cincinnati Bengals", "Cleveland Browns",
+      "Dallas Cowboys", "Denver Broncos", "Detroit Lions", "Green Bay Packers",
+      "Houston Texans", "Indianapolis Colts", "Jacksonville Jaguars", "Kansas City Chiefs",
+      "Las Vegas Raiders", "Los Angeles Chargers", "Los Angeles Rams", "Miami Dolphins",
+      "Minnesota Vikings", "New England Patriots", "New Orleans Saints", "New York Giants",
+      "New York Jets", "Philadelphia Eagles", "Pittsburgh Steelers", "San Francisco 49ers",
+      "Seattle Seahawks", "Tampa Bay Buccaneers", "Tennessee Titans", "Washington Commanders"
+    ];
+
+    // State
+    let listings = [];
+    let autoRefreshInterval = null;
+    let countdownValue = 5;
+    let currentView = 'table'; // Default to table/list view
+
+    // Elements
+    const listingsGrid = document.getElementById('listings-grid');
+    const listingsTable = document.getElementById('listings-table');
+    const tableBody = document.getElementById('table-body');
+    const statusEl = document.getElementById('status');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const autoRefreshCheckbox = document.getElementById('auto-refresh');
+    const countdownEl = document.getElementById('countdown');
+
+    // Filters
+    const filterDealsOnly = document.getElementById('filter-deals-only');
+    const filterMinDiscount = document.getElementById('filter-min-discount');
+    const filterTier = document.getElementById('filter-tier');
+    const filterMaxPrice = document.getElementById('filter-max-price');
+    const filterMaxSerial = document.getElementById('filter-max-serial');
+    const filterPlayer = document.getElementById('filter-player');
+    const filterTeam = document.getElementById('filter-team');
+    const sortBy = document.getElementById('sort-by');
+
+    // View toggle
+    document.getElementById('view-grid').addEventListener('click', () => {
+      currentView = 'grid';
+      document.getElementById('view-grid').classList.add('active');
+      document.getElementById('view-table').classList.remove('active');
+      listingsGrid.classList.add('active');
+      listingsTable.classList.remove('active');
+    });
+
+    document.getElementById('view-table').addEventListener('click', () => {
+      currentView = 'table';
+      document.getElementById('view-table').classList.add('active');
+      document.getElementById('view-grid').classList.remove('active');
+      listingsTable.classList.add('active');
+      listingsGrid.classList.remove('active');
+    });
+
+    // Format helpers
+    function formatPrice(val) {
+      if (val == null) return '-';
+      return '$' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDealPercent(listing, floor) {
+      if (!floor || !listing || floor <= 0) return null;
+      const diff = ((floor - listing) / floor) * 100;
+      return diff;
+    }
+
+    function getDealClass(percent) {
+      if (percent == null) return 'neutral';
+      if (percent >= 20) return 'hot';
+      if (percent >= 10) return 'warm';
+      if (percent >= 5) return 'good';
+      return 'neutral';
+    }
+
+    function formatTimeAgo(date) {
+      if (!date) return '-';
+      const now = new Date();
+      const diff = now - new Date(date);
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      return `${days}d ago`;
+    }
+
+    function getTierClass(tier) {
+      if (!tier) return 'common';
+      return tier.toLowerCase();
+    }
+
+    // Warmup the cache on first load
+    let cacheWarmedUp = false;
+    let availableTeams = [];
+    
+    async function warmupCache() {
+      if (cacheWarmedUp) return;
+      try {
+        document.getElementById('live-status').textContent = 'Warming up cache...';
+        const res = await fetch('/api/sniper-warmup?limit=100');
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('cache-status').textContent = `${data.cacheSize} floors cached`;
+          cacheWarmedUp = true;
+        }
+      } catch (e) {
+        console.error('Warmup error:', e);
+      }
+    }
+    
+    // Fetch all listings
+    async function fetchListings() {
+      btnRefresh.classList.add('loading');
+
+      try {
+        const response = await fetch('/api/sniper-deals');
+        const data = await response.json();
+
+        if (data.error) throw new Error(data.error);
+
+        listings = data.listings || [];
+        
+        // Update stats
+        document.getElementById('stat-deals').textContent = data.dealsCount || 0;
+        document.getElementById('stat-listings').textContent = data.total || 0;
+        
+        // Populate team dropdown from API data
+        if (data.availableTeams && data.availableTeams.length > 0) {
+          availableTeams = data.availableTeams;
+          const currentTeam = filterTeam.value;
+          filterTeam.innerHTML = '<option value="">All Teams</option>';
+          availableTeams.forEach(team => {
+            const opt = document.createElement('option');
+            opt.value = team;
+            opt.textContent = team;
+            filterTeam.appendChild(opt);
+          });
+          filterTeam.value = currentTeam; // Restore selection
+        }
+        
+        // Update live indicator
+        document.getElementById('live-status').textContent = data.watching 
+          ? `LIVE · Block ${data.lastCheckedBlock}` 
+          : 'Offline';
+        document.getElementById('cache-status').textContent = `${data.floorCacheSize} floors cached`;
+        document.getElementById('live-dot').style.background = data.watching ? '#22c55e' : '#ef4444';
+
+        renderListings();
+        
+        const timestamp = new Date().toLocaleTimeString();
+        statusEl.textContent = `${timestamp} • ${data.total} listings, ${data.dealsCount} deals`;
+        statusEl.className = data.dealsCount > 0 ? 'success' : '';
+
+      } catch (err) {
+        console.error('Error fetching listings:', err);
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'error';
+        document.getElementById('live-dot').style.background = '#ef4444';
+      } finally {
+        btnRefresh.classList.remove('loading');
+      }
+    }
+    
+    // Warmup on load
+    warmupCache();
+
+    // Filter and sort
+    function getFilteredListings() {
+      let filtered = [...listings];
+
+      // Deals only filter
+      const dealsOnly = filterDealsOnly.value;
+      if (dealsOnly === 'deals') {
+        filtered = filtered.filter(l => l.dealPercent > 0);
+      }
+
+      // Min discount filter
+      const minDiscount = parseFloat(filterMinDiscount.value);
+      if (minDiscount) {
+        filtered = filtered.filter(l => (l.dealPercent || 0) >= minDiscount);
+      }
+
+      // Tier filter
+      const tier = filterTier.value;
+      if (tier) {
+        filtered = filtered.filter(l => l.tier?.toUpperCase() === tier);
+      }
+
+      // Max listing price
+      const maxPrice = parseFloat(filterMaxPrice.value);
+      if (maxPrice) {
+        filtered = filtered.filter(l => (l.listingPrice || 0) <= maxPrice);
+      }
+
+      // Max serial
+      const maxSerial = parseInt(filterMaxSerial.value);
+      if (maxSerial) {
+        filtered = filtered.filter(l => (l.serialNumber || Infinity) <= maxSerial);
+      }
+
+      // Player search
+      const playerSearch = filterPlayer.value.toLowerCase().trim();
+      if (playerSearch) {
+        filtered = filtered.filter(l => 
+          l.playerName?.toLowerCase().includes(playerSearch)
+        );
+      }
+
+      // Team filter
+      const team = filterTeam.value;
+      if (team) {
+        filtered = filtered.filter(l => l.teamName?.includes(team));
+      }
+
+      // Sort
+      const sort = sortBy.value;
+      filtered.sort((a, b) => {
+        switch (sort) {
+          case 'deal-desc':
+            return (b.dealPercent || -999) - (a.dealPercent || -999);
+          case 'price-asc':
+            return (a.listingPrice || Infinity) - (b.listingPrice || Infinity);
+          case 'price-desc':
+            return (b.listingPrice || 0) - (a.listingPrice || 0);
+          case 'serial-asc':
+            return (a.serialNumber || Infinity) - (b.serialNumber || Infinity);
+          case 'time-desc':
+            return new Date(b.listedAt || 0) - new Date(a.listedAt || 0);
+          default:
+            return 0;
+        }
+      });
+
+      // Update filtered count
+      document.getElementById('stat-filtered').textContent = filtered.length;
+
+      return filtered;
+    }
+
+    // Render listings
+    function renderListings() {
+      const filtered = getFilteredListings();
+
+      if (filtered.length === 0) {
+        listingsGrid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="icon">🔍</div>
+            <h3>No listings found</h3>
+            <p>Try adjusting your filters or check back soon</p>
+          </div>
+        `;
+        tableBody.innerHTML = `
+          <tr><td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
+            No listings match your filters
+          </td></tr>
+        `;
+        return;
+      }
+
+      // Grid view
+      listingsGrid.innerHTML = filtered.map(l => {
+        const isLowSerial = (l.serialNumber || 999999) <= 100;
+
+        return `
+          <div class="listing-card">
+            <div class="card-image">
+              ${isLowSerial ? `
+                <div class="serial-badge low-serial">#${l.serialNumber}</div>
+              ` : `
+                <div class="serial-badge">#${l.serialNumber || '?'}</div>
+              `}
+              
+              <div style="color: #4b5563; font-size: 3rem;">🏈</div>
+              
+              <div class="tier-badge ${getTierClass(l.tier)}">${l.tier || 'Unknown'}</div>
+            </div>
+            
+            <div class="card-body">
+              <h3 class="player-name">${l.playerName || 'Unknown Player'}</h3>
+              <div class="play-info">
+                <span>📍 ${l.teamName || 'Unknown'}</span>
+                ${l.setName ? `<span>📦 ${l.setName}</span>` : ''}
+              </div>
+              
+              <div class="price-section">
+                <div class="price-box listing">
+                  <div class="price-label">Low Ask</div>
+                  <div class="price-value">${formatPrice(l.lowAsk)}</div>
+                </div>
+                <div class="price-box floor">
+                  <div class="price-label">Buyer</div>
+                  <div class="price-value" style="font-size: 0.9rem; color: #9ca3af;">${l.buyerName || '-'}</div>
+                </div>
+              </div>
+              
+              <div class="time-badge">
+                ⏱️ ${formatTimeAgo(l.listedAt)}
+              </div>
+            </div>
+            
+            <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe">
+              🎯 Snipe
+            </a>
+          </div>
+        `;
+      }).join('');
+
+      // Table view - all listings with deal highlighting
+      tableBody.innerHTML = filtered.map(l => {
+        const isDeal = l.dealPercent > 0;
+        const isHotDeal = l.dealPercent >= 15;
+        const isGoodDeal = l.dealPercent >= 5;
+        const isOverpriced = l.dealPercent < 0;
+        
+        // Row background
+        let rowBg = '';
+        if (isHotDeal) rowBg = 'background: rgba(34, 197, 94, 0.2);';
+        else if (isGoodDeal) rowBg = 'background: rgba(34, 197, 94, 0.1);';
+        else if (isDeal) rowBg = 'background: rgba(34, 197, 94, 0.05);';
+        else if (isOverpriced) rowBg = 'background: rgba(239, 68, 68, 0.05);';
+        
+        // Deal display
+        let dealDisplay = '—';
+        let dealColor = '#6b7280';
+        if (l.dealPercent > 0) {
+          dealDisplay = `↓${l.dealPercent.toFixed(1)}%`;
+          dealColor = isHotDeal ? '#22c55e' : isGoodDeal ? '#4ade80' : '#86efac';
+        } else if (l.dealPercent < 0) {
+          dealDisplay = `↑${Math.abs(l.dealPercent).toFixed(1)}%`;
+          dealColor = '#ef4444';
+        } else if (l.floor) {
+          dealDisplay = '=';
+          dealColor = '#6b7280';
+        }
+        
+        // Button style
+        let btnBg = '#3b82f6';
+        let btnText = 'View';
+        if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
+        else if (isDeal) { btnBg = '#4ade80'; btnText = '⚡ BUY'; }
+        
+        return `
+          <tr style="${rowBg}">
+            <td>
+              <strong>${l.playerName || 'Unknown'}</strong>
+              <div style="font-size: 0.75rem; color: #6b7280;">${l.teamName || ''}</div>
+            </td>
+            <td><span class="tier-badge ${getTierClass(l.tier)}" style="font-size: 0.7rem;">${l.tier || '?'}</span></td>
+            <td style="font-family: 'JetBrains Mono', monospace; ${l.isLowSerial ? 'color: #fbbf24; font-weight: 600;' : ''}">#${l.serialNumber || '?'}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#3b82f6'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.floor)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: ${dealColor}; font-weight: 600;">${dealDisplay}</td>
+            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
+            <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
+            <td>
+              <a href="${l.listingUrl || '#'}" target="_blank" 
+                 style="background: ${btnBg}; color: ${isDeal ? '#000' : '#fff'}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700;">
+                ${btnText}
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Auto-refresh every 3 seconds for live sniping
+    function startAutoRefresh() {
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      
+      countdownValue = 3;
+      countdownEl.textContent = `${countdownValue}s`;
+
+      autoRefreshInterval = setInterval(() => {
+        if (!autoRefreshCheckbox.checked) {
+          clearInterval(autoRefreshInterval);
+          countdownEl.textContent = 'off';
+          return;
+        }
+
+        countdownValue--;
+        countdownEl.textContent = `${countdownValue}s`;
+
+        if (countdownValue <= 0) {
+          fetchListings();
+          countdownValue = 3;
+        }
+      }, 1000);
+    }
+
+    // Event listeners
+    btnRefresh.addEventListener('click', fetchListings);
+    autoRefreshCheckbox.addEventListener('change', () => {
+      if (autoRefreshCheckbox.checked) {
+        startAutoRefresh();
+      } else {
+        clearInterval(autoRefreshInterval);
+        countdownEl.textContent = 'off';
+      }
+    });
+
+    // Filter change listeners
+    [filterDealsOnly, filterMinDiscount, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, sortBy].forEach(el => {
+      el.addEventListener('change', renderListings);
+      if (el.tagName === 'INPUT') {
+        el.addEventListener('input', renderListings);
+      }
+    });
+
+    // Table sorting
+    document.querySelectorAll('.listings-table th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        const currentSort = sortBy.value;
+        
+        // Map table columns to sort values
+        const sortMap = {
+          'player': 'time-desc', // No direct player sort, use time
+          'tier': 'time-desc',
+          'serial': 'serial-asc',
+          'price': 'price-asc',
+          'floor': 'price-asc',
+          'deal': 'deal-desc',
+          'time': 'time-desc'
+        };
+
+        if (sortMap[key]) {
+          sortBy.value = sortMap[key];
+          renderListings();
+        }
+      });
+    });
+
+    // Initialize
+    fetchListings();
+    startAutoRefresh();
+  </script>
+</body>
+</html>
+

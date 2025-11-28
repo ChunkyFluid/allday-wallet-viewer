@@ -8,11 +8,13 @@
       '/index.html': 'nav-wallet',
       '/top-holders.html': 'nav-top-holders',
       '/explorer.html': 'nav-explorer',
+      '/sniper.html': 'nav-sniper',
       '/insights.html': 'nav-insights',
       '/live-transactions.html': 'nav-live',
       '/faq.html': 'nav-faq',
       '/contact.html': 'nav-contact',
-      '/login.html': 'nav-account-link'
+      '/login.html': 'nav-account-link',
+      '/profiles.html': 'nav-profiles'
     };
 
     // Remove active class from all nav links

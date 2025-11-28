@@ -244,29 +244,12 @@
     </style>
   </head>
   <body>
-    <header class="app-header">
-      <div class="brand">
-        <div class="brand-logo">🐱</div>
-        <div>
-          <div class="brand-title">Chunky's NFLAD Viewer</div>
-        </div>
-      </div>
-      <nav class="main-nav">
-        <a href="/" id="nav-wallet">Wallet</a>
-        <a href="/top-holders.html" id="nav-top-holders">Top holders</a>
-        <a href="/explorer.html" id="nav-explorer">Browse</a>
-        <a href="/insights.html" id="nav-insights">Insights</a>
-        <a href="/live-transactions.html" id="nav-live" class="active">Live</a>
-        <a href="/faq.html" id="nav-faq">FAQ</a>
-        <a href="/contact.html" id="nav-contact">Contact</a>
-        <a href="/login.html" id="nav-account-link">Login</a>
-      </nav>
-    </header>
-    <script src="/header.js"></script>
+    <div id="app-header"></div>
+    <script src="/layout.js"></script>
 
     <main class="app-main">
       <h1 class="page-title">Live NFL All Day Transactions</h1>
-      <p class="page-subtitle">Real-time transactions via local Flow Light Node (seconds delay)</p>
+      <p class="page-subtitle">Real-time transactions via Flow blockchain API (seconds delay)</p>
 
       <div class="controls">
         <div class="status-indicator">
@@ -277,7 +260,7 @@
         <button class="btn" id="btn-stop">Stop</button>
         <button class="btn" id="btn-clear">Clear</button>
         <select class="btn" id="source-select" style="min-width: 180px;">
-          <option value="lightnode" selected>🟢 Light Node (real-time)</option>
+          <option value="lightnode" selected>🟢 Flow API (real-time)</option>
           <option value="snowflake">📊 Snowflake (~45 min delay)</option>
           <option value="live">🔌 WebSocket (experimental)</option>
           <option value="flow-rest">⚡ Flow REST (unreliable)</option>
@@ -456,12 +439,12 @@
 
       async function fetchLatestEvents() {
         try {
-          // Light Node source (real-time via local Flow node)
+          // Flow API source (real-time via public Flow REST API)
           if (dataSource === 'lightnode') {
             const eventsRes = await fetch('/api/lightnode-events?limit=50');
             
             if (!eventsRes.ok) {
-              throw new Error(`Failed to fetch from light node: HTTP ${eventsRes.status}`);
+              throw new Error(`Failed to fetch from Flow API: HTTP ${eventsRes.status}`);
             }
             
             const eventsData = await eventsRes.json();
@@ -487,8 +470,8 @@
               ? `${eventsData.startHeight}-${eventsData.endHeight}` 
               : eventsData.latestBlockHeight;
             const statusText = events.length > 0 
-              ? `Light Node: ${events.length} events in blocks ${blockRange}` 
-              : `Light Node: Watching blocks ${blockRange}...`;
+              ? `Flow API: ${events.length} events in blocks ${blockRange}` 
+              : `Flow API: Watching blocks ${blockRange}...`;
             updateStatus('active', statusText);
             return;
           }

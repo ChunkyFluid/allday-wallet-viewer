@@ -22,22 +22,14 @@
           ${navLink("/profiles.html", "Profiles")}
           ${navLink("/top-holders.html", "Top holders")}
           ${navLink("/explorer.html", "Browse")}
+          <a href="/sniper.html" class="${path === '/sniper.html' ? 'active nav-hot' : 'nav-hot'}">🎯 Sniper</a>
+          ${navLink("/live-transactions.html", "Live")}
+          ${navLink("/insights.html", "Insights")}
           ${navLink("/faq.html", "FAQ")}
           ${navLink("/contact.html", "Contact")}
           ${navLink("/login.html", "Login", { id: "nav-account-link" })}
         </nav>
 
-        <form id="wallet-form" class="wallet-form" action="/" method="GET">
-          <input
-            id="wallet-input"
-            name="wallet"
-            type="text"
-            class="wallet-input"
-            placeholder="0x… wallet address"
-            autocomplete="off"
-          />
-          <button type="submit" class="btn-primary">View Wallet</button>
-        </form>
       </header>
     `;
     }
