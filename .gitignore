@@ -6,3 +6,6 @@ data/*.csv
 
 # Dependencies
 node_modules/
+
+# Log files
+*.log
