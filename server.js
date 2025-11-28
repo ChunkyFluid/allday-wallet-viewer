@@ -1911,46 +1911,148 @@ app.get("/api/teams", async (req, res) => {
 // Global insights: aggregate stats across all wallets
 app.get("/api/insights", async (req, res) => {
   try {
-    // Get aggregate stats from top_wallets_snapshot (which has all wallets)
-    const statsResult = await pool.query(
-      `
-      SELECT
-        COUNT(*)::bigint AS total_wallets,
-        SUM(total_moments)::bigint AS total_moments,
-        AVG(total_moments)::numeric AS avg_collection_size,
-        SUM(unlocked_moments)::bigint AS total_unlocked,
-        SUM(locked_moments)::bigint AS total_locked,
-        SUM(tier_common)::bigint AS tier_common_total,
-        SUM(tier_uncommon)::bigint AS tier_uncommon_total,
-        SUM(tier_rare)::bigint AS tier_rare_total,
-        SUM(tier_legendary)::bigint AS tier_legendary_total,
-        SUM(tier_ultimate)::bigint AS tier_ultimate_total
-      FROM top_wallets_snapshot
-      WHERE wallet_address NOT IN (
-        '0xe4cf4bdc1751c65d', -- AllDay contract
-        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
-      );
-      `
-    );
-
-    // Get size distribution buckets
-    const sizeDistResult = await pool.query(
-      `
-      SELECT
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
-        COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
-        COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
-      FROM top_wallets_snapshot
-      WHERE wallet_address NOT IN (
-        '0xe4cf4bdc1751c65d',
-        '0xb6f2481eba4df97b'
-      );
-      `
-    );
+    // Run all queries in parallel for speed
+    const [
+      statsResult,
+      sizeDistResult,
+      biggestCollectorResult,
+      lowSerialResult,
+      topTeamsResult,
+      topPlayersResult,
+      topSetsResult,
+      positionResult,
+      marketResult,
+      medianResult
+    ] = await Promise.all([
+      // Basic stats
+      pool.query(`
+        SELECT
+          COUNT(*)::bigint AS total_wallets,
+          SUM(total_moments)::bigint AS total_moments,
+          AVG(total_moments)::numeric AS avg_collection_size,
+          SUM(unlocked_moments)::bigint AS total_unlocked,
+          SUM(locked_moments)::bigint AS total_locked,
+          SUM(tier_common)::bigint AS tier_common_total,
+          SUM(tier_uncommon)::bigint AS tier_uncommon_total,
+          SUM(tier_rare)::bigint AS tier_rare_total,
+          SUM(tier_legendary)::bigint AS tier_legendary_total,
+          SUM(tier_ultimate)::bigint AS tier_ultimate_total
+        FROM top_wallets_snapshot
+        WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
+      `),
+      
+      // Size distribution
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
+          COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
+          COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
+        FROM top_wallets_snapshot
+        WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
+      `),
+      
+      // Biggest collector
+      pool.query(`
+        SELECT 
+          t.wallet_address,
+          t.total_moments,
+          COALESCE(w.display_name, w.username, t.wallet_address) AS name
+        FROM top_wallets_snapshot t
+        LEFT JOIN wallet_profiles w ON w.wallet_address = t.wallet_address
+        WHERE t.wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b')
+        ORDER BY t.total_moments DESC
+        LIMIT 1;
+      `),
+      
+      // Low serial counts
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE serial_number = 1)::bigint AS serial_1,
+          COUNT(*) FILTER (WHERE serial_number <= 10)::bigint AS serial_10,
+          COUNT(*) FILTER (WHERE serial_number <= 100)::bigint AS serial_100,
+          COUNT(*) FILTER (WHERE serial_number <= 1000)::bigint AS serial_1000
+        FROM nft_core_metadata;
+      `),
+      
+      // Top 5 teams
+      pool.query(`
+        SELECT team_name, COUNT(*)::bigint AS count
+        FROM nft_core_metadata
+        WHERE team_name IS NOT NULL AND team_name != ''
+        GROUP BY team_name
+        ORDER BY count DESC
+        LIMIT 5;
+      `),
+      
+      // Top 5 players
+      pool.query(`
+        SELECT 
+          CONCAT(first_name, ' ', last_name) AS player_name,
+          team_name,
+          COUNT(*)::bigint AS count
+        FROM nft_core_metadata
+        WHERE first_name IS NOT NULL AND last_name IS NOT NULL
+        GROUP BY first_name, last_name, team_name
+        ORDER BY count DESC
+        LIMIT 5;
+      `),
+      
+      // Top 5 sets
+      pool.query(`
+        SELECT set_name, COUNT(*)::bigint AS count
+        FROM nft_core_metadata
+        WHERE set_name IS NOT NULL AND set_name != ''
+        GROUP BY set_name
+        ORDER BY count DESC
+        LIMIT 5;
+      `),
+      
+      // Position breakdown
+      pool.query(`
+        SELECT position, COUNT(*)::bigint AS count
+        FROM nft_core_metadata
+        WHERE position IS NOT NULL AND position != ''
+        GROUP BY position
+        ORDER BY count DESC;
+      `),
+      
+      // Market stats
+      pool.query(`
+        SELECT 
+          COUNT(*)::bigint AS editions_with_price,
+          ROUND(AVG(lowest_ask_usd)::numeric, 2) AS avg_floor,
+          ROUND(SUM(lowest_ask_usd)::numeric, 2) AS total_floor_value,
+          ROUND(MAX(lowest_ask_usd)::numeric, 2) AS highest_floor,
+          ROUND(AVG(avg_sale_usd)::numeric, 2) AS avg_sale
+        FROM edition_price_scrape
+        WHERE lowest_ask_usd > 0;
+      `),
+      
+      // Median collection size
+      pool.query(`
+        SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_moments) AS median
+        FROM top_wallets_snapshot
+        WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
+      `)
+    ]);
 
     const stats = statsResult.rows[0] || {};
     const sizeDist = sizeDistResult.rows[0] || {};
+    const biggestCollector = biggestCollectorResult.rows[0] || {};
+    const lowSerials = lowSerialResult.rows[0] || {};
+    const market = marketResult.rows[0] || {};
+    const medianRow = medianResult.rows[0] || {};
+
+    // Calculate tier percentages
+    const totalMoments = Number(stats.total_moments) || 1;
+    const tierPercents = {
+      common: ((Number(stats.tier_common_total) / totalMoments) * 100).toFixed(1),
+      uncommon: ((Number(stats.tier_uncommon_total) / totalMoments) * 100).toFixed(1),
+      rare: ((Number(stats.tier_rare_total) / totalMoments) * 100).toFixed(1),
+      legendary: ((Number(stats.tier_legendary_total) / totalMoments) * 100).toFixed(2),
+      ultimate: ((Number(stats.tier_ultimate_total) / totalMoments) * 100).toFixed(3)
+    };
 
     return res.json({
       ok: true,
@@ -1958,19 +2060,46 @@ app.get("/api/insights", async (req, res) => {
         totalWallets: Number(stats.total_wallets) || 0,
         totalMoments: Number(stats.total_moments) || 0,
         avgCollectionSize: Math.round(Number(stats.avg_collection_size) || 0),
+        medianCollectionSize: Math.round(Number(medianRow.median) || 0),
         totalUnlocked: Number(stats.total_unlocked) || 0,
         totalLocked: Number(stats.total_locked) || 0,
         tierCommon: Number(stats.tier_common_total) || 0,
         tierUncommon: Number(stats.tier_uncommon_total) || 0,
         tierRare: Number(stats.tier_rare_total) || 0,
         tierLegendary: Number(stats.tier_legendary_total) || 0,
-        tierUltimate: Number(stats.tier_ultimate_total) || 0
+        tierUltimate: Number(stats.tier_ultimate_total) || 0,
+        tierPercents
       },
       sizeDistribution: {
         "1-10": Number(sizeDist.bin_1_10) || 0,
-        "10-100": Number(sizeDist.bin_10_100) || 0,
-        "100-1000": Number(sizeDist.bin_100_1000) || 0,
-        "1000+": Number(sizeDist.bin_1000_plus) || 0
+        "11-100": Number(sizeDist.bin_10_100) || 0,
+        "101-1K": Number(sizeDist.bin_100_1000) || 0,
+        "1K+": Number(sizeDist.bin_1000_plus) || 0
+      },
+      biggestCollector: {
+        name: biggestCollector.name || "Unknown",
+        wallet: biggestCollector.wallet_address || "",
+        moments: Number(biggestCollector.total_moments) || 0
+      },
+      lowSerials: {
+        "#1": Number(lowSerials.serial_1) || 0,
+        "≤10": Number(lowSerials.serial_10) || 0,
+        "≤100": Number(lowSerials.serial_100) || 0,
+        "≤1000": Number(lowSerials.serial_1000) || 0
+      },
+      topTeams: topTeamsResult.rows.map(r => ({ name: r.team_name, count: Number(r.count) })),
+      topPlayers: topPlayersResult.rows.map(r => ({ name: r.player_name, team: r.team_name, count: Number(r.count) })),
+      topSets: topSetsResult.rows.map(r => ({ name: r.set_name, count: Number(r.count) })),
+      positions: positionResult.rows.reduce((acc, r) => {
+        acc[r.position] = Number(r.count);
+        return acc;
+      }, {}),
+      market: {
+        editionsWithPrice: Number(market.editions_with_price) || 0,
+        avgFloor: Number(market.avg_floor) || 0,
+        totalFloorValue: Number(market.total_floor_value) || 0,
+        highestFloor: Number(market.highest_floor) || 0,
+        avgSale: Number(market.avg_sale) || 0
       }
     });
   } catch (err) {
