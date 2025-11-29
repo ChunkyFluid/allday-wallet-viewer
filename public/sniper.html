@@ -615,6 +615,21 @@
       border-bottom: 1px solid var(--sniper-border);
     }
 
+    .listings-table th:last-child,
+    .listings-table td:last-child {
+      white-space: nowrap;
+      min-width: 100px;
+    }
+
+    .listing-sold {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+
+    .listing-sold td {
+      color: #6b7280 !important;
+    }
+
     .listings-table th {
       background: var(--sniper-card);
       color: #9ca3af;
@@ -1476,9 +1491,10 @@
       listingsGrid.innerHTML = filtered.map(l => {
         // Gold serial only if #1 or matches jersey number
         const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
+        const soldClass = l.isSold ? 'listing-sold' : '';
 
         return `
-          <div class="listing-card">
+          <div class="listing-card ${soldClass}">
             <div class="card-image">
               ${isSpecialSerial ? `
                 <div class="serial-badge low-serial">#${l.serialNumber}</div>
@@ -1514,9 +1530,15 @@
               </div>
             </div>
             
-            <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe">
-              🎯 Snipe
-            </a>
+            ${l.isSold ? `
+              <div class="btn-snipe" style="background: #6b7280; cursor: not-allowed; opacity: 0.7;">
+                SOLD
+              </div>
+            ` : `
+              <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe">
+                🎯 Snipe
+              </a>
+            `}
           </div>
         `;
       }).join('');
@@ -1555,11 +1577,14 @@
         // Button style
         let btnBg = '#3b82f6';
         let btnText = 'View';
-        if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
+        if (l.isSold) { btnBg = '#6b7280'; btnText = 'SOLD'; }
+        else if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
         else if (isDeal) { btnBg = '#4ade80'; btnText = '⚡ BUY'; }
         
+        const soldClass = l.isSold ? 'listing-sold' : '';
+        
         return `
-          <tr style="${rowBg}">
+          <tr class="${soldClass}" style="${rowBg}">
             <td>
               <strong>${l.playerName || 'Unknown'}</strong>
               <div style="font-size: 0.75rem; color: #6b7280;">${l.teamName || ''}</div>
@@ -1575,10 +1600,16 @@
             <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
-              <a href="${l.listingUrl || '#'}" target="_blank" 
-                 style="background: ${btnBg}; color: ${isDeal ? '#000' : '#fff'}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700;">
-                ${btnText}
-              </a>
+              ${l.isSold ? `
+                <span style="background: ${btnBg}; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-block;">
+                  ${btnText}
+                </span>
+              ` : `
+                <a href="${l.listingUrl || '#'}" target="_blank" 
+                   style="background: ${btnBg}; color: ${isDeal ? '#000' : '#fff'}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; display: inline-block;">
+                  ${btnText}
+                </a>
+              `}
             </td>
           </tr>
         `;
@@ -1606,11 +1637,12 @@
         
         // Card class
         let cardClass = 'mobile-card';
-        if (isHotDeal) cardClass += ' is-hot-deal';
+        if (l.isSold) cardClass += ' listing-sold';
+        else if (isHotDeal) cardClass += ' is-hot-deal';
         else if (isDeal) cardClass += ' is-deal';
         
         return `
-          <a href="${l.listingUrl || '#'}" target="_blank" class="${cardClass}">
+          <a href="${l.isSold ? '#' : l.listingUrl || '#'}" ${l.isSold ? '' : 'target="_blank"'} class="${cardClass}" ${l.isSold ? 'style="pointer-events: none;"' : ''}>
             <div class="mobile-card-icon ${tierClass}">🏈</div>
             <div class="mobile-card-main">
               <div class="mobile-card-header">
@@ -1625,9 +1657,14 @@
               </div>
             </div>
             <div class="mobile-card-right">
-              <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
-              ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
-              ${dealDisplay ? `<div class="mobile-card-deal ${dealClass}">${dealDisplay}</div>` : ''}
+              ${l.isSold ? `
+                <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700; text-decoration: line-through;">${formatPrice(l.listingPrice)}</div>
+                <div style="color: #ef4444; font-size: 0.75rem; font-weight: 600;">SOLD</div>
+              ` : `
+                <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
+                ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
+                ${dealDisplay ? `<div class="mobile-card-deal ${dealClass}">${dealDisplay}</div>` : ''}
+              `}
             </div>
           </a>
         `;

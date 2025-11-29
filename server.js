@@ -3520,12 +3520,18 @@ function updateFloorCache(editionId, newFloor) {
 
 const sniperListings = []; // Array of ALL listings
 const seenListingNfts = new Set(); // Track seen nftIds to prevent duplicates
+const soldNfts = new Set(); // Track sold NFTs
 const MAX_SNIPER_LISTINGS = 500;
 
 function addSniperListing(listing) {
   // Dedupe by nftId - same NFT can't be listed twice
   if (seenListingNfts.has(listing.nftId)) return;
   seenListingNfts.add(listing.nftId);
+  
+  // Mark as sold if already in sold set
+  if (soldNfts.has(listing.nftId)) {
+    listing.isSold = true;
+  }
   
   // Add to front of array
   sniperListings.unshift(listing);
@@ -3537,8 +3543,19 @@ function addSniperListing(listing) {
   }
   
   // Log deals (below floor)
-  if (listing.dealPercent > 0) {
+  if (listing.dealPercent > 0 && !listing.isSold) {
     console.log(`[SNIPER] 🎯 DEAL: ${listing.playerName} #${listing.serialNumber || '?'} - $${listing.listingPrice} (floor $${listing.floor}) - ${listing.dealPercent.toFixed(1)}% off!`);
+  }
+}
+
+function markListingAsSold(nftId) {
+  soldNfts.add(nftId);
+  
+  // Mark existing listings as sold
+  for (const listing of sniperListings) {
+    if (listing.nftId === nftId) {
+      listing.isSold = true;
+    }
   }
 }
 
@@ -3653,6 +3670,7 @@ async function processListingEvent(event) {
       sellerName,
       sellerAddr,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
+      isSold: soldNfts.has(nftId),
       listedAt: timestamp || new Date().toISOString(),
       listingUrl: `https://nflallday.com/listing/moment/${editionId}`
     };
@@ -3699,79 +3717,136 @@ async function watchForListings() {
       
       if (latestHeight <= lastCheckedBlock) return;
       
-      // Query for ListingAvailable events in new blocks
+      // Query for ListingAvailable and ListingCompleted events in new blocks
       const startHeight = lastCheckedBlock + 1;
       const endHeight = Math.min(latestHeight, startHeight + 50); // Max 50 blocks at a time
       
-      const eventUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`;
+      // Check for new listings
+      const listingUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`;
+      const listingRes = await fetch(listingUrl);
       
-      const eventRes = await fetch(eventUrl);
-      if (!eventRes.ok) {
-        lastCheckedBlock = endHeight;
-        return;
-      }
-      
-      const eventData = await eventRes.json();
+      // Check for completed listings (sales)
+      const completedUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`;
+      const completedRes = await fetch(completedUrl);
       
       let newListingCount = 0;
       let alldayCount = 0;
+      let soldCount = 0;
       
-      for (const block of eventData) {
-        if (!block.events) continue;
+      // Process new listings
+      if (listingRes.ok) {
+        const eventData = await listingRes.json();
         
-        for (const event of block.events) {
-          try {
-            // Decode the payload
-            let payload = event.payload;
-            if (typeof payload === 'string') {
-              payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+        for (const block of eventData) {
+          if (!block.events) continue;
+          
+          for (const event of block.events) {
+            try {
+              // Decode the payload
+              let payload = event.payload;
+              if (typeof payload === 'string') {
+                payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+              }
+              
+              if (!payload?.value?.fields) continue;
+              
+              const fields = payload.value.fields;
+              const getField = (name) => {
+                const f = fields.find(x => x.name === name);
+                if (!f) return null;
+                if (f.value?.value?.value) return f.value.value.value;
+                if (f.value?.value) return f.value.value;
+                return f.value;
+              };
+              
+              // Check if this is an AllDay NFT
+              const nftType = fields.find(f => f.name === 'nftType');
+              const typeId = nftType?.value?.staticType?.typeID || 
+                            nftType?.value?.value?.staticType?.typeID || '';
+              
+              if (!typeId.includes('AllDay')) continue;
+              
+              const nftId = getField('nftID')?.toString();
+              const priceStr = getField('price');
+              const listingPrice = priceStr ? parseFloat(priceStr) : null;
+              const sellerAddr = getField('storefrontAddress')?.toString()?.toLowerCase();
+              
+              if (!nftId || !listingPrice) continue;
+              
+              alldayCount++;
+              
+              // Process this listing
+              await processListingEvent({
+                nftId,
+                listingPrice,
+                sellerAddr,
+                timestamp: block.block_timestamp
+              });
+              
+              newListingCount++;
+              
+            } catch (e) {
+              // Skip malformed events
             }
-            
-            if (!payload?.value?.fields) continue;
-            
-            const fields = payload.value.fields;
-            const getField = (name) => {
-              const f = fields.find(x => x.name === name);
-              if (!f) return null;
-              if (f.value?.value?.value) return f.value.value.value;
-              if (f.value?.value) return f.value.value;
-              return f.value;
-            };
-            
-            // Check if this is an AllDay NFT
-            const nftType = fields.find(f => f.name === 'nftType');
-            const typeId = nftType?.value?.staticType?.typeID || 
-                          nftType?.value?.value?.staticType?.typeID || '';
-            
-            if (!typeId.includes('AllDay')) continue;
-            
-            const nftId = getField('nftID')?.toString();
-            const priceStr = getField('price');
-            const listingPrice = priceStr ? parseFloat(priceStr) : null;
-            const sellerAddr = getField('storefrontAddress')?.toString()?.toLowerCase();
-            
-            if (!nftId || !listingPrice) continue;
-            
-            alldayCount++;
-            
-            // Process this listing
-            await processListingEvent({
-              nftId,
-              listingPrice,
-              sellerAddr,
-              timestamp: block.block_timestamp
-            });
-            
-            newListingCount++;
-            
-          } catch (e) {
-            // Skip malformed events
           }
         }
       }
       
-      if (alldayCount > 0) {
-        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} AllDay listings`);
+      // Process completed listings (mark as sold)
+      if (completedRes.ok) {
+        const eventData = await completedRes.json();
+        
+        for (const block of eventData) {
+          if (!block.events) continue;
+          
+          for (const event of block.events) {
+            try {
+              // Decode the payload
+              let payload = event.payload;
+              if (typeof payload === 'string') {
+                payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+              }
+              
+              if (!payload?.value?.fields) continue;
+              
+              const fields = payload.value.fields;
+              const getField = (name) => {
+                const f = fields.find(x => x.name === name);
+                if (!f) return null;
+                if (f.value?.value?.value) return f.value.value.value;
+                if (f.value?.value) return f.value.value;
+                return f.value;
+              };
+              
+              // Check if this is an AllDay NFT
+              const nftType = fields.find(f => f.name === 'nftType');
+              const typeId = nftType?.value?.staticType?.typeID || 
+                            nftType?.value?.value?.staticType?.typeID || '';
+              
+              if (!typeId.includes('AllDay')) continue;
+              
+              const nftId = getField('nftID')?.toString();
+              
+              if (!nftId) continue;
+              
+              // Mark this NFT as sold
+              markListingAsSold(nftId);
+              soldCount++;
+              
+            } catch (e) {
+              // Skip malformed events
+            }
+          }
+        }
+      }
+      
+      if (!listingRes.ok && !completedRes.ok) {
+        lastCheckedBlock = endHeight;
+        return;
+      }
+      
+      if (alldayCount > 0 || soldCount > 0) {
+        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold`);
       }
       
       lastCheckedBlock = endHeight;
