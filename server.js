@@ -1954,29 +1954,29 @@ app.post("/api/insights/refresh", async (req, res) => {
     ] = await Promise.all([
       // Basic stats
       pool.query(`
-        SELECT
-          COUNT(*)::bigint AS total_wallets,
-          SUM(total_moments)::bigint AS total_moments,
-          AVG(total_moments)::numeric AS avg_collection_size,
-          SUM(unlocked_moments)::bigint AS total_unlocked,
-          SUM(locked_moments)::bigint AS total_locked,
-          SUM(tier_common)::bigint AS tier_common_total,
-          SUM(tier_uncommon)::bigint AS tier_uncommon_total,
-          SUM(tier_rare)::bigint AS tier_rare_total,
-          SUM(tier_legendary)::bigint AS tier_legendary_total,
-          SUM(tier_ultimate)::bigint AS tier_ultimate_total
-        FROM top_wallets_snapshot
+      SELECT
+        COUNT(*)::bigint AS total_wallets,
+        SUM(total_moments)::bigint AS total_moments,
+        AVG(total_moments)::numeric AS avg_collection_size,
+        SUM(unlocked_moments)::bigint AS total_unlocked,
+        SUM(locked_moments)::bigint AS total_locked,
+        SUM(tier_common)::bigint AS tier_common_total,
+        SUM(tier_uncommon)::bigint AS tier_uncommon_total,
+        SUM(tier_rare)::bigint AS tier_rare_total,
+        SUM(tier_legendary)::bigint AS tier_legendary_total,
+        SUM(tier_ultimate)::bigint AS tier_ultimate_total
+      FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
       
       // Size distribution
       pool.query(`
-        SELECT
-          COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
-          COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
-          COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
-          COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
-        FROM top_wallets_snapshot
+      SELECT
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 1 AND 10)::bigint AS bin_1_10,
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 11 AND 100)::bigint AS bin_10_100,
+        COUNT(*) FILTER (WHERE total_moments BETWEEN 101 AND 1000)::bigint AS bin_100_1000,
+        COUNT(*) FILTER (WHERE total_moments > 1000)::bigint AS bin_1000_plus
+      FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
       
@@ -3556,7 +3556,7 @@ async function processListingEvent(event) {
     if (!editionId) {
       try {
         const result = await pgQuery(
-          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name, series_name
+          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name, series_name, jersey_number
            FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
@@ -3595,7 +3595,7 @@ async function processListingEvent(event) {
     if (!momentData || !momentData.series_name) {
       try {
         const result = await pgQuery(
-          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position
+          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position, jersey_number
            FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
@@ -3649,6 +3649,7 @@ async function processListingEvent(event) {
       setName: momentData?.set_name,
       seriesName: momentData?.series_name,
       position: momentData?.position,
+      jerseyNumber: momentData?.jersey_number ? Number(momentData.jersey_number) : null,
       sellerName,
       sellerAddr,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
@@ -3840,18 +3841,22 @@ app.get("/api/sniper-deals", async (req, res) => {
     
     const seriesMapByNftId = new Map();
     const seriesMapByEditionId = new Map();
+    const jerseyMapByNftId = new Map();
     const aspMap = new Map();
     
-    // Batch fetch series names by nftId
+    // Batch fetch series names and jersey numbers by nftId
     if (allNftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT nft_id, series_name FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+          `SELECT nft_id, series_name, jersey_number FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
           [allNftIds]
         );
         metaResult.rows.forEach(row => {
           if (row.series_name) {
             seriesMapByNftId.set(row.nft_id, row.series_name);
+          }
+          if (row.jersey_number) {
+            jerseyMapByNftId.set(row.nft_id, Number(row.jersey_number));
           }
         });
       } catch (e) {
@@ -3909,6 +3914,11 @@ app.get("/api/sniper-deals", async (req, res) => {
         } else if (enriched.editionId && seriesMapByEditionId.has(enriched.editionId)) {
           enriched.seriesName = seriesMapByEditionId.get(enriched.editionId);
         }
+      }
+      
+      // Fill in jerseyNumber if missing
+      if (!enriched.jerseyNumber && enriched.nftId && jerseyMapByNftId.has(enriched.nftId)) {
+        enriched.jerseyNumber = jerseyMapByNftId.get(enriched.nftId);
       }
       
       // Always try to fill in avgSale if we have an editionId (even if it was previously null)

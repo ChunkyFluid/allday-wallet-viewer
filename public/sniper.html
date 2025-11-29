@@ -1474,12 +1474,13 @@
 
       // Grid view
       listingsGrid.innerHTML = filtered.map(l => {
-        const isLowSerial = (l.serialNumber || 999999) <= 100;
+        // Gold serial only if #1 or matches jersey number
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
 
         return `
           <div class="listing-card">
             <div class="card-image">
-              ${isLowSerial ? `
+              ${isSpecialSerial ? `
                 <div class="serial-badge low-serial">#${l.serialNumber}</div>
               ` : `
                 <div class="serial-badge">#${l.serialNumber || '?'}</div>
@@ -1527,6 +1528,9 @@
         const isGoodDeal = l.dealPercent >= 5;
         const isOverpriced = l.dealPercent < 0;
         
+        // Gold serial only if #1 or matches jersey number
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
+        
         // Row background
         let rowBg = '';
         if (isHotDeal) rowBg = 'background: rgba(34, 197, 94, 0.2);';
@@ -1561,8 +1565,8 @@
               <div style="font-size: 0.75rem; color: #6b7280;">${l.teamName || ''}</div>
             </td>
             <td><span class="tier-badge ${getTierClass(l.tier)}" style="font-size: 0.7rem;">${l.tier || '?'}</span></td>
-            <td style="font-family: 'JetBrains Mono', monospace; ${l.isLowSerial ? 'color: #fbbf24; font-weight: 600;' : ''}">#${l.serialNumber || '?'}</td>
-            <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#3b82f6'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; ${isSpecialSerial ? 'color: #fbbf24; font-weight: 600;' : 'color: #9ca3af;'}">#${l.serialNumber || '?'}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#9ca3af'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.floor)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.avgSale)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: ${dealColor}; font-weight: 600;">${dealDisplay}</td>
@@ -1584,7 +1588,8 @@
       mobileListings.innerHTML = filtered.map(l => {
         const isDeal = l.dealPercent > 0;
         const isHotDeal = l.dealPercent >= 15;
-        const isLowSerial = (l.serialNumber || 999999) <= 100;
+        // Gold serial only if #1 or matches jersey number
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
         const tierClass = getTierClass(l.tier);
         const teamAbbrev = getTeamAbbrev(l.teamName);
         
@@ -1616,11 +1621,11 @@
               <div class="mobile-card-details">
                 <span class="mobile-card-set">${l.seriesName || 'Unknown Series'}</span>
                 <span class="mobile-card-set">${l.setName || 'Unknown Set'}</span>
-                <span class="mobile-card-serial ${isLowSerial ? 'low-serial' : ''}">#${l.serialNumber || '?'}</span>
+                <span class="mobile-card-serial ${isSpecialSerial ? 'low-serial' : ''}">#${l.serialNumber || '?'}</span>
               </div>
             </div>
             <div class="mobile-card-right">
-              <div class="mobile-card-price">${formatPrice(l.listingPrice)}</div>
+              <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
               ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
               ${dealDisplay ? `<div class="mobile-card-deal ${dealClass}">${dealDisplay}</div>` : ''}
             </div>
