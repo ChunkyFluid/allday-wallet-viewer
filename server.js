@@ -3591,16 +3591,23 @@ async function processListingEvent(event) {
       dealPercent = ((previousFloor - listingPrice) / previousFloor) * 100;
     }
     
-    // Get moment metadata if we don't have it
-    if (!momentData) {
+    // Get moment metadata if we don't have it, or if we're missing series_name
+    if (!momentData || !momentData.series_name) {
       try {
         const result = await pgQuery(
           `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position
            FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
-        momentData = result.rows[0] || {};
-      } catch (e) { momentData = {}; }
+        if (result.rows[0]) {
+          // Merge with existing momentData if it exists
+          momentData = momentData ? { ...momentData, ...result.rows[0] } : result.rows[0];
+        } else if (!momentData) {
+          momentData = {};
+        }
+      } catch (e) { 
+        if (!momentData) momentData = {};
+      }
     }
     
     // Get ASP (Average Sale Price) from edition_price_scrape
@@ -3907,6 +3914,13 @@ app.get("/api/sniper-deals", async (req, res) => {
       
       return enriched;
     });
+    
+    // Debug: Log enrichment stats
+    if (enrichedListings.length > 0) {
+      const withSeries = enrichedListings.filter(l => l.seriesName).length;
+      const withASP = enrichedListings.filter(l => l.avgSale != null).length;
+      console.log(`[Sniper API] Enriched ${enrichedListings.length} listings: ${withSeries} with series, ${withASP} with ASP`);
+    }
     
     // Get unique teams and tiers for filter dropdowns
     const allTeams = [...new Set(sniperListings.map(l => l.teamName).filter(Boolean))].sort();
