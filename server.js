@@ -3556,7 +3556,7 @@ async function processListingEvent(event) {
     if (!editionId) {
       try {
         const result = await pgQuery(
-          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name
+          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name, series_name
            FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
@@ -3595,12 +3595,24 @@ async function processListingEvent(event) {
     if (!momentData) {
       try {
         const result = await pgQuery(
-          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, position
+          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position
            FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
         momentData = result.rows[0] || {};
       } catch (e) { momentData = {}; }
+    }
+    
+    // Get ASP (Average Sale Price) from edition_price_scrape
+    let avgSale = null;
+    if (editionId) {
+      try {
+        const priceResult = await pgQuery(
+          `SELECT avg_sale_usd FROM edition_price_scrape WHERE edition_id = $1 LIMIT 1`,
+          [editionId]
+        );
+        avgSale = priceResult.rows[0]?.avg_sale_usd ? Number(priceResult.rows[0].avg_sale_usd) : null;
+      } catch (e) { /* ignore */ }
     }
     
     // Get seller name
@@ -3621,12 +3633,14 @@ async function processListingEvent(event) {
       serialNumber: momentData?.serial_number,
       listingPrice,
       floor: previousFloor,
+      avgSale,
       dealPercent: Math.round(dealPercent * 10) / 10,
       playerName: momentData?.first_name && momentData?.last_name 
         ? `${momentData.first_name} ${momentData.last_name}` : null,
       teamName: momentData?.team_name,
       tier: momentData?.tier,
       setName: momentData?.set_name,
+      seriesName: momentData?.series_name,
       position: momentData?.position,
       sellerName,
       sellerAddr,

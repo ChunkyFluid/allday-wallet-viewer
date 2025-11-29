@@ -1170,7 +1170,10 @@
               <th data-sort="serial">Serial</th>
               <th data-sort="price">Listed</th>
               <th data-sort="floor">Floor</th>
+              <th data-sort="asp">ASP</th>
               <th data-sort="deal">vs Floor</th>
+              <th>Series</th>
+              <th>Set</th>
               <th>Seller</th>
               <th data-sort="time">When</th>
               <th>Action</th>
@@ -1457,7 +1460,7 @@
           </div>
         `;
         tableBody.innerHTML = `
-          <tr><td colspan="9" style="text-align: center; padding: 40px; color: #6b7280;">
+          <tr><td colspan="12" style="text-align: center; padding: 40px; color: #6b7280;">
             No listings match your filters
           </td></tr>
         `;
@@ -1561,7 +1564,10 @@
             <td style="font-family: 'JetBrains Mono', monospace; ${l.isLowSerial ? 'color: #fbbf24; font-weight: 600;' : ''}">#${l.serialNumber || '?'}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#3b82f6'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.floor)}</td>
+            <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.avgSale)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: ${dealColor}; font-weight: 600;">${dealDisplay}</td>
+            <td style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
+            <td style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
             <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
@@ -1608,12 +1614,14 @@
                 <span class="mobile-card-tier ${tierClass}">${l.tier || '?'}</span>
               </div>
               <div class="mobile-card-details">
+                <span class="mobile-card-set">${l.seriesName || 'Unknown Series'}</span>
                 <span class="mobile-card-set">${l.setName || 'Unknown Set'}</span>
                 <span class="mobile-card-serial ${isLowSerial ? 'low-serial' : ''}">#${l.serialNumber || '?'}</span>
               </div>
             </div>
             <div class="mobile-card-right">
               <div class="mobile-card-price">${formatPrice(l.listingPrice)}</div>
+              ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
               ${dealDisplay ? `<div class="mobile-card-deal ${dealClass}">${dealDisplay}</div>` : ''}
             </div>
           </a>
@@ -1677,6 +1685,7 @@
           'serial': 'serial-asc',
           'price': 'price-asc',
           'floor': 'price-asc',
+          'asp': 'price-asc', // Use price sort for ASP
           'deal': 'deal-desc',
           'time': 'time-desc'
         };
