@@ -344,6 +344,43 @@
         padding: 0.25rem 0.4rem;
         text-align: left;
         white-space: nowrap;
+        font-size: 0.85rem;
+      }
+
+      /* Allow some columns to be more compact */
+      td:nth-child(2), /* Team */
+      td:nth-child(3), /* Pos */
+      td:nth-child(5), /* Serial */
+      td:nth-child(6), /* Max */
+      td:nth-child(7), /* Series */
+      td:nth-child(8), /* Set */
+      td:nth-child(13), /* Date */
+      td:nth-child(14) { /* Links */
+        padding: 0.25rem 0.3rem;
+      }
+
+      /* Compact series and set columns with ellipsis */
+      td:nth-child(7), /* Series */
+      td:nth-child(8) { /* Set */
+        max-width: 70px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Compact player name column */
+      td:first-child {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Make price columns more compact */
+      td:nth-child(9), /* Low Ask */
+      td:nth-child(10), /* ASP */
+      td:nth-child(11) { /* Top Sale */
+        padding: 0.25rem 0.35rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
       }
 
       th {
@@ -496,9 +533,9 @@
 
       .link-group {
         display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-        font-size: 0.72rem;
+        flex-direction: row;
+        gap: 0.3rem;
+        font-size: 0.75rem;
       }
 
       .link-group a {
@@ -875,15 +912,15 @@
                   <th class="sortable" data-sort-key="team_name">Team</th>
                   <th class="sortable" data-sort-key="position">Pos</th>
                   <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">Serial</th>
+                  <th class="sortable" data-sort-key="serial_number">#</th>
                   <th class="sortable" data-sort-key="max_mint_size">Max</th>
                   <th class="sortable" data-sort-key="series_name">Series</th>
                   <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="low_ask_usd">Low Ask</th>
-                  <th class="sortable" data-sort-key="avg_sale_usd">Avg Sale</th>
-                  <th class="sortable" data-sort-key="top_sale_usd">Top Sale</th>
-                  <th class="sortable" data-sort-key="is_locked">Locked</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Last event</th>
+                  <th class="sortable" data-sort-key="low_ask_usd">Low</th>
+                  <th class="sortable" data-sort-key="avg_sale_usd">ASP</th>
+                  <th class="sortable" data-sort-key="top_sale_usd">Top</th>
+                  <th class="sortable" data-sort-key="is_locked">🔒</th>
+                  <th class="sortable" data-sort-key="last_event_ts">Date</th>
                   <th>Links</th>
                 </tr>
               </thead>

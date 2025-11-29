@@ -337,6 +337,52 @@ function getTeamAbbrev(teamName) {
     return abbrevs[teamName] || teamName?.substring(0, 3).toUpperCase() || '???';
 }
 
+function abbreviateSeries(seriesName) {
+    if (!seriesName) return "";
+    // Common abbreviations
+    const abbrevs = {
+        "2025 Season": "2025",
+        "2024 Season": "2024",
+        "2023 Season": "2023",
+        "2022 Season": "2022",
+        "2021 Season": "2021",
+        "Series 1": "S1",
+        "Series 2": "S2",
+        "Series 3": "S3",
+        "Historical": "Hist",
+        "Historical 24": "Hist 24",
+        "Historical 25": "Hist 25"
+    };
+    if (abbrevs[seriesName]) return abbrevs[seriesName];
+    // If longer than 12 chars, truncate
+    if (seriesName.length > 12) {
+        return seriesName.substring(0, 10) + "..";
+    }
+    return seriesName;
+}
+
+function abbreviateSet(setName) {
+    if (!setName) return "";
+    // Common long set names that can be abbreviated
+    const abbrevs = {
+        "Move the Chains": "MTC",
+        "Make the Stop": "MTS",
+        "Rookie Debut": "Rookie",
+        "Game Changers": "GC",
+        "Gridiron": "Grid",
+        "Showtime": "Show",
+        "Locked In": "Locked",
+        "Draw it Up": "Draw",
+        "Highwire": "Wire"
+    };
+    if (abbrevs[setName]) return abbrevs[setName];
+    // If longer than 15 chars, truncate
+    if (setName.length > 15) {
+        return setName.substring(0, 13) + "..";
+    }
+    return setName;
+}
+
 function renderPage(page) {
     const els = getEls();
     if (!els.tbody) return;
@@ -373,28 +419,36 @@ function renderPage(page) {
         const avgSale = formatPrice(r.avg_sale_usd);
         const topSale = formatPrice(r.top_sale_usd);
 
+        // Use abbreviations for compact display
+        const teamAbbrev = getTeamAbbrev(r.team_name);
+        const seriesAbbrev = abbreviateSeries(r.series_name);
+        const setAbbrev = abbreviateSet(r.set_name);
+        
+        // Compact date format (just date, no time)
+        const eventDate = r.last_event_ts ? formatDate(r.last_event_ts).split(',')[0] : "";
+        
         tr.innerHTML = `
       <td>${playerName || "(unknown)"}</td>
-      <td>${r.team_name || ""}</td>
+      <td title="${r.team_name || ""}">${teamAbbrev}</td>
       <td>${r.position || ""}</td>
       <td>${tierHtml}</td>
       <td>${serial}</td>
       <td>${max}</td>
-      <td>${r.series_name || ""}</td>
-      <td>${r.set_name || ""}</td>
+      <td title="${r.series_name || ""}">${seriesAbbrev}</td>
+      <td title="${r.set_name || ""}">${setAbbrev}</td>
       <td>${lowAsk}</td>
       <td>${avgSale}</td>
       <td>${topSale}</td>
       <td>
         <span class="locked-pill ${r.is_locked ? "locked" : "unlocked"}">
-          ${r.is_locked ? "Locked" : "Unlocked"}
+          ${r.is_locked ? "🔒" : "✓"}
         </span>
       </td>
-      <td>${formatDate(r.last_event_ts)}</td>
+      <td>${eventDate}</td>
       <td>
         <div class="link-group">
-          ${momentUrl ? `<a href="${momentUrl}" target="_blank" rel="noopener">Moment</a>` : ""}
-          ${marketUrl ? `<a href="${marketUrl}" target="_blank" rel="noopener">Market</a>` : ""}
+          ${momentUrl ? `<a href="${momentUrl}" target="_blank" rel="noopener" title="View Moment">M</a>` : ""}
+          ${marketUrl ? `<a href="${marketUrl}" target="_blank" rel="noopener" title="View Market">$</a>` : ""}
         </div>
       </td>
     `;
