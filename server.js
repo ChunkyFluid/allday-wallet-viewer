@@ -3826,18 +3826,74 @@ app.get("/api/sniper-deals", async (req, res) => {
       filtered = filtered.filter(l => l.dealPercent > 0);
     }
     
+    // Enrich listings with missing ASP and Series data (batch queries for performance)
+    const needsSeries = filtered.filter(l => !l.seriesName && l.nftId);
+    const needsASP = filtered.filter(l => l.avgSale === undefined && l.editionId);
+    
+    const seriesMap = new Map();
+    const aspMap = new Map();
+    
+    // Batch fetch series names
+    if (needsSeries.length > 0) {
+      try {
+        const nftIds = needsSeries.map(l => l.nftId).filter(Boolean);
+        if (nftIds.length > 0) {
+          const metaResult = await pgQuery(
+            `SELECT nft_id, series_name FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+            [nftIds]
+          );
+          metaResult.rows.forEach(row => {
+            if (row.series_name) seriesMap.set(row.nft_id, row.series_name);
+          });
+        }
+      } catch (e) { /* ignore */ }
+    }
+    
+    // Batch fetch ASP
+    if (needsASP.length > 0) {
+      try {
+        const editionIds = needsASP.map(l => l.editionId).filter(Boolean);
+        if (editionIds.length > 0) {
+          const priceResult = await pgQuery(
+            `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[])`,
+            [editionIds]
+          );
+          priceResult.rows.forEach(row => {
+            if (row.avg_sale_usd) aspMap.set(row.edition_id, Number(row.avg_sale_usd));
+          });
+        }
+      } catch (e) { /* ignore */ }
+    }
+    
+    // Enrich listings with fetched data
+    const enrichedListings = filtered.map(listing => {
+      const enriched = { ...listing };
+      
+      // Fill in missing seriesName
+      if (!enriched.seriesName && enriched.nftId && seriesMap.has(enriched.nftId)) {
+        enriched.seriesName = seriesMap.get(enriched.nftId);
+      }
+      
+      // Fill in missing avgSale
+      if (enriched.avgSale === undefined && enriched.editionId) {
+        enriched.avgSale = aspMap.has(enriched.editionId) ? aspMap.get(enriched.editionId) : null;
+      }
+      
+      return enriched;
+    });
+    
     // Get unique teams and tiers for filter dropdowns
     const allTeams = [...new Set(sniperListings.map(l => l.teamName).filter(Boolean))].sort();
     const allTiers = [...new Set(sniperListings.map(l => l.tier).filter(Boolean))];
     
     // Count deals
-    const dealsCount = filtered.filter(l => l.dealPercent > 0).length;
+    const dealsCount = enrichedListings.filter(l => l.dealPercent > 0).length;
     
     return res.json({
       ok: true,
-      listings: filtered,
+      listings: enrichedListings,
       total: sniperListings.length,
-      filtered: filtered.length,
+      filtered: enrichedListings.length,
       dealsCount,
       watching: isWatchingListings,
       lastCheckedBlock,
