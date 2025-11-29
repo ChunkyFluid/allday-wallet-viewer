@@ -89,7 +89,7 @@
       }
 
       .histogram-label {
-        min-width: 90px;
+        min-width: 120px;
         font-size: 0.75rem;
         color: var(--text-muted);
       }
@@ -641,9 +641,15 @@
             // Collection sizes
             renderHistogram("histogram-sizes", sizeDist, (v) => v.toLocaleString(), "bar-default");
 
-            // Series
+            // Series - abbreviate long names for better alignment
             const seriesData = {};
-            series.forEach(s => seriesData[s.name] = s.count);
+            series.forEach(s => {
+              let label = s.name;
+              // Abbreviate long historical names
+              if (label === "Historical (2024 Release)") label = "Historical 24";
+              else if (label === "Historical (2025 Release)") label = "Historical 25";
+              seriesData[label] = s.count;
+            });
             renderHistogram("histogram-series", seriesData, (v) => v.toLocaleString(), "bar-default");
 
             // Tier histogram with colors
