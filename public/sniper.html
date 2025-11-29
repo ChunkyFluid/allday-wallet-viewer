@@ -622,8 +622,7 @@
     }
 
     .listing-sold {
-      opacity: 0.5;
-      text-decoration: line-through;
+      opacity: 0.6;
     }
 
     .listing-sold td {
@@ -1190,6 +1189,7 @@
               <th>Series</th>
               <th>Set</th>
               <th>Seller</th>
+              <th>Buyer</th>
               <th data-sort="time">When</th>
               <th>Action</th>
             </tr>
@@ -1516,13 +1516,20 @@
               
               <div class="price-section">
                 <div class="price-box listing">
-                  <div class="price-label">Low Ask</div>
-                  <div class="price-value">${formatPrice(l.lowAsk)}</div>
+                  <div class="price-label">Price</div>
+                  <div class="price-value">${formatPrice(l.listingPrice)}</div>
                 </div>
+                ${l.isSold && l.buyerName ? `
                 <div class="price-box floor">
                   <div class="price-label">Buyer</div>
-                  <div class="price-value" style="font-size: 0.9rem; color: #9ca3af;">${l.buyerName || '-'}</div>
+                  <div class="price-value" style="font-size: 0.9rem; color: #9ca3af;">${l.buyerName || l.buyerAddr || '-'}</div>
                 </div>
+                ` : `
+                <div class="price-box floor">
+                  <div class="price-label">Floor</div>
+                  <div class="price-value">${formatPrice(l.floor)}</div>
+                </div>
+                `}
               </div>
               
               <div class="time-badge">
@@ -1530,15 +1537,9 @@
               </div>
             </div>
             
-            ${l.isSold ? `
-              <div class="btn-snipe" style="background: #6b7280; cursor: not-allowed; opacity: 0.7;">
-                SOLD
-              </div>
-            ` : `
-              <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe">
-                🎯 Snipe
-              </a>
-            `}
+            <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe" style="${l.isSold ? 'background: #6b7280; opacity: 0.7;' : ''}">
+              ${l.isSold ? 'SOLD' : '🎯 Snipe'}
+            </a>
           </div>
         `;
       }).join('');
@@ -1598,18 +1599,13 @@
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
             <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
+            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerName || l.buyerAddr || '-') : '-'}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
-              ${l.isSold ? `
-                <span style="background: ${btnBg}; color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-block;">
-                  ${btnText}
-                </span>
-              ` : `
-                <a href="${l.listingUrl || '#'}" target="_blank" 
-                   style="background: ${btnBg}; color: ${isDeal ? '#000' : '#fff'}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; display: inline-block;">
-                  ${btnText}
-                </a>
-              `}
+              <a href="${l.listingUrl || '#'}" target="_blank" 
+                 style="background: ${btnBg}; color: ${l.isSold ? '#fff' : (isDeal ? '#000' : '#fff')}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; display: inline-block;">
+                ${btnText}
+              </a>
             </td>
           </tr>
         `;
@@ -1642,7 +1638,7 @@
         else if (isDeal) cardClass += ' is-deal';
         
         return `
-          <a href="${l.isSold ? '#' : l.listingUrl || '#'}" ${l.isSold ? '' : 'target="_blank"'} class="${cardClass}" ${l.isSold ? 'style="pointer-events: none;"' : ''}>
+          <a href="${l.listingUrl || '#'}" target="_blank" class="${cardClass}">
             <div class="mobile-card-icon ${tierClass}">🏈</div>
             <div class="mobile-card-main">
               <div class="mobile-card-header">
@@ -1658,8 +1654,9 @@
             </div>
             <div class="mobile-card-right">
               ${l.isSold ? `
-                <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700; text-decoration: line-through;">${formatPrice(l.listingPrice)}</div>
+                <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700;">${formatPrice(l.listingPrice)}</div>
                 <div style="color: #ef4444; font-size: 0.75rem; font-weight: 600;">SOLD</div>
+                ${l.buyerName || l.buyerAddr ? `<div style="font-size: 0.7rem; color: #9ca3af; margin-top: 4px;">Buyer: ${l.buyerName || l.buyerAddr}</div>` : ''}
               ` : `
                 <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
                 ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}

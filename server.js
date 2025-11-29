@@ -3548,13 +3548,31 @@ function addSniperListing(listing) {
   }
 }
 
-function markListingAsSold(nftId) {
+async function markListingAsSold(nftId, buyerAddr = null) {
   soldNfts.add(nftId);
+  
+  // Get buyer name if we have buyer address
+  let buyerName = buyerAddr;
+  if (buyerAddr) {
+    try {
+      const result = await pgQuery(
+        `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+        [buyerAddr]
+      );
+      buyerName = result.rows[0]?.display_name || buyerAddr;
+    } catch (e) {
+      buyerName = buyerAddr;
+    }
+  }
   
   // Mark existing listings as sold
   for (const listing of sniperListings) {
     if (listing.nftId === nftId) {
       listing.isSold = true;
+      if (buyerAddr) {
+        listing.buyerAddr = buyerAddr;
+        listing.buyerName = buyerName;
+      }
     }
   }
 }
@@ -3651,6 +3669,18 @@ async function processListingEvent(event) {
       } catch (e) { /* ignore */ }
     }
     
+    // Check if this listing is sold and get buyer info
+    let buyerAddr = null;
+    let buyerName = null;
+    if (soldNfts.has(nftId)) {
+      // Find the sold listing to get buyer info
+      const soldListing = sniperListings.find(l => l.nftId === nftId && l.isSold);
+      if (soldListing) {
+        buyerAddr = soldListing.buyerAddr;
+        buyerName = soldListing.buyerName;
+      }
+    }
+    
     const listing = {
       nftId,
       editionId,
@@ -3669,6 +3699,8 @@ async function processListingEvent(event) {
       jerseyNumber: momentData?.jersey_number ? Number(momentData.jersey_number) : null,
       sellerName,
       sellerAddr,
+      buyerAddr,
+      buyerName,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
       isSold: soldNfts.has(nftId),
       listedAt: timestamp || new Date().toISOString(),
@@ -3829,8 +3861,36 @@ async function watchForListings() {
               
               if (!nftId) continue;
               
-              // Mark this NFT as sold
-              markListingAsSold(nftId);
+              // Extract buyer address from the event
+              // Try multiple possible field names
+              let buyerAddr = getField('purchaser')?.toString()?.toLowerCase() || 
+                             getField('buyer')?.toString()?.toLowerCase() ||
+                             getField('recipient')?.toString()?.toLowerCase() ||
+                             null;
+              
+              // If not in event fields, try to get from transaction authorizer
+              // The buyer is typically the transaction authorizer (the account that signed)
+              if (!buyerAddr) {
+                const txId = event.transaction_id || event.transactionId || block.transaction_id;
+                if (txId) {
+                  try {
+                    // Fetch transaction to get authorizer
+                    const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`);
+                    if (txRes.ok) {
+                      const txData = await txRes.json();
+                      // The authorizer is typically the first account in the authorization list
+                      if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
+                        buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
+                      }
+                    }
+                  } catch (e) {
+                    // Ignore transaction fetch errors
+                  }
+                }
+              }
+              
+              // Mark this NFT as sold with buyer info
+              await markListingAsSold(nftId, buyerAddr);
               soldCount++;
               
             } catch (e) {
