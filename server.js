@@ -3827,56 +3827,82 @@ app.get("/api/sniper-deals", async (req, res) => {
     }
     
     // Enrich listings with missing ASP and Series data (batch queries for performance)
-    const needsSeries = filtered.filter(l => !l.seriesName && l.nftId);
-    const needsASP = filtered.filter(l => l.avgSale === undefined && l.editionId);
+    // Get all nftIds and editionIds that need enrichment
+    const allNftIds = [...new Set(filtered.map(l => l.nftId).filter(Boolean))];
+    const allEditionIds = [...new Set(filtered.map(l => l.editionId).filter(Boolean))];
     
-    const seriesMap = new Map();
+    const seriesMapByNftId = new Map();
+    const seriesMapByEditionId = new Map();
     const aspMap = new Map();
     
-    // Batch fetch series names
-    if (needsSeries.length > 0) {
+    // Batch fetch series names by nftId
+    if (allNftIds.length > 0) {
       try {
-        const nftIds = needsSeries.map(l => l.nftId).filter(Boolean);
-        if (nftIds.length > 0) {
-          const metaResult = await pgQuery(
-            `SELECT nft_id, series_name FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
-            [nftIds]
-          );
-          metaResult.rows.forEach(row => {
-            if (row.series_name) seriesMap.set(row.nft_id, row.series_name);
-          });
-        }
-      } catch (e) { /* ignore */ }
+        const metaResult = await pgQuery(
+          `SELECT nft_id, series_name FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+          [allNftIds]
+        );
+        metaResult.rows.forEach(row => {
+          if (row.series_name) {
+            seriesMapByNftId.set(row.nft_id, row.series_name);
+          }
+        });
+      } catch (e) {
+        console.error("[Sniper] Error fetching series names by nftId:", e.message);
+      }
     }
     
-    // Batch fetch ASP
-    if (needsASP.length > 0) {
+    // Batch fetch series names by editionId (fallback for listings without nftId)
+    if (allEditionIds.length > 0) {
       try {
-        const editionIds = needsASP.map(l => l.editionId).filter(Boolean);
-        if (editionIds.length > 0) {
-          const priceResult = await pgQuery(
-            `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[])`,
-            [editionIds]
-          );
-          priceResult.rows.forEach(row => {
-            if (row.avg_sale_usd) aspMap.set(row.edition_id, Number(row.avg_sale_usd));
-          });
-        }
-      } catch (e) { /* ignore */ }
+        const metaResult = await pgQuery(
+          `SELECT edition_id, series_name FROM nft_core_metadata WHERE edition_id = ANY($1::text[]) AND series_name IS NOT NULL`,
+          [allEditionIds]
+        );
+        metaResult.rows.forEach(row => {
+          if (row.series_name) {
+            seriesMapByEditionId.set(row.edition_id, row.series_name);
+          }
+        });
+      } catch (e) {
+        console.error("[Sniper] Error fetching series names by editionId:", e.message);
+      }
     }
     
-    // Enrich listings with fetched data
+    // Batch fetch ASP for all listings
+    if (allEditionIds.length > 0) {
+      try {
+        const priceResult = await pgQuery(
+          `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[])`,
+          [allEditionIds]
+        );
+        priceResult.rows.forEach(row => {
+          if (row.avg_sale_usd != null) {
+            aspMap.set(row.edition_id, Number(row.avg_sale_usd));
+          }
+        });
+      } catch (e) {
+        console.error("[Sniper] Error fetching ASP:", e.message);
+      }
+    }
+    
+    // Enrich all listings with fetched data
     const enrichedListings = filtered.map(listing => {
       const enriched = { ...listing };
       
-      // Fill in missing seriesName
-      if (!enriched.seriesName && enriched.nftId && seriesMap.has(enriched.nftId)) {
-        enriched.seriesName = seriesMap.get(enriched.nftId);
+      // Fill in seriesName if missing - try nftId first, then editionId
+      if (!enriched.seriesName) {
+        if (enriched.nftId && seriesMapByNftId.has(enriched.nftId)) {
+          enriched.seriesName = seriesMapByNftId.get(enriched.nftId);
+        } else if (enriched.editionId && seriesMapByEditionId.has(enriched.editionId)) {
+          enriched.seriesName = seriesMapByEditionId.get(enriched.editionId);
+        }
       }
       
-      // Fill in missing avgSale
-      if (enriched.avgSale === undefined && enriched.editionId) {
-        enriched.avgSale = aspMap.has(enriched.editionId) ? aspMap.get(enriched.editionId) : null;
+      // Fill in avgSale if missing or null
+      if ((enriched.avgSale === undefined || enriched.avgSale === null) && enriched.editionId) {
+        const asp = aspMap.get(enriched.editionId);
+        enriched.avgSale = asp !== undefined ? asp : null;
       }
       
       return enriched;
