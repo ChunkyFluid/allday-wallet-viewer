@@ -3880,14 +3880,19 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (allEditionIds.length > 0) {
       try {
         const priceResult = await pgQuery(
-          `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[])`,
+          `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[]) AND avg_sale_usd IS NOT NULL`,
           [allEditionIds]
         );
         priceResult.rows.forEach(row => {
-          if (row.avg_sale_usd != null) {
-            aspMap.set(row.edition_id, Number(row.avg_sale_usd));
+          const aspValue = row.avg_sale_usd;
+          if (aspValue != null) {
+            const numValue = Number(aspValue);
+            if (!isNaN(numValue) && numValue > 0) {
+              aspMap.set(row.edition_id, numValue);
+            }
           }
         });
+        console.log(`[Sniper API] Fetched ASP for ${aspMap.size} editions out of ${allEditionIds.length} requested`);
       } catch (e) {
         console.error("[Sniper] Error fetching ASP:", e.message);
       }
@@ -3906,10 +3911,14 @@ app.get("/api/sniper-deals", async (req, res) => {
         }
       }
       
-      // Fill in avgSale if missing or null
-      if ((enriched.avgSale === undefined || enriched.avgSale === null) && enriched.editionId) {
-        const asp = aspMap.get(enriched.editionId);
-        enriched.avgSale = asp !== undefined ? asp : null;
+      // Always try to fill in avgSale if we have an editionId (even if it was previously null)
+      if (enriched.editionId) {
+        if (aspMap.has(enriched.editionId)) {
+          enriched.avgSale = aspMap.get(enriched.editionId);
+        } else if (enriched.avgSale === undefined) {
+          // Only set to null if it was undefined, don't overwrite if it was explicitly set to null before
+          enriched.avgSale = null;
+        }
       }
       
       return enriched;
@@ -3918,8 +3927,9 @@ app.get("/api/sniper-deals", async (req, res) => {
     // Debug: Log enrichment stats
     if (enrichedListings.length > 0) {
       const withSeries = enrichedListings.filter(l => l.seriesName).length;
-      const withASP = enrichedListings.filter(l => l.avgSale != null).length;
-      console.log(`[Sniper API] Enriched ${enrichedListings.length} listings: ${withSeries} with series, ${withASP} with ASP`);
+      const withASP = enrichedListings.filter(l => l.avgSale != null && l.avgSale > 0).length;
+      const withEditionId = enrichedListings.filter(l => l.editionId).length;
+      console.log(`[Sniper API] Enriched ${enrichedListings.length} listings: ${withSeries} with series, ${withASP} with ASP (${withEditionId} have editionId)`);
     }
     
     // Get unique teams and tiers for filter dropdowns
