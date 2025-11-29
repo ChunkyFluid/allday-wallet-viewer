@@ -794,6 +794,34 @@
 
           <h3>🎚️ Filters</h3>
 
+          <!-- Sort Options (Mobile-friendly) -->
+          <div class="filter-group">
+            <label for="mobile-sort-key">Sort By</label>
+            <select id="mobile-sort-key" class="filter-select">
+              <option value="last_event_ts">Last Event (Newest)</option>
+              <option value="playerName">Player Name</option>
+              <option value="team_name">Team</option>
+              <option value="position">Position</option>
+              <option value="tier">Tier</option>
+              <option value="serial_number">Serial Number</option>
+              <option value="max_mint_size">Max Mint Size</option>
+              <option value="series_name">Series</option>
+              <option value="set_name">Set</option>
+              <option value="low_ask_usd">Low Ask Price</option>
+              <option value="avg_sale_usd">Average Sale Price</option>
+              <option value="top_sale_usd">Top Sale Price</option>
+              <option value="is_locked">Locked Status</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="mobile-sort-dir">Sort Direction</label>
+            <select id="mobile-sort-dir" class="filter-select">
+              <option value="desc">Descending (High→Low / Z→A)</option>
+              <option value="asc">Ascending (Low→High / A→Z)</option>
+            </select>
+          </div>
+
           <div class="filter-group">
             <label for="filter-team">Team</label>
             <select id="filter-team" class="filter-select"></select>

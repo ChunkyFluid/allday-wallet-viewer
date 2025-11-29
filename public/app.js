@@ -450,6 +450,7 @@ function renderPage(page) {
     }
 
     updateSortHeaderClasses();
+    updateMobileSortDropdowns();
 }
 
 function updateSortHeaderClasses() {
@@ -463,6 +464,18 @@ function updateSortHeaderClasses() {
             th.classList.add(currentSortDir === "asc" ? "sort-asc" : "sort-desc");
         }
     });
+}
+
+function updateMobileSortDropdowns() {
+    const mobileSortKey = document.getElementById("mobile-sort-key");
+    const mobileSortDir = document.getElementById("mobile-sort-dir");
+    
+    if (mobileSortKey) {
+        mobileSortKey.value = currentSortKey;
+    }
+    if (mobileSortDir) {
+        mobileSortDir.value = currentSortDir;
+    }
 }
 
 // Client-side cache for prices and filters
@@ -784,9 +797,33 @@ function wireEvents() {
                     currentSortKey = key;
                     currentSortDir = "asc";
                 }
+                // Update mobile sort dropdowns to match
+                updateMobileSortDropdowns();
                 applySort();
                 renderPage(1);
             });
+        });
+    }
+
+    // Mobile sort dropdowns
+    const mobileSortKey = document.getElementById("mobile-sort-key");
+    const mobileSortDir = document.getElementById("mobile-sort-dir");
+    
+    if (mobileSortKey) {
+        mobileSortKey.addEventListener("change", () => {
+            currentSortKey = mobileSortKey.value;
+            applySort();
+            renderPage(1);
+            updateSortHeaderClasses();
+        });
+    }
+    
+    if (mobileSortDir) {
+        mobileSortDir.addEventListener("change", () => {
+            currentSortDir = mobileSortDir.value;
+            applySort();
+            renderPage(1);
+            updateSortHeaderClasses();
         });
     }
 
@@ -941,4 +978,5 @@ window.runQuery = async function runQuery(walletRaw) {
 document.addEventListener("DOMContentLoaded", () => {
     wireEvents();
     updateSortHeaderClasses();
+    updateMobileSortDropdowns();
 });
