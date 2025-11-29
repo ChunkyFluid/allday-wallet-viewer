@@ -3871,7 +3871,41 @@ async function watchForListings() {
               // If not in event fields, try to get from transaction authorizer
               // The buyer is typically the transaction authorizer (the account that signed)
               if (!buyerAddr) {
-                const txId = event.transaction_id || event.transactionId || block.transaction_id;
+                // Try to get transaction ID from various locations
+                let txId = event.transaction_id || event.transactionId || 
+                          block.transaction_id || block.transactions?.[0]?.id;
+                
+                // Also check if transaction info is in the block structure
+                if (!txId && block.transactions && block.transactions.length > 0) {
+                  txId = block.transactions[0].id;
+                }
+                
+                // Try to get from block by querying the block directly
+                if (!txId && block.block_height) {
+                  try {
+                    const blockRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=${block.block_height}`);
+                    if (blockRes.ok) {
+                      const blockData = await blockRes.json();
+                      if (blockData?.[0]?.collection_guarantees && blockData[0].collection_guarantees.length > 0) {
+                        const collectionId = blockData[0].collection_guarantees[0].collection_id;
+                        if (collectionId) {
+                          const collectionRes = await fetch(`${FLOW_REST_API}/v1/collections/${collectionId}`);
+                          if (collectionRes.ok) {
+                            const collectionData = await collectionRes.json();
+                            if (collectionData?.transactions && collectionData.transactions.length > 0) {
+                              // Find the transaction that contains this ListingCompleted event
+                              // We'll try the first transaction (usually correct for single-event transactions)
+                              txId = collectionData.transactions[0];
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // Ignore block fetch errors
+                  }
+                }
+                
                 if (txId) {
                   try {
                     // Fetch transaction to get authorizer
@@ -3879,18 +3913,76 @@ async function watchForListings() {
                     if (txRes.ok) {
                       const txData = await txRes.json();
                       // The authorizer is typically the first account in the authorization list
+                      // For purchases, the payer/authorizer is the buyer
                       if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
                         buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
+                      } else if (txData?.payload?.payer) {
+                        buyerAddr = txData.payload.payer?.toLowerCase();
+                      } else if (txData?.payload?.proposalKey?.address) {
+                        buyerAddr = txData.payload.proposalKey.address?.toLowerCase();
                       }
                     }
                   } catch (e) {
-                    // Ignore transaction fetch errors
+                    console.error(`[Sniper] Error fetching transaction ${txId} for buyer:`, e.message);
                   }
+                }
+              }
+              
+              // If we still don't have buyer, try to get from Snowflake as fallback
+              // This adds a small delay but ensures we get the buyer info
+              if (!buyerAddr) {
+                try {
+                  await ensureSnowflakeConnected();
+                  // Query Snowflake for the transaction that completed this listing
+                  // The buyer is typically the transaction authorizer (first signer)
+                  // We'll get the TX_ID and then fetch the transaction to get the authorizer
+                  const snowflakeQuery = `
+                    SELECT TX_ID, TX_PAYER_ADDRESS
+                    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+                    WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+                      AND EVENT_TYPE = 'ListingCompleted'
+                      AND EVENT_DATA:nftID::STRING = '${nftId}'
+                      AND TX_SUCCEEDED = TRUE
+                    ORDER BY BLOCK_TIMESTAMP DESC
+                    LIMIT 1
+                  `;
+                  
+                  const snowflakeResult = await snowflake.execute({ sqlText: snowflakeQuery });
+                  const rows = await snowflakeResult.fetchAll();
+                  if (rows.length > 0) {
+                    const txId = rows[0].TX_ID;
+                    if (txId) {
+                      // Fetch transaction from Flow REST API to get authorizer
+                      try {
+                        const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`);
+                        if (txRes.ok) {
+                          const txData = await txRes.json();
+                          if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
+                            buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
+                            console.log(`[Sniper] Got buyer ${buyerAddr} from transaction ${txId} for ${nftId}`);
+                          }
+                        }
+                      } catch (e) {
+                        // Fallback to payer address if transaction fetch fails
+                        if (rows[0].TX_PAYER_ADDRESS) {
+                          buyerAddr = rows[0].TX_PAYER_ADDRESS.toLowerCase();
+                          console.log(`[Sniper] Using payer address ${buyerAddr} as buyer for ${nftId}`);
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error(`[Sniper] Error querying Snowflake for buyer:`, e.message);
                 }
               }
               
               // Mark this NFT as sold with buyer info
               await markListingAsSold(nftId, buyerAddr);
+              if (buyerAddr) {
+                console.log(`[Sniper] Marked ${nftId} as sold to ${buyerAddr}`);
+              } else {
+                console.log(`[Sniper] Marked ${nftId} as sold but could not determine buyer`);
+              }
               soldCount++;
               
             } catch (e) {
