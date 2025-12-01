@@ -297,10 +297,10 @@
     <body>
         <div id="app-header"></div>
         <script src="/layout.js"></script>
-        <!-- Flow Client Library - Use ES module approach (v2) -->
+        <!-- Flow Client Library - Use ES module from unpkg -->
         <script type="module">
             // Load FCL as ES module (browser-compatible)
-            import * as fcl from 'https://cdn.jsdelivr.net/npm/@onflow/fcl@1.12.2/dist/fcl.esm.min.js';
+            import * as fcl from 'https://unpkg.com/@onflow/fcl@1.12.2/dist/fcl.esm.js';
             
             // Configure FCL (official Flow documentation pattern)
             fcl.config()
