@@ -43,6 +43,9 @@ app.use(express.json());
 // Static files
 app.use(express.static(path.join(__dirname, "public")));
 
+// Serve node_modules for ES module imports (localhost testing)
+app.use('/node_modules', express.static(path.join(__dirname, 'node_modules')));
+
 // Sessions (must be before routes)
 app.use(
   session({
@@ -4575,7 +4578,10 @@ async function loadRecentListingsFromDB() {
     let updated = 0;
     for (const row of result.rows) {
       try {
-        const listing = JSON.parse(row.listing_data);
+        // Handle both JSON string and already-parsed object (PostgreSQL JSONB)
+        const listing = typeof row.listing_data === 'string' 
+          ? JSON.parse(row.listing_data) 
+          : row.listing_data;
         if (listing.nftId) {
           if (!seenListingNfts.has(listing.nftId)) {
             // New listing - add it

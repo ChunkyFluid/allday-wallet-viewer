@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build:fcl": "npx esbuild src/fcl-bundle.js --bundle --format=iife --global-name=fcl --outfile=public/js/fcl-bundle.js --platform=browser",
+    "prestart": "npm run build:fcl"
   },
   "dependencies": {
     "@onflow/fcl": "^1.20.6",

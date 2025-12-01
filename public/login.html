@@ -297,21 +297,25 @@
     <body>
         <div id="app-header"></div>
         <script src="/layout.js"></script>
-        <!-- Flow Client Library - Use ES module from unpkg -->
-        <script type="module">
-            // Load FCL as ES module (browser-compatible)
-            import * as fcl from 'https://unpkg.com/@onflow/fcl@1.12.2/dist/fcl.esm.js';
-            
-            // Configure FCL (official Flow documentation pattern)
-            fcl.config()
-                .put("accessNode.api", "https://rest-mainnet.onflow.org")
-                .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
-                .put("app.detail.title", "Chunky's NFLAD Viewer")
-                .put("app.detail.icon", window.location.origin + "/favicon.ico");
-            
-            // Expose FCL globally for non-module scripts
-            window.fcl = fcl;
-            console.log('✅ FCL loaded and configured');
+        <!-- Flow Client Library - Bundled with esbuild -->
+        <script src="/js/fcl-bundle.js"></script>
+        <script>
+            // FCL is configured in the bundle and will be available as window.fcl
+            // Wait for the bundle to fully initialize
+            (function() {
+                let checkCount = 0;
+                const checkFCL = setInterval(() => {
+                    checkCount++;
+                    if (window.fcl && typeof window.fcl.config === 'function') {
+                        clearInterval(checkFCL);
+                        console.log('✅ FCL is ready to use');
+                    } else if (checkCount > 50) {
+                        clearInterval(checkFCL);
+                        console.warn('⚠️ FCL not found after 5 seconds');
+                        console.log('Available window properties:', Object.keys(window).filter(k => k.toLowerCase().includes('fcl')));
+                    }
+                }, 100);
+            })();
         </script>
         
         <div class="app-shell">
@@ -597,17 +601,33 @@
                     setStatus(loginStatus, "Connecting wallet...", null);
                     
                     try {
-                        // Wait a moment for FCL to be available (if page just loaded)
-                        let fcl = window.fcl;
-                        if (!fcl) {
+                        // Wait for FCL to be available (bundle loads asynchronously)
+                        let fclModule = window.fcl;
+                        if (!fclModule) {
                             setStatus(loginStatus, "Loading Flow library...", null);
-                            for (let i = 0; i < 20 && !fcl; i++) {
+                            // Wait up to 5 seconds for FCL to load
+                            for (let i = 0; i < 50 && !fclModule; i++) {
                                 await new Promise(resolve => setTimeout(resolve, 100));
-                                fcl = window.fcl;
+                                fclModule = window.fcl;
+                                if (fclModule) break;
                             }
                         }
                         
+                        // FCL is exported as ES module: {default: fcl, fcl: fcl, __esModule: true}
+                        // Extract the actual FCL object from the module wrapper
+                        let fcl = fclModule;
+                        if (fclModule && fclModule.__esModule) {
+                            // ES module export - try named export first, then default
+                            fcl = fclModule.fcl || fclModule.default || fclModule;
+                        } else if (fclModule && (fclModule.fcl || fclModule.default)) {
+                            // Not marked as ES module but has the structure
+                            fcl = fclModule.fcl || fclModule.default;
+                        }
+                        
+                        // Final check
                         if (!fcl || typeof fcl.config !== 'function') {
+                            console.error('FCL not accessible. window.fcl:', window.fcl);
+                            console.error('Extracted fcl:', fcl);
                             setStatus(loginStatus, "Flow library not loaded. Please refresh the page.", "error");
                             return;
                         }
