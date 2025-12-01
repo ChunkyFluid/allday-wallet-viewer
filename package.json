@@ -8,6 +8,8 @@
     "dev": "node server.js"
   },
   "dependencies": {
+    "@onflow/fcl": "^1.20.6",
+    "@onflow/types": "^1.5.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^6.1.0",
@@ -15,6 +17,8 @@
     "express": "^4.19.2",
     "express-session": "^1.18.2",
     "node-fetch": "^2.7.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "pg": "^8.16.3",
     "snowflake-sdk": "^1.11.3",
     "ws": "^8.18.3"

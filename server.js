@@ -14,6 +14,21 @@ import session from "express-session";
 import bcrypt from "bcrypt";
 import WebSocket from "ws";
 
+// Optional imports for OAuth (only if packages are installed)
+let passport = null;
+// Google OAuth disabled - removed from UI
+// let GoogleStrategy = null;
+try {
+  const passportModule = await import("passport");
+  passport = passportModule.default;
+  // Google OAuth disabled
+  // const googleModule = await import("passport-google-oauth20");
+  // GoogleStrategy = googleModule.Strategy;
+} catch (e) {
+  console.warn("⚠️  Passport packages not installed. Google OAuth will be disabled.");
+  console.warn("   Install with: npm install passport passport-google-oauth20");
+}
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +56,8 @@ app.use(
     }
   })
 );
+
+// Passport will be initialized dynamically if Google OAuth is configured
 
 // ------------------ Snowflake connection ------------------
 
@@ -2495,6 +2512,179 @@ app.post("/api/login-dapper", async (req, res) => {
   } catch (err) {
     console.error("POST /api/login-dapper error:", err);
     return res.status(500).json({ ok: false, error: "Failed to log in with Dapper" });
+  }
+});
+
+// Google OAuth disabled - removed from UI
+// Configure Google OAuth Strategy (dynamically load passport if needed)
+/*
+(async () => {
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    try {
+      // Dynamically import passport modules
+      const passportModule = await import("passport");
+      const passport = passportModule.default;
+      const googleModule = await import("passport-google-oauth20");
+      const GoogleStrategy = googleModule.Strategy;
+      
+      // Initialize Passport middleware
+      app.use(passport.initialize());
+      app.use(passport.session());
+      
+      passport.use(
+        new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || "/api/auth/google/callback",
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          const googleEmail = profile.emails?.[0]?.value;
+          const googleId = profile.id;
+          const displayName = profile.displayName || profile.name?.givenName || "User";
+
+          if (!googleEmail) {
+            return done(new Error("No email found in Google profile"), null);
+          }
+
+          // Use synthetic email format: google:googleId
+          const syntheticEmail = `google:${googleId}`;
+
+          // Upsert user
+          const upsertSql = `
+            INSERT INTO public.users (email, password_hash, display_name, default_wallet_address)
+            VALUES ($1, NULL, $2, NULL)
+            ON CONFLICT (email)
+            DO UPDATE SET
+              display_name = COALESCE(EXCLUDED.display_name, users.display_name)
+            RETURNING id, email, display_name, default_wallet_address;
+          `;
+
+          const { rows } = await pool.query(upsertSql, [syntheticEmail, displayName]);
+          const user = rows[0];
+
+          return done(null, {
+            id: user.id,
+            email: user.email,
+            display_name: user.display_name,
+            default_wallet_address: user.default_wallet_address,
+            auth_provider: "google",
+            google_id: googleId,
+            google_email: googleEmail
+          });
+        } catch (err) {
+          console.error("Google OAuth error:", err);
+          return done(err, null);
+        }
+      }
+    )
+  );
+
+  // Serialize user for session
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
+  // Deserialize user from session
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, email, display_name, default_wallet_address FROM public.users WHERE id = $1`,
+        [id]
+      );
+      if (rows.length) {
+        done(null, rows[0]);
+      } else {
+        done(new Error("User not found"), null);
+      }
+    } catch (err) {
+      done(err, null);
+    }
+  });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/login.html?error=google_auth_failed" }),
+    (req, res) => {
+      // Set session
+      req.session.user = {
+        id: req.user.id,
+        email: req.user.email,
+        display_name: req.user.display_name,
+        default_wallet_address: req.user.default_wallet_address,
+        auth_provider: "google"
+      };
+      res.redirect("/?auth=success");
+    }
+    );
+    
+    console.log("✅ Google OAuth configured successfully");
+  } catch (e) {
+    console.warn("⚠️  Google OAuth not available - passport packages not installed");
+    console.warn("   Install with: npm install passport passport-google-oauth20");
+    console.warn("   Google sign-in will be disabled until packages are installed");
+    }
+  }
+})();
+*/
+
+// POST /api/login-flow - Authenticate with Flow wallet (Dapper, Blocto, etc.)
+app.post("/api/login-flow", async (req, res) => {
+  try {
+    let { wallet_address, signed_message, signature } = req.body || {};
+
+    if (!wallet_address || typeof wallet_address !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing wallet_address" });
+    }
+
+    wallet_address = wallet_address.trim().toLowerCase();
+    if (!wallet_address.startsWith("0x")) {
+      wallet_address = "0x" + wallet_address;
+    }
+
+    // Basic sanity check – Flow-style address (16 hex characters after 0x)
+    if (!/^0x[0-9a-f]{16}$/i.test(wallet_address)) {
+      return res.status(400).json({ ok: false, error: "Invalid Flow wallet address format (must be 0x followed by 16 hex characters)" });
+    }
+
+    // TODO: Verify signature if provided (for production security)
+    // For now, we'll trust the wallet address from FCL
+    
+    // Use synthetic email format: flow:wallet_address
+    const syntheticEmail = `flow:${wallet_address}`;
+
+    const upsertSql = `
+      INSERT INTO public.users (email, password_hash, default_wallet_address)
+      VALUES ($1, NULL, $2)
+      ON CONFLICT (email)
+      DO UPDATE SET
+        default_wallet_address = EXCLUDED.default_wallet_address
+      RETURNING id, email, default_wallet_address, display_name;
+    `;
+
+    const { rows } = await pool.query(upsertSql, [syntheticEmail, wallet_address]);
+    const user = rows[0];
+
+    // Set session
+    req.session.user = {
+      id: user.id,
+      email: user.email,
+      default_wallet_address: user.default_wallet_address,
+      display_name: user.display_name,
+      auth_provider: "flow"
+    };
+
+    return res.json({
+      ok: true,
+      user: req.session.user
+    });
+  } catch (err) {
+    console.error("POST /api/login-flow error:", err);
+    return res.status(500).json({ ok: false, error: "Failed to log in with Flow wallet" });
   }
 });
 

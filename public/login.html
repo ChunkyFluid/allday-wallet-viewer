@@ -105,14 +105,14 @@
                 border-color: #ef4444;
             }
 
-            .btn-google {
-                background: white;
-                color: #333;
-                border: 1px solid #dadce0;
+            .btn-flow {
+                background: linear-gradient(135deg, #00EF8B, #00D972);
+                color: #000;
+                border: none;
                 padding: 0.75rem 1.5rem;
                 border-radius: 12px;
                 font-size: 1rem;
-                font-weight: 500;
+                font-weight: 600;
                 cursor: pointer;
                 transition: all 0.2s;
                 display: flex;
@@ -121,10 +121,11 @@
                 width: 100%;
             }
 
-            .btn-google:hover {
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-                background: #f8f9fa;
+            .btn-flow:hover {
+                box-shadow: 0 4px 12px rgba(0, 239, 139, 0.3);
+                transform: translateY(-1px);
             }
+
 
             .status {
                 margin-top: 1rem;
@@ -296,6 +297,40 @@
     <body>
         <div id="app-header"></div>
         <script src="/layout.js"></script>
+        <!-- Flow Client Library - Simple script tag (standard approach) -->
+        <script src="https://unpkg.com/@onflow/fcl@latest/dist/fcl.js"></script>
+        <script>
+            // Configure FCL when it loads (official Flow documentation pattern)
+            (function() {
+                function configureFCL() {
+                    if (window.fcl && typeof window.fcl.config === 'function') {
+                        window.fcl.config()
+                            .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                            .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                            .put("app.detail.title", "Chunky's NFLAD Viewer")
+                            .put("app.detail.icon", window.location.origin + "/favicon.ico");
+                        console.log('✅ FCL configured');
+                        return true;
+                    }
+                    return false;
+                }
+                
+                // Try immediately
+                if (!configureFCL()) {
+                    // Wait for script to load
+                    let attempts = 0;
+                    const checkInterval = setInterval(() => {
+                        attempts++;
+                        if (configureFCL() || attempts > 50) {
+                            clearInterval(checkInterval);
+                            if (attempts > 50) {
+                                console.warn('⚠️ FCL not loaded after 5 seconds');
+                            }
+                        }
+                    }, 100);
+                }
+            })();
+        </script>
         
         <div class="app-shell">
             <div class="login-wrapper">
@@ -326,15 +361,14 @@
 
                     <div class="divider">or</div>
 
-                    <button id="btn-google-login" class="btn-google" type="button">
+                    <button id="btn-flow-wallet" class="btn-flow" type="button" style="margin-bottom: 0.75rem;">
                         <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 0.5rem;">
-                            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
-                            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.96-2.184l-2.908-2.258c-.806.54-1.837.86-3.052.86-2.35 0-4.34-1.587-5.052-3.72H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
-                            <path fill="#FBBC05" d="M3.948 10.718c-.18-.54-.282-1.117-.282-1.718 0-.601.102-1.178.282-1.718V4.95H.957C.348 6.174 0 7.55 0 9c0 1.45.348 2.826.957 4.05l2.991-2.332z"/>
-                            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.95L3.948 7.282C4.66 5.147 6.65 3.58 9 3.58z"/>
+                            <path fill="#00EF8B" d="M9 0L0 5v8l9 5 9-5V5L9 0z"/>
+                            <path fill="#00D972" d="M9 0v18l9-5V5L9 0z"/>
                         </svg>
-                        Continue with Google
+                        Connect Flow Wallet
                     </button>
+
 
                     <div id="login-status" class="status"></div>
                 </section>
@@ -424,6 +458,11 @@
         </div>
 
         <script>
+            // Check for success/error query params
+            const urlParams = new URLSearchParams(window.location.search);
+            const success = urlParams.get('success');
+            const error = urlParams.get('error');
+            
             const loginView = document.getElementById("login-view");
             const signupView = document.getElementById("signup-view");
             const settingsView = document.getElementById("settings-view");
@@ -438,6 +477,8 @@
                 el.classList.remove("error", "success");
                 if (type) el.classList.add(type);
             }
+            
+            // Handle OAuth callback messages (Flow wallet handled separately)
 
             // Check if user is logged in and show appropriate view
             async function checkLoginStatus() {
@@ -567,10 +608,68 @@
                 }
             });
 
-            // Google OAuth
-            document.getElementById("btn-google-login").addEventListener("click", () => {
-                setStatus(loginStatus, "Google Sign-In coming soon!", "error");
-            });
+            // Flow Wallet Authentication
+            const btnFlowWallet = document.getElementById("btn-flow-wallet");
+            if (btnFlowWallet) {
+                btnFlowWallet.addEventListener("click", async () => {
+                    setStatus(loginStatus, "Connecting wallet...", null);
+                    
+                    try {
+                        // Wait a moment for FCL to be available (if page just loaded)
+                        let fcl = window.fcl;
+                        if (!fcl) {
+                            setStatus(loginStatus, "Loading Flow library...", null);
+                            for (let i = 0; i < 20 && !fcl; i++) {
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                fcl = window.fcl;
+                            }
+                        }
+                        
+                        if (!fcl || typeof fcl.config !== 'function') {
+                            setStatus(loginStatus, "Flow library not loaded. Please refresh the page.", "error");
+                            return;
+                        }
+                        
+                        // FCL should already be configured on page load, but ensure it's ready
+                        // Authenticate with Flow wallet (shows wallet discovery modal)
+                        setStatus(loginStatus, "Opening wallet selection...", null);
+                        const user = await fcl.authenticate();
+                        
+                        if (user && user.addr) {
+                            setStatus(loginStatus, "Authenticating...", null);
+                            
+                            // Send wallet address to backend
+                            setStatus(loginStatus, "Authenticating...", null);
+                            const res = await fetch("/api/login-flow", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                                body: JSON.stringify({ 
+                                    wallet_address: user.addr,
+                                    signed_message: user.signedMessage || null,
+                                    signature: user.signature || null
+                                })
+                            });
+                            
+                            const data = await res.json();
+                            if (res.ok && data.ok) {
+                                setStatus(loginStatus, "Connected! ✨", "success");
+                                setTimeout(() => {
+                                    window.location.href = "/";
+                                }, 1000);
+                            } else {
+                                setStatus(loginStatus, data.error || "Authentication failed", "error");
+                            }
+                        } else {
+                            setStatus(loginStatus, "Wallet connection cancelled", "error");
+                        }
+                    } catch (err) {
+                        console.error("Flow wallet auth error:", err);
+                        setStatus(loginStatus, err.message || "Failed to connect wallet", "error");
+                    }
+                });
+            }
+
 
             // Save wallet
             document.getElementById("btn-save-wallet").addEventListener("click", async () => {
