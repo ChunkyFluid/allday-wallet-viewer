@@ -352,7 +352,7 @@
                             <path fill="#00EF8B" d="M9 0L0 5v8l9 5 9-5V5L9 0z"/>
                             <path fill="#00D972" d="M9 0v18l9-5V5L9 0z"/>
                         </svg>
-                        Connect Flow Wallet
+                        Connect Dapper Wallet
                     </button>
 
 
@@ -633,15 +633,134 @@
                         }
                         
                         // FCL should already be configured on page load, but ensure it's ready
-                        // Authenticate with Flow wallet (shows wallet discovery modal)
-                        setStatus(loginStatus, "Opening wallet selection...", null);
-                        const user = await fcl.authenticate();
+                        // Re-apply config to ensure discovery.authn.endpoint is set
+                        fcl.config()
+                            .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                            .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                            .put("discovery.authn.endpoint", "https://fcl-discovery.onflow.org/api/authn")
+                            .put("discovery.authn.include", ["dapper-wallet"])
+                            .put("discovery.authn.exclude", ["flow-wallet", "nufi", "blocto"])
+                            .put("app.detail.title", "Chunky's NFLAD Viewer")
+                            .put("app.detail.icon", window.location.origin + "/favicon.ico")
+                            .put("service.OpenID.scopes", "email");
+                        
+                        // Verify config is set
+                        const authnEndpoint = await fcl.config.get("discovery.authn.endpoint");
+                        console.log("Verified discovery.authn.endpoint:", authnEndpoint);
+                        if (!authnEndpoint) {
+                            setStatus(loginStatus, "FCL configuration error. Please refresh the page.", "error");
+                            return;
+                        }
+                        
+                        // Authenticate with Dapper wallet only using Discovery API
+                        setStatus(loginStatus, "Opening Dapper wallet...", null);
+                        
+                        let user;
+                        try {
+                            // Get available auth services using Discovery API
+                            const servicesResult = await fcl.discovery.authn.snapshot();
+                            console.log("Discovery snapshot result:", servicesResult);
+                            console.log("Type:", typeof servicesResult);
+                            console.log("Is array?", Array.isArray(servicesResult));
+                            
+                            // Handle different response structures
+                            let services = [];
+                            if (Array.isArray(servicesResult)) {
+                                services = servicesResult;
+                            } else if (servicesResult && Array.isArray(servicesResult.results)) {
+                                services = servicesResult.results;
+                            } else if (servicesResult && servicesResult.services && Array.isArray(servicesResult.services)) {
+                                services = servicesResult.services;
+                            } else if (servicesResult && typeof servicesResult === 'object') {
+                                // Try to extract services from object
+                                services = Object.values(servicesResult).filter(item => 
+                                    item && typeof item === 'object' && (item.type === 'authn' || item.provider)
+                                );
+                            }
+                            
+                            console.log("Extracted services array:", services);
+                            console.log("Services count:", services.length);
+                            
+                            if (!Array.isArray(services) || services.length === 0) {
+                                console.error("No services found. Full result:", servicesResult);
+                                setStatus(loginStatus, "No wallets available. Please check your connection.", "error");
+                                return;
+                            }
+                            
+                            // Find Dapper service (using wallet UID or address)
+                            const dapperService = services.find(s => {
+                                const provider = s.provider || s;
+                                return provider?.uid === "dapper-wallet" ||
+                                    provider?.address === "0xead892083b3e2c6c" ||
+                                    s.address === "0xead892083b3e2c6c" ||
+                                    s.endpoint?.includes("dapper") ||
+                                    s.endpoint?.includes("meetdapper") ||
+                                    provider?.name?.toLowerCase().includes("dapper");
+                            });
+                            
+                            if (!dapperService) {
+                                console.error("Dapper service not found. Available services:", services.map(s => {
+                                    const p = s.provider || s;
+                                    return {
+                                        uid: p?.uid,
+                                        name: p?.name,
+                                        address: p?.address || s.address,
+                                        endpoint: s.endpoint
+                                    };
+                                }));
+                                setStatus(loginStatus, "Dapper wallet not available. Please ensure Dapper is installed.", "error");
+                                return;
+                            }
+                            
+                            console.log("Found Dapper service:", dapperService);
+                            
+                            // Authenticate with Dapper service directly
+                            user = await fcl.authenticate({ service: dapperService });
+                        } catch (authErr) {
+                            console.error("FCL authentication error:", authErr);
+                            setStatus(loginStatus, "Authentication cancelled or failed: " + (authErr.message || String(authErr)), "error");
+                            return;
+                        }
+                        
+                        console.log("FCL user object:", user);
                         
                         if (user && user.addr) {
-                            setStatus(loginStatus, "Authenticating...", null);
+                            // Check if user authenticated with Dapper wallet
+                            // Get the current user service to detect provider
+                            let walletProvider = null;
+                            try {
+                                const currentUser = await fcl.currentUser().snapshot();
+                                console.log("Current user service:", currentUser);
+                                
+                                // Check service endpoint to determine provider
+                                if (currentUser && currentUser.services) {
+                                    const authnService = currentUser.services.find(s => s.type === 'authn');
+                                    if (authnService) {
+                                        const endpoint = authnService.endpoint || authnService.provider?.endpoint || '';
+                                        if (endpoint.includes('dapper') || endpoint.includes('meetdapper')) {
+                                            walletProvider = 'dapper';
+                                        }
+                                    }
+                                }
+                            } catch (serviceErr) {
+                                console.warn("Could not detect wallet provider:", serviceErr);
+                            }
                             
-                            // Send wallet address to backend
-                            setStatus(loginStatus, "Authenticating...", null);
+                            // If we couldn't detect provider, assume it's not Dapper and reject
+                            if (walletProvider !== 'dapper') {
+                                setStatus(loginStatus, "Only Dapper wallets are supported. Please use Dapper Wallet.", "error");
+                                // Unauthenticate to clear the session
+                                try {
+                                    await fcl.unauthenticate();
+                                } catch (e) {
+                                    // Ignore errors
+                                }
+                                return;
+                            }
+                            
+                            setStatus(loginStatus, "Authenticating with Dapper...", null);
+                            
+                            // Send wallet address to backend (Dapper wallet only)
                             const res = await fetch("/api/login-flow", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -649,11 +768,14 @@
                                 body: JSON.stringify({ 
                                     wallet_address: user.addr,
                                     signed_message: user.signedMessage || null,
-                                    signature: user.signature || null
+                                    signature: user.signature || null,
+                                    wallet_provider: "dapper"
                                 })
                             });
                             
                             const data = await res.json();
+                            console.log("Login response:", data);
+                            
                             if (res.ok && data.ok) {
                                 setStatus(loginStatus, "Connected! ✨", "success");
                                 setTimeout(() => {

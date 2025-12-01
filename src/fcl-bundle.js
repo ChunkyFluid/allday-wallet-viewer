@@ -3,12 +3,20 @@
 
 import * as fcl from '@onflow/fcl';
 
-// Configure FCL for Flow Mainnet
+// Configure FCL for Flow Mainnet - Dapper Wallet only
 fcl.config()
   .put("accessNode.api", "https://rest-mainnet.onflow.org")
+  // Discovery endpoint for wallet selection UI
   .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+  // Discovery API endpoint for programmatic access (required for snapshot())
+  .put("discovery.authn.endpoint", "https://fcl-discovery.onflow.org/api/authn")
+  // Include only Dapper Wallet (using wallet UID - recommended)
+  .put("discovery.authn.include", ["dapper-wallet"])
+  // Exclude all other default wallets
+  .put("discovery.authn.exclude", ["flow-wallet", "nufi", "blocto"])
   .put("app.detail.title", "Chunky's NFLAD Viewer")
-  .put("app.detail.icon", typeof window !== 'undefined' ? window.location.origin + "/favicon.ico" : "/favicon.ico");
+  .put("app.detail.icon", typeof window !== 'undefined' ? window.location.origin + "/favicon.ico" : "/favicon.ico")
+  .put("service.OpenID.scopes", "email");
 
 // Expose FCL globally - ensure it's the actual FCL object, not the module wrapper
 if (typeof window !== 'undefined') {

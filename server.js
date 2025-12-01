@@ -2635,12 +2635,28 @@ app.post("/api/login-dapper", async (req, res) => {
 })();
 */
 
-// POST /api/login-flow - Authenticate with Flow wallet (Dapper, Blocto, etc.)
+// POST /api/login-flow - Authenticate with Dapper wallet only
 app.post("/api/login-flow", async (req, res) => {
   try {
-    let { wallet_address, signed_message, signature } = req.body || {};
+    let { wallet_address, signed_message, signature, wallet_provider } = req.body || {};
+    
+    // Only allow Dapper wallets
+    if (wallet_provider !== "dapper") {
+      console.log("[Flow Login] Rejected non-Dapper wallet attempt");
+      return res.status(403).json({ 
+        ok: false, 
+        error: "Only Dapper wallets are supported. Please use Dapper Wallet to sign in." 
+      });
+    }
+
+    console.log("[Flow Login] Received request:", { 
+      wallet_address: wallet_address ? wallet_address.substring(0, 20) + '...' : 'missing',
+      has_signed_message: !!signed_message,
+      has_signature: !!signature
+    });
 
     if (!wallet_address || typeof wallet_address !== "string") {
+      console.error("[Flow Login] Missing wallet_address");
       return res.status(400).json({ ok: false, error: "Missing wallet_address" });
     }
 
@@ -2649,16 +2665,49 @@ app.post("/api/login-flow", async (req, res) => {
       wallet_address = "0x" + wallet_address;
     }
 
-    // Basic sanity check – Flow-style address (16 hex characters after 0x)
-    if (!/^0x[0-9a-f]{16}$/i.test(wallet_address)) {
-      return res.status(400).json({ ok: false, error: "Invalid Flow wallet address format (must be 0x followed by 16 hex characters)" });
+    // Flow addresses are 16 hex characters after 0x, but be more lenient
+    // Some wallets might return addresses in different formats
+    const flowAddressPattern = /^0x[0-9a-f]{8,16}$/i;
+    if (!flowAddressPattern.test(wallet_address)) {
+      console.error("[Flow Login] Invalid address format:", wallet_address);
+      return res.status(400).json({ ok: false, error: `Invalid Flow wallet address format: ${wallet_address}` });
     }
+    
+    // Normalize to 16 characters (pad with zeros if needed)
+    const addressPart = wallet_address.substring(2);
+    const normalizedAddress = "0x" + addressPart.padStart(16, '0');
 
     // TODO: Verify signature if provided (for production security)
     // For now, we'll trust the wallet address from FCL
     
     // Use synthetic email format: flow:wallet_address
-    const syntheticEmail = `flow:${wallet_address}`;
+    const syntheticEmail = `flow:${normalizedAddress}`;
+
+    console.log("[Flow Login] Creating/updating user:", syntheticEmail);
+
+    // Ensure password_hash column is nullable (run migration if needed)
+    // This is a one-time migration that will be skipped if already done
+    try {
+      const checkResult = await pool.query(`
+        SELECT is_nullable 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users' 
+        AND column_name = 'password_hash';
+      `);
+      
+      if (checkResult.rows.length > 0 && checkResult.rows[0].is_nullable === 'NO') {
+        await pool.query(`
+          ALTER TABLE public.users 
+          ALTER COLUMN password_hash DROP NOT NULL;
+        `);
+        console.log("[Flow Login] Made password_hash nullable (migration applied)");
+      }
+    } catch (alterErr) {
+      // If migration fails, log but continue - might be permission issue
+      console.warn("[Flow Login] Could not check/alter password_hash column:", alterErr.message);
+      console.warn("[Flow Login] You may need to run: ALTER TABLE public.users ALTER COLUMN password_hash DROP NOT NULL;");
+    }
 
     const upsertSql = `
       INSERT INTO public.users (email, password_hash, default_wallet_address)
@@ -2669,7 +2718,12 @@ app.post("/api/login-flow", async (req, res) => {
       RETURNING id, email, default_wallet_address, display_name;
     `;
 
-    const { rows } = await pool.query(upsertSql, [syntheticEmail, wallet_address]);
+    const { rows } = await pool.query(upsertSql, [syntheticEmail, normalizedAddress]);
+    
+    if (!rows || rows.length === 0) {
+      console.error("[Flow Login] Database query returned no rows");
+      return res.status(500).json({ ok: false, error: "Failed to create user account" });
+    }
     const user = rows[0];
 
     // Set session
@@ -2687,7 +2741,15 @@ app.post("/api/login-flow", async (req, res) => {
     });
   } catch (err) {
     console.error("POST /api/login-flow error:", err);
-    return res.status(500).json({ ok: false, error: "Failed to log in with Flow wallet" });
+    console.error("Error details:", {
+      message: err.message,
+      stack: err.stack,
+      code: err.code
+    });
+    return res.status(500).json({ 
+      ok: false, 
+      error: "Failed to log in with Flow wallet: " + (err.message || String(err))
+    });
   }
 });
 
@@ -4234,7 +4296,7 @@ async function watchForListings() {
                   // The buyer is typically the transaction authorizer (first signer)
                   // We'll get the TX_ID and then fetch the transaction to get the authorizer
                   const snowflakeQuery = `
-                    SELECT TX_ID, TX_PAYER_ADDRESS
+                    SELECT TX_ID
                     FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
                     WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
                       AND EVENT_TYPE = 'ListingCompleted'
@@ -4260,12 +4322,7 @@ async function watchForListings() {
                           }
                         }
                       } catch (e) {
-                        // Fallback to payer address if transaction fetch fails
-                        const payerAddr = row.TX_PAYER_ADDRESS || row.tx_payer_address;
-                        if (payerAddr) {
-                          buyerAddr = payerAddr.toLowerCase();
-                          console.log(`[Sniper] Using payer address ${buyerAddr} as buyer for ${nftId}`);
-                        }
+                        console.log(`[Sniper] Could not fetch transaction ${txId} from Flow API:`, e.message);
                       }
                     }
                   }
