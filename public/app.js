@@ -37,7 +37,7 @@ function showLoadingAnimation() {
     if (els.tbody) {
         els.tbody.innerHTML = `
             <tr class="skeleton-row">
-                <td class="skeleton-cell" colspan="14">
+                <td class="skeleton-cell" colspan="15">
                     <div class="wallet-loading">
                         <div class="loading-spinner"></div>
                         <div class="loading-text">
@@ -300,7 +300,8 @@ function applySort() {
             key === "max_mint_size" ||
             key === "low_ask_usd" ||
             key === "avg_sale_usd" ||
-            key === "top_sale_usd"
+            key === "top_sale_usd" ||
+            key === "owned_count"
         ) {
             va = Number(va) || 0;
             vb = Number(vb) || 0;
@@ -383,6 +384,18 @@ function abbreviateSet(setName) {
     return setName;
 }
 
+function countDuplicatesByEdition(moments) {
+    // Count how many times each edition_id appears
+    const editionCounts = {};
+    for (const moment of moments) {
+        const editionId = moment.edition_id;
+        if (editionId) {
+            editionCounts[editionId] = (editionCounts[editionId] || 0) + 1;
+        }
+    }
+    return editionCounts;
+}
+
 function renderPage(page) {
     const els = getEls();
     if (!els.tbody) return;
@@ -395,6 +408,9 @@ function renderPage(page) {
     const start = (currentPage - 1) * PAGE_SIZE;
     const end = Math.min(start + PAGE_SIZE, total);
     const slice = filteredMoments.slice(start, end);
+
+    // Count duplicates by edition_id across all moments in the wallet (not just filtered)
+    const editionCounts = countDuplicatesByEdition(allMoments);
 
     els.tbody.innerHTML = "";
 
@@ -427,8 +443,13 @@ function renderPage(page) {
         // Compact date format (just date, no time)
         const eventDate = r.last_event_ts ? formatDate(r.last_event_ts).split(',')[0] : "";
         
+        // Get duplicate count for this edition
+        const duplicateCount = r.edition_id ? editionCounts[r.edition_id] : 1;
+        const ownedDisplay = duplicateCount > 1 ? `<span class="duplicate-count" title="Owned ${duplicateCount} of this moment">${duplicateCount}</span>` : "1";
+        
         tr.innerHTML = `
       <td>${playerName || "(unknown)"}</td>
+      <td style="text-align: center;">${ownedDisplay}</td>
       <td title="${r.team_name || ""}">${teamAbbrev}</td>
       <td>${r.position || ""}</td>
       <td>${tierHtml}</td>
@@ -461,6 +482,10 @@ function renderPage(page) {
             const cardUrl = marketUrl || momentUrl || "#";
             const lockedClass = r.is_locked ? "locked" : "unlocked";
             
+            // Get duplicate count for mobile view
+            const duplicateCount = r.edition_id ? editionCounts[r.edition_id] : 1;
+            const mobileCountBadge = duplicateCount > 1 ? ` <span class="duplicate-count">x${duplicateCount}</span>` : "";
+            
             const card = document.createElement("a");
             card.href = cardUrl;
             card.target = "_blank";
@@ -472,6 +497,7 @@ function renderPage(page) {
                         <span class="mobile-card-title">${playerName || "Unknown"}</span>
                         <span class="mobile-card-badge">${teamAbbrev}</span>
                         <span class="mobile-card-badge tier ${tierLower}">${r.tier || "?"}</span>
+                        ${duplicateCount > 1 ? `<span class="duplicate-count">x${duplicateCount}</span>` : ""}
                     </div>
                     <div class="mobile-card-details">
                         <span>${r.set_name || "Unknown Set"}</span>
@@ -913,6 +939,7 @@ function exportCsv() {
         "tier",
         "serial_number",
         "max_mint_size",
+        "owned_count",
         "first_name",
         "last_name",
         "team_name",
@@ -982,6 +1009,12 @@ window.runQuery = async function runQuery(walletRaw) {
         allMoments = await fetchWalletMoments(wallet);
 
         await attachPricesToMoments(allMoments);
+
+        // Add owned_count to all moments for sorting
+        const editionCounts = countDuplicatesByEdition(allMoments);
+        for (const moment of allMoments) {
+            moment.owned_count = moment.edition_id ? (editionCounts[moment.edition_id] || 1) : 1;
+        }
 
         // Update summary with mini stats now that we have moments
         updateSummaryWithStats(wallet);

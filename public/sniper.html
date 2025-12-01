@@ -629,6 +629,14 @@
       color: #6b7280 !important;
     }
 
+    .listing-unlisted {
+      opacity: 0.5;
+    }
+
+    .listing-unlisted td {
+      color: #9ca3af !important;
+    }
+
     .listings-table th {
       background: var(--sniper-card);
       color: #9ca3af;
@@ -1110,6 +1118,21 @@
             <option value="10">10%+ off</option>
             <option value="15">15%+ off</option>
             <option value="20">20%+ off</option>
+            <option value="30">30%+ off</option>
+            <option value="35">35%+ off</option>
+            <option value="40">40%+ off</option>
+            <option value="45">45%+ off</option>
+            <option value="50">50%+ off</option>
+            <option value="55">55%+ off</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Owned Status</label>
+          <select class="filter-select" id="filter-owned">
+            <option value="">All</option>
+            <option value="owned">Owned</option>
+            <option value="not-owned">Not Owned</option>
           </select>
         </div>
 
@@ -1180,6 +1203,7 @@
           <thead>
             <tr>
               <th data-sort="player">Player</th>
+              <th>Owned</th>
               <th data-sort="tier">Tier</th>
               <th data-sort="serial">Serial</th>
               <th data-sort="price">Listed</th>
@@ -1199,6 +1223,13 @@
 
         <!-- Mobile Card View -->
         <div class="mobile-listings" id="mobile-listings"></div>
+        
+        <!-- Pagination -->
+        <div id="sniper-pager" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; justify-content: center; font-size: 0.85rem;">
+          <button id="sniper-page-prev" style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;" disabled>← Prev</button>
+          <span id="sniper-page-info" style="color: #9ca3af; min-width: 200px; text-align: center;"></span>
+          <button id="sniper-page-next" style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;" disabled>Next →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1222,6 +1253,12 @@
     let autoRefreshInterval = null;
     let countdownValue = 5;
     let currentView = 'table'; // Default to table/list view
+    let ownedCounts = {}; // Map of edition_id -> count for signed-in user
+    let userWallet = null; // User's wallet address if signed in
+    let isInitialLoad = true; // Track if this is the first load
+    let isLoadingListings = false; // Track if listings are currently being fetched
+    let currentPage = 1; // Current page number
+    const PAGE_SIZE = 20; // Listings per page
 
     // Elements
     const listingsGrid = document.getElementById('listings-grid');
@@ -1235,6 +1272,7 @@
     // Filters
     const filterDealsOnly = document.getElementById('filter-deals-only');
     const filterMinDiscount = document.getElementById('filter-min-discount');
+    const filterOwned = document.getElementById('filter-owned');
     const filterTier = document.getElementById('filter-tier');
     const filterMaxPrice = document.getElementById('filter-max-price');
     const filterMaxSerial = document.getElementById('filter-max-serial');
@@ -1298,6 +1336,52 @@
       return tier.toLowerCase();
     }
 
+    // Fetch user's owned moments if signed in
+    async function fetchOwnedCounts() {
+      try {
+        // Check if user is signed in
+        const meRes = await fetch('/api/me', { credentials: 'include' });
+        const meData = await meRes.json();
+        
+        if (!meData.ok || !meData.user || !meData.user.default_wallet_address) {
+          ownedCounts = {};
+          userWallet = null;
+          return;
+        }
+        
+        userWallet = meData.user.default_wallet_address;
+        
+        // Fetch wallet moments
+        const walletRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
+        const walletData = await walletRes.json();
+        
+        if (!walletData.ok || !walletData.rows) {
+          ownedCounts = {};
+          return;
+        }
+        
+        // Count duplicates by edition_id
+        const counts = {};
+        for (const moment of walletData.rows) {
+          if (moment.edition_id) {
+            counts[moment.edition_id] = (counts[moment.edition_id] || 0) + 1;
+          }
+        }
+        
+        ownedCounts = counts;
+      } catch (err) {
+        console.error('Error fetching owned counts:', err);
+        ownedCounts = {};
+        userWallet = null;
+      }
+    }
+    
+    // Get owned count for a listing
+    function getOwnedCount(editionId) {
+      if (!editionId || !ownedCounts[editionId]) return null;
+      return ownedCounts[editionId];
+    }
+    
     // Warmup the cache on first load
     let cacheWarmedUp = false;
     let availableTeams = [];
@@ -1320,20 +1404,111 @@
     // Fetch all listings
     async function fetchListings() {
       btnRefresh.classList.add('loading');
+      isLoadingListings = true;
+      if (statusEl) {
+        statusEl.textContent = 'Loading listings...';
+        statusEl.className = '';
+      }
+      // Show loading state in table
+      renderListings();
 
       try {
-        const response = await fetch('/api/sniper-deals');
-        const data = await response.json();
+        // Fetch owned counts if user is signed in (do this in parallel with listings)
+        const ownedPromise = fetchOwnedCounts();
+        
+        // Always use real-time endpoint - it's fast and reads from in-memory array
+        // The watcher continuously populates the array, so it should have recent listings
+        let data;
+        let isHistoricalData = false;
+        
+        if (isInitialLoad) {
+          console.log('[Sniper] Initial load - fetching real-time listings...');
+          isInitialLoad = false; // Mark as no longer initial load
+        }
+        
+        // Use real-time endpoint (fast - reads from in-memory array)
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+          const response = await fetch('/api/sniper-deals', { signal: controller.signal });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          data = await response.json();
+          console.log('[Sniper] Real-time response:', { ok: data.ok, count: data.listings?.length || 0, watching: data.watching });
+          
+          // If no listings yet and watcher just started, show a message
+          if (data.listings && data.listings.length === 0 && !data.watching) {
+            console.log('[Sniper] No listings yet - watcher may still be starting');
+          }
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          if (fetchErr.name === 'AbortError') {
+            throw new Error('Request timed out - server may be slow. Please try refreshing.');
+          }
+          throw fetchErr;
+        }
 
-        if (data.error) throw new Error(data.error);
+        // Validate response
+        if (!data) {
+          console.error('[Sniper] No data received from API');
+          throw new Error('No data received from API');
+        }
+
+        if (!data.ok) {
+          console.error('[Sniper] API returned not ok:', data.error);
+          throw new Error(data.error || 'Failed to fetch listings');
+        }
+
+        if (data.error) {
+          console.error('[Sniper] API returned error:', data.error);
+          throw new Error(data.error);
+        }
 
         listings = data.listings || [];
         
-        // Update stats
-        document.getElementById('stat-deals').textContent = data.dealsCount || 0;
-        document.getElementById('stat-listings').textContent = data.total || 0;
+        if (!Array.isArray(listings)) {
+          console.error('[Sniper] listings is not an array!', typeof listings, listings);
+          listings = [];
+        }
         
-        // Populate team dropdown from API data
+        console.log('[Sniper] Final listings count:', listings.length);
+        
+        console.log('[Sniper] Processed listings:', listings.length, 'isHistorical:', isHistoricalData);
+        
+        // Normalize listing structure if coming from historical endpoint
+        // (sniper-listings uses currentFloor, sniper-deals uses floor)
+        if (isHistoricalData && listings.length > 0) {
+          listings = listings.map(l => {
+            const normalized = { ...l };
+            if (l.currentFloor !== undefined && l.floor === undefined) {
+              normalized.floor = l.currentFloor;
+            }
+            return normalized;
+          });
+          console.log('[Sniper] Normalized historical listings:', listings.length);
+        }
+        
+        // Ensure we have listings array even if empty
+        if (!Array.isArray(listings)) {
+          console.error('[Sniper] listings is not an array:', typeof listings, listings);
+          listings = [];
+        }
+        
+        // Wait for owned counts to finish
+        await ownedPromise;
+        
+        // Update stats
+        const dealsCount = listings.filter(l => l.dealPercent && l.dealPercent > 0).length;
+        document.getElementById('stat-deals').textContent = dealsCount || 0;
+        document.getElementById('stat-listings').textContent = listings.length || 0;
+        
+        // Populate team dropdown from API data (only if available)
         if (data.availableTeams && data.availableTeams.length > 0) {
           availableTeams = data.availableTeams;
           const currentTeam = filterTeam.value;
@@ -1345,26 +1520,57 @@
             filterTeam.appendChild(opt);
           });
           filterTeam.value = currentTeam; // Restore selection
+        } else if (listings.length > 0) {
+          // If no teams from API, extract from listings
+          const uniqueTeams = [...new Set(listings.map(l => l.teamName).filter(Boolean))].sort();
+          if (uniqueTeams.length > 0 && availableTeams.length === 0) {
+            availableTeams = uniqueTeams;
+            const currentTeam = filterTeam.value;
+            filterTeam.innerHTML = '<option value="">All Teams</option>';
+            availableTeams.forEach(team => {
+              const opt = document.createElement('option');
+              opt.value = team;
+              opt.textContent = team;
+              filterTeam.appendChild(opt);
+            });
+            filterTeam.value = currentTeam;
+          }
         }
         
-        // Update live indicator
-        document.getElementById('live-status').textContent = data.watching 
-          ? `LIVE · Block ${data.lastCheckedBlock}` 
-          : 'Offline';
-        document.getElementById('cache-status').textContent = `${data.floorCacheSize} floors cached`;
-        document.getElementById('live-dot').style.background = data.watching ? '#22c55e' : '#ef4444';
+        // Update live indicator (only if data available from real-time endpoint)
+        if (data.watching !== undefined) {
+          document.getElementById('live-status').textContent = data.watching 
+            ? `LIVE · Block ${data.lastCheckedBlock || '?'}` 
+            : 'Offline';
+          document.getElementById('cache-status').textContent = `${data.floorCacheSize || 0} floors cached`;
+          document.getElementById('live-dot').style.background = data.watching ? '#22c55e' : '#ef4444';
+        } else {
+          // For historical data, show that it's recent listings
+          document.getElementById('live-status').textContent = 'Recent Listings';
+          document.getElementById('cache-status').textContent = `${listings.length} listings loaded`;
+          document.getElementById('live-dot').style.background = '#6b7280';
+        }
 
+        isLoadingListings = false;
+        
+        console.log('[Sniper] About to render listings:', listings.length);
         renderListings();
         
         const timestamp = new Date().toLocaleTimeString();
-        statusEl.textContent = `${timestamp} • ${data.total} listings, ${data.dealsCount} deals`;
-        statusEl.className = data.dealsCount > 0 ? 'success' : '';
+        const totalCount = data.total || data.count || listings.length;
+        statusEl.textContent = `${timestamp} • ${totalCount} listings, ${dealsCount} deals`;
+        statusEl.className = dealsCount > 0 ? 'success' : '';
+        
+        console.log('[Sniper] Render complete, listings array length:', listings.length);
 
       } catch (err) {
         console.error('Error fetching listings:', err);
+        isLoadingListings = false;
         statusEl.textContent = 'Error: ' + err.message;
         statusEl.className = 'error';
         document.getElementById('live-dot').style.background = '#ef4444';
+        // Still render even on error (will show empty state)
+        renderListings();
       } finally {
         btnRefresh.classList.remove('loading');
       }
@@ -1387,6 +1593,20 @@
       const minDiscount = parseFloat(filterMinDiscount.value);
       if (minDiscount) {
         filtered = filtered.filter(l => (l.dealPercent || 0) >= minDiscount);
+      }
+
+      // Owned status filter
+      const ownedFilter = filterOwned.value;
+      if (ownedFilter === 'owned') {
+        filtered = filtered.filter(l => {
+          const count = getOwnedCount(l.editionId);
+          return count && count > 0;
+        });
+      } else if (ownedFilter === 'not-owned') {
+        filtered = filtered.filter(l => {
+          const count = getOwnedCount(l.editionId);
+          return !count || count === 0;
+        });
       }
 
       // Tier filter
@@ -1463,8 +1683,53 @@
 
     // Render listings
     function renderListings() {
-      const filtered = getFilteredListings();
+      console.log('[Sniper renderListings] Called, isLoading:', isLoadingListings, 'listings count:', listings?.length || 0, 'type:', typeof listings);
       const mobileListings = document.getElementById('mobile-listings');
+      
+      // Ensure listings is an array
+      if (!Array.isArray(listings)) {
+        console.error('[Sniper renderListings] listings is not an array!', typeof listings, listings);
+        listings = [];
+      }
+      
+      // If listings are currently being loaded, show loading state
+      if (isLoadingListings && listings.length === 0) {
+        listingsGrid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="icon">⏳</div>
+            <h3>Loading listings...</h3>
+            <p>Fetching recent listings from the last 6 hours</p>
+          </div>
+        `;
+        tableBody.innerHTML = `
+          <tr><td colspan="14" style="text-align: center; padding: 40px; color: #6b7280;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+              <span>⏳</span>
+              <span>Loading listings...</span>
+            </div>
+          </td></tr>
+        `;
+        if (mobileListings) {
+          mobileListings.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #6b7280;">
+              ⏳ Loading listings...
+            </div>
+          `;
+        }
+        return;
+      }
+      
+      const filtered = getFilteredListings();
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      
+      // Update current page if it's out of bounds
+      currentPage = Math.max(1, Math.min(currentPage, totalPages));
+      
+      // Get the slice for current page
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const end = Math.min(start + PAGE_SIZE, total);
+      const pageListings = filtered.slice(start, end);
 
       if (filtered.length === 0) {
         listingsGrid.innerHTML = `
@@ -1475,7 +1740,7 @@
           </div>
         `;
         tableBody.innerHTML = `
-          <tr><td colspan="12" style="text-align: center; padding: 40px; color: #6b7280;">
+          <tr><td colspan="14" style="text-align: center; padding: 40px; color: #6b7280;">
             No listings match your filters
           </td></tr>
         `;
@@ -1488,10 +1753,14 @@
       }
 
       // Grid view
-      listingsGrid.innerHTML = filtered.map(l => {
+      listingsGrid.innerHTML = pageListings.map(l => {
         // Gold serial only if #1 or matches jersey number
         const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
-        const soldClass = l.isSold ? 'listing-sold' : '';
+        const soldClass = l.isSold ? 'listing-sold' : (l.isUnlisted ? 'listing-unlisted' : '');
+        const ownedCount = getOwnedCount(l.editionId);
+        const ownedBadge = ownedCount 
+          ? `<span style="display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);" title="You own ${ownedCount} of this moment">x${ownedCount}</span>`
+          : '';
 
         return `
           <div class="listing-card ${soldClass}">
@@ -1508,7 +1777,7 @@
             </div>
             
             <div class="card-body">
-              <h3 class="player-name">${l.playerName || 'Unknown Player'}</h3>
+              <h3 class="player-name">${l.playerName || 'Unknown Player'}${ownedBadge}</h3>
               <div class="play-info">
                 <span>📍 ${l.teamName || 'Unknown'}</span>
                 ${l.setName ? `<span>📦 ${l.setName}</span>` : ''}
@@ -1537,15 +1806,15 @@
               </div>
             </div>
             
-            <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe" style="${l.isSold ? 'background: #6b7280; opacity: 0.7;' : ''}">
-              ${l.isSold ? 'SOLD' : '🎯 Snipe'}
+            <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe" style="${l.isSold ? 'background: #6b7280; opacity: 0.7;' : (l.isUnlisted ? 'background: #9ca3af; opacity: 0.7;' : '')}">
+              ${l.isSold ? 'SOLD' : (l.isUnlisted ? 'UNLISTED' : '🎯 Snipe')}
             </a>
           </div>
         `;
       }).join('');
 
       // Table view - all listings with deal highlighting (Desktop)
-      tableBody.innerHTML = filtered.map(l => {
+      tableBody.innerHTML = pageListings.map(l => {
         const isDeal = l.dealPercent > 0;
         const isHotDeal = l.dealPercent >= 15;
         const isGoodDeal = l.dealPercent >= 5;
@@ -1579,10 +1848,17 @@
         let btnBg = '#3b82f6';
         let btnText = 'View';
         if (l.isSold) { btnBg = '#6b7280'; btnText = 'SOLD'; }
+        else if (l.isUnlisted) { btnBg = '#9ca3af'; btnText = 'UNLISTED'; }
         else if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
         else if (isDeal) { btnBg = '#4ade80'; btnText = '⚡ BUY'; }
         
-        const soldClass = l.isSold ? 'listing-sold' : '';
+        const soldClass = l.isSold ? 'listing-sold' : (l.isUnlisted ? 'listing-unlisted' : '');
+        
+        // Get owned count
+        const ownedCount = getOwnedCount(l.editionId);
+        const ownedDisplay = ownedCount 
+          ? `<span class="duplicate-count" title="You own ${ownedCount} of this moment" style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);">${ownedCount}</span>`
+          : '<span style="color: #6b7280;">—</span>';
         
         return `
           <tr class="${soldClass}" style="${rowBg}">
@@ -1590,6 +1866,7 @@
               <strong>${l.playerName || 'Unknown'}</strong>
               <div style="font-size: 0.75rem; color: #6b7280;">${l.teamName || ''}</div>
             </td>
+            <td style="text-align: center;">${ownedDisplay}</td>
             <td><span class="tier-badge ${getTierClass(l.tier)}" style="font-size: 0.7rem;">${l.tier || '?'}</span></td>
             <td style="font-family: 'JetBrains Mono', monospace; ${isSpecialSerial ? 'color: #fbbf24; font-weight: 600;' : 'color: #9ca3af;'}">#${l.serialNumber || '?'}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#9ca3af'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
@@ -1599,11 +1876,11 @@
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
             <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
-            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerName || l.buyerAddr || '-') : '-'}</td>
+            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerName || l.buyerAddr || '-') : (l.isUnlisted ? '—' : '-')}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
               <a href="${l.listingUrl || '#'}" target="_blank" 
-                 style="background: ${btnBg}; color: ${l.isSold ? '#fff' : (isDeal ? '#000' : '#fff')}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; display: inline-block;">
+                 style="background: ${btnBg}; color: ${(l.isSold || l.isUnlisted) ? '#fff' : (isDeal ? '#000' : '#fff')}; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; display: inline-block;">
                 ${btnText}
               </a>
             </td>
@@ -1612,7 +1889,7 @@
       }).join('');
 
       // Mobile card view
-      mobileListings.innerHTML = filtered.map(l => {
+      mobileListings.innerHTML = pageListings.map(l => {
         const isDeal = l.dealPercent > 0;
         const isHotDeal = l.dealPercent >= 15;
         // Gold serial only if #1 or matches jersey number
@@ -1634,15 +1911,22 @@
         // Card class
         let cardClass = 'mobile-card';
         if (l.isSold) cardClass += ' listing-sold';
+        else if (l.isUnlisted) cardClass += ' listing-unlisted';
         else if (isHotDeal) cardClass += ' is-hot-deal';
         else if (isDeal) cardClass += ' is-deal';
+        
+        // Get owned count
+        const ownedCount = getOwnedCount(l.editionId);
+        const ownedBadge = ownedCount 
+          ? `<span style="display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);" title="You own ${ownedCount} of this moment">x${ownedCount}</span>`
+          : '';
         
         return `
           <a href="${l.listingUrl || '#'}" target="_blank" class="${cardClass}">
             <div class="mobile-card-icon ${tierClass}">🏈</div>
             <div class="mobile-card-main">
               <div class="mobile-card-header">
-                <span class="mobile-card-player">${l.playerName || 'Unknown'}</span>
+                <span class="mobile-card-player">${l.playerName || 'Unknown'}${ownedBadge}</span>
                 <span class="mobile-card-team">${teamAbbrev}</span>
                 <span class="mobile-card-tier ${tierClass}">${l.tier || '?'}</span>
               </div>
@@ -1657,6 +1941,9 @@
                 <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700;">${formatPrice(l.listingPrice)}</div>
                 <div style="color: #ef4444; font-size: 0.75rem; font-weight: 600;">SOLD</div>
                 ${l.buyerName || l.buyerAddr ? `<div style="font-size: 0.7rem; color: #9ca3af; margin-top: 4px;">Buyer: ${l.buyerName || l.buyerAddr}</div>` : ''}
+              ` : l.isUnlisted ? `
+                <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700;">${formatPrice(l.listingPrice)}</div>
+                <div style="color: #9ca3af; font-size: 0.75rem; font-weight: 600;">UNLISTED</div>
               ` : `
                 <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
                 ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
@@ -1666,6 +1953,23 @@
           </a>
         `;
       }).join('');
+      
+      // Update pagination controls
+      const pagerInfo = document.getElementById('sniper-page-info');
+      const pagerPrev = document.getElementById('sniper-page-prev');
+      const pagerNext = document.getElementById('sniper-page-next');
+      
+      if (pagerInfo) {
+        const from = total ? start + 1 : 0;
+        const to = end;
+        pagerInfo.textContent = `Page ${currentPage} of ${totalPages} • showing ${from}-${to} of ${total}`;
+      }
+      if (pagerPrev) {
+        pagerPrev.disabled = currentPage <= 1;
+      }
+      if (pagerNext) {
+        pagerNext.disabled = currentPage >= totalPages;
+      }
     }
 
     // Auto-refresh every 3 seconds for live sniping
@@ -1703,13 +2007,41 @@
       }
     });
 
-    // Filter change listeners
-    [filterDealsOnly, filterMinDiscount, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, sortBy].forEach(el => {
-      el.addEventListener('change', renderListings);
+    // Filter change listeners - reset to page 1 when filters change
+    [filterDealsOnly, filterMinDiscount, filterOwned, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, sortBy].forEach(el => {
+      el.addEventListener('change', () => {
+        currentPage = 1; // Reset to first page when filters change
+        renderListings();
+      });
       if (el.tagName === 'INPUT') {
-        el.addEventListener('input', renderListings);
+        el.addEventListener('input', () => {
+          currentPage = 1; // Reset to first page when filters change
+          renderListings();
+        });
       }
     });
+    
+    // Pagination button listeners
+    const pagerPrev = document.getElementById('sniper-page-prev');
+    const pagerNext = document.getElementById('sniper-page-next');
+    if (pagerPrev) {
+      pagerPrev.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderListings();
+        }
+      });
+    }
+    if (pagerNext) {
+      pagerNext.addEventListener('click', () => {
+        const total = getFilteredListings().length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderListings();
+        }
+      });
+    }
 
     // Table sorting
     document.querySelectorAll('.listings-table th[data-sort]').forEach(th => {
@@ -1731,6 +2063,7 @@
 
         if (sortMap[key]) {
           sortBy.value = sortMap[key];
+          currentPage = 1; // Reset to first page when sorting changes
           renderListings();
         }
       });
@@ -1747,8 +2080,9 @@
       });
     }
 
-    // Initialize
+    // Initialize - fetch listings immediately, owned counts in parallel
     fetchListings();
+    fetchOwnedCounts(); // Run in parallel, doesn't need to wait
     startAutoRefresh();
   </script>
 </body>

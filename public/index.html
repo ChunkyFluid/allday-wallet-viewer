@@ -225,6 +225,24 @@
         color: white;
       }
 
+      .duplicate-count {
+        display: inline-block;
+        margin-left: 0.35rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: rgba(111, 66, 193, 0.25);
+        color: var(--accent-cyan);
+        border: 1px solid rgba(13, 202, 240, 0.3);
+        vertical-align: middle;
+      }
+      
+      /* When used in the Owned column, no margin needed */
+      td .duplicate-count {
+        margin-left: 0;
+      }
+
       .content {
         display: grid;
         grid-template-columns: minmax(110px, 260px) minmax(0, 1fr);
@@ -909,6 +927,7 @@
               <thead>
                 <tr>
                   <th class="sortable" data-sort-key="playerName">Player</th>
+                  <th class="sortable" data-sort-key="owned_count">Owned</th>
                   <th class="sortable" data-sort-key="team_name">Team</th>
                   <th class="sortable" data-sort-key="position">Pos</th>
                   <th class="sortable" data-sort-key="tier">Tier</th>

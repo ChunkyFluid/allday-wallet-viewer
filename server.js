@@ -3521,16 +3521,55 @@ function updateFloorCache(editionId, newFloor) {
 const sniperListings = []; // Array of ALL listings
 const seenListingNfts = new Set(); // Track seen nftIds to prevent duplicates
 const soldNfts = new Set(); // Track sold NFTs
+const unlistedNfts = new Set(); // Track unlisted/removed NFTs
 const MAX_SNIPER_LISTINGS = 500;
+
+// Ensure sniper_listings table exists for persistence
+async function ensureSniperListingsTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sniper_listings (
+        nft_id TEXT PRIMARY KEY,
+        listing_data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_sniper_listings_updated ON sniper_listings (updated_at DESC);
+    `);
+  } catch (err) {
+    console.error("[Sniper] Error ensuring sniper_listings table:", err.message);
+  }
+}
+
+async function persistSniperListing(listing) {
+  try {
+    await pool.query(
+      `INSERT INTO sniper_listings (nft_id, listing_data, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (nft_id) 
+       DO UPDATE SET listing_data = $2, updated_at = NOW()`,
+      [listing.nftId, JSON.stringify(listing)]
+    );
+  } catch (err) {
+    // Don't log errors for persistence - it's not critical
+    // console.error("[Sniper] Error persisting listing:", err.message);
+  }
+}
 
 function addSniperListing(listing) {
   // Dedupe by nftId - same NFT can't be listed twice
   if (seenListingNfts.has(listing.nftId)) return;
   seenListingNfts.add(listing.nftId);
   
-  // Mark as sold if already in sold set
+  // Mark status based on what we know
   if (soldNfts.has(listing.nftId)) {
     listing.isSold = true;
+    listing.isUnlisted = false;
+  } else if (unlistedNfts.has(listing.nftId)) {
+    listing.isSold = false;
+    listing.isUnlisted = true;
+  } else {
+    listing.isSold = false;
+    listing.isUnlisted = false;
   }
   
   // Add to front of array
@@ -3542,15 +3581,17 @@ function addSniperListing(listing) {
     if (removed) seenListingNfts.delete(removed.nftId);
   }
   
+  // Persist to database (async, don't wait)
+  persistSniperListing(listing).catch(() => {}); // Ignore errors
+  
   // Log deals (below floor)
-  if (listing.dealPercent > 0 && !listing.isSold) {
+  if (listing.dealPercent > 0 && !listing.isSold && !listing.isUnlisted) {
     console.log(`[SNIPER] 🎯 DEAL: ${listing.playerName} #${listing.serialNumber || '?'} - $${listing.listingPrice} (floor $${listing.floor}) - ${listing.dealPercent.toFixed(1)}% off!`);
   }
 }
 
-async function markListingAsSold(nftId, buyerAddr = null) {
-  soldNfts.add(nftId);
-  
+// Mark listing as sold by listingResourceID (more accurate than nftId)
+async function markListingAsSoldByResourceID(listingResourceID, buyerAddr = null) {
   // Get buyer name if we have buyer address
   let buyerName = buyerAddr;
   if (buyerAddr) {
@@ -3565,22 +3606,78 @@ async function markListingAsSold(nftId, buyerAddr = null) {
     }
   }
   
-  // Mark existing listings as sold
+  // Find and mark the specific listing by listingResourceID
+  let found = false;
   for (const listing of sniperListings) {
-    if (listing.nftId === nftId) {
+    if (listing.listingResourceID === listingResourceID) {
       listing.isSold = true;
+      listing.isUnlisted = false;
       if (buyerAddr) {
         listing.buyerAddr = buyerAddr;
         listing.buyerName = buyerName;
       }
+      // Also add to soldNfts set for this nftId (for backwards compatibility)
+      if (listing.nftId) {
+        soldNfts.add(listing.nftId);
+        unlistedNfts.delete(listing.nftId);
+      }
+      // Persist the updated listing
+      persistSniperListing(listing).catch(() => {});
+      found = true;
     }
+  }
+  
+  if (!found) {
+    console.log(`[Sniper] Warning: Could not find listing with resourceID ${listingResourceID} to mark as sold`);
+  }
+}
+
+// Legacy function for backwards compatibility (deprecated - use markListingAsSoldByResourceID)
+async function markListingAsSold(nftId, buyerAddr = null) {
+  // This is less accurate - try to find the most recent listing for this NFT
+  const listing = sniperListings.find(l => l.nftId === nftId && !l.isSold && !l.isUnlisted);
+  if (listing && listing.listingResourceID) {
+    await markListingAsSoldByResourceID(listing.listingResourceID, buyerAddr);
+  }
+}
+
+// Mark listing as unlisted by listingResourceID (more accurate than nftId)
+async function markListingAsUnlistedByResourceID(listingResourceID) {
+  // Find and mark the specific listing by listingResourceID
+  let found = false;
+  for (const listing of sniperListings) {
+    if (listing.listingResourceID === listingResourceID) {
+      listing.isSold = false;
+      listing.isUnlisted = true;
+      // Also add to unlistedNfts set for this nftId (for backwards compatibility)
+      if (listing.nftId) {
+        unlistedNfts.add(listing.nftId);
+        soldNfts.delete(listing.nftId);
+      }
+      // Persist the updated listing
+      persistSniperListing(listing).catch(() => {});
+      found = true;
+    }
+  }
+  
+  if (!found) {
+    console.log(`[Sniper] Warning: Could not find listing with resourceID ${listingResourceID} to mark as unlisted`);
+  }
+}
+
+// Legacy function for backwards compatibility (deprecated - use markListingAsUnlistedByResourceID)
+async function markListingAsUnlisted(nftId) {
+  // This is less accurate - try to find the most recent listing for this NFT
+  const listing = sniperListings.find(l => l.nftId === nftId && !l.isSold && !l.isUnlisted);
+  if (listing && listing.listingResourceID) {
+    await markListingAsUnlistedByResourceID(listing.listingResourceID);
   }
 }
 
 // Process a new listing event from the Light Node
 async function processListingEvent(event) {
   try {
-    const { nftId, listingPrice, sellerAddr, timestamp, editionId: eventEditionId } = event;
+    const { nftId, listingResourceID, listingPrice, sellerAddr, timestamp, editionId: eventEditionId } = event;
     
     if (!nftId || !listingPrice) return;
     
@@ -3683,6 +3780,7 @@ async function processListingEvent(event) {
     
     const listing = {
       nftId,
+      listingResourceID, // Store the listing resource ID for matching
       editionId,
       serialNumber: momentData?.serial_number,
       listingPrice,
@@ -3702,7 +3800,7 @@ async function processListingEvent(event) {
       buyerAddr,
       buyerName,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
-      isSold: soldNfts.has(nftId),
+      isSold: false, // Don't check soldNfts here - we'll match by listingResourceID
       listedAt: timestamp || new Date().toISOString(),
       listingUrl: `https://nflallday.com/listing/moment/${editionId}`
     };
@@ -3749,7 +3847,7 @@ async function watchForListings() {
       
       if (latestHeight <= lastCheckedBlock) return;
       
-      // Query for ListingAvailable and ListingCompleted events in new blocks
+      // Query for ListingAvailable, ListingCompleted, and ListingRemoved events in new blocks
       const startHeight = lastCheckedBlock + 1;
       const endHeight = Math.min(latestHeight, startHeight + 50); // Max 50 blocks at a time
       
@@ -3761,9 +3859,14 @@ async function watchForListings() {
       const completedUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`;
       const completedRes = await fetch(completedUrl);
       
+      // Check for removed listings (unlisted/cancelled)
+      const removedUrl = `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingRemoved&start_height=${startHeight}&end_height=${endHeight}`;
+      const removedRes = await fetch(removedUrl);
+      
       let newListingCount = 0;
       let alldayCount = 0;
       let soldCount = 0;
+      let unlistedCount = 0;
       
       // Process new listings
       if (listingRes.ok) {
@@ -3858,8 +3961,9 @@ async function watchForListings() {
               if (!typeId.includes('AllDay')) continue;
               
               const nftId = getField('nftID')?.toString();
+              const listingResourceID = getField('listingResourceID')?.toString();
               
-              if (!nftId) continue;
+              if (!nftId || !listingResourceID) continue;
               
               // Extract buyer address from the event
               // Try multiple possible field names
@@ -3947,10 +4051,10 @@ async function watchForListings() {
                     LIMIT 1
                   `;
                   
-                  const snowflakeResult = await snowflake.execute({ sqlText: snowflakeQuery });
-                  const rows = await snowflakeResult.fetchAll();
-                  if (rows.length > 0) {
-                    const txId = rows[0].TX_ID;
+                  const rows = await executeSql(snowflakeQuery);
+                  if (rows && rows.length > 0) {
+                    const row = rows[0];
+                    const txId = row.TX_ID || row.tx_id;
                     if (txId) {
                       // Fetch transaction from Flow REST API to get authorizer
                       try {
@@ -3964,8 +4068,9 @@ async function watchForListings() {
                         }
                       } catch (e) {
                         // Fallback to payer address if transaction fetch fails
-                        if (rows[0].TX_PAYER_ADDRESS) {
-                          buyerAddr = rows[0].TX_PAYER_ADDRESS.toLowerCase();
+                        const payerAddr = row.TX_PAYER_ADDRESS || row.tx_payer_address;
+                        if (payerAddr) {
+                          buyerAddr = payerAddr.toLowerCase();
                           console.log(`[Sniper] Using payer address ${buyerAddr} as buyer for ${nftId}`);
                         }
                       }
@@ -3976,14 +4081,64 @@ async function watchForListings() {
                 }
               }
               
-              // Mark this NFT as sold with buyer info
-              await markListingAsSold(nftId, buyerAddr);
+              // Mark this specific listing as sold by listingResourceID (not just nftId)
+              await markListingAsSoldByResourceID(listingResourceID, buyerAddr);
               if (buyerAddr) {
-                console.log(`[Sniper] Marked ${nftId} as sold to ${buyerAddr}`);
+                console.log(`[Sniper] Marked listing ${listingResourceID} (NFT ${nftId}) as sold to ${buyerAddr}`);
               } else {
-                console.log(`[Sniper] Marked ${nftId} as sold but could not determine buyer`);
+                console.log(`[Sniper] Marked listing ${listingResourceID} (NFT ${nftId}) as sold but could not determine buyer`);
               }
               soldCount++;
+              
+            } catch (e) {
+              // Skip malformed events
+            }
+          }
+        }
+      }
+      
+      // Process removed listings (unlisted/cancelled)
+      if (removedRes.ok) {
+        const eventData = await removedRes.json();
+        
+        for (const block of eventData) {
+          if (!block.events) continue;
+          
+          for (const event of block.events) {
+            try {
+              // Decode the payload
+              let payload = event.payload;
+              if (typeof payload === 'string') {
+                payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+              }
+              
+              if (!payload?.value?.fields) continue;
+              
+              const fields = payload.value.fields;
+              const getField = (name) => {
+                const f = fields.find(x => x.name === name);
+                if (!f) return null;
+                if (f.value?.value?.value) return f.value.value.value;
+                if (f.value?.value) return f.value.value;
+                return f.value;
+              };
+              
+              // Check if this is an AllDay NFT
+              const nftType = fields.find(f => f.name === 'nftType');
+              const typeId = nftType?.value?.staticType?.typeID || 
+                            nftType?.value?.value?.staticType?.typeID || '';
+              
+              if (!typeId.includes('AllDay')) continue;
+              
+              const nftId = getField('nftID')?.toString();
+              const listingResourceID = getField('listingResourceID')?.toString();
+              
+              if (!nftId || !listingResourceID) continue;
+              
+              // Mark this specific listing as unlisted by listingResourceID
+              await markListingAsUnlistedByResourceID(listingResourceID);
+              unlistedCount++;
+              console.log(`[Sniper] Marked listing ${listingResourceID} (NFT ${nftId}) as unlisted`);
               
             } catch (e) {
               // Skip malformed events
@@ -3997,8 +4152,8 @@ async function watchForListings() {
         return;
       }
       
-      if (alldayCount > 0 || soldCount > 0) {
-        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold`);
+      if (alldayCount > 0 || soldCount > 0 || unlistedCount > 0) {
+        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold, ${unlistedCount} unlisted (total in memory: ${sniperListings.length})`);
       }
       
       lastCheckedBlock = endHeight;
@@ -4013,18 +4168,322 @@ async function watchForListings() {
   checkForNewListings(); // Run immediately
 }
 
+// Pre-populate sniper listings from Snowflake on startup
+async function preloadSniperListings() {
+  try {
+    console.log("[Sniper] Pre-loading recent listings from Snowflake...");
+    await ensureSnowflakeConnected();
+    
+    const hoursAgo = 12; // Load last 12 hours
+    const limitNum = 200;
+    const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
+    const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
+    
+    const eventsSql = `
+      WITH listings AS (
+        SELECT
+          EVENT_DATA:nftID::STRING AS nft_id,
+          EVENT_DATA:listingResourceID::STRING AS listing_id,
+          TRY_TO_DOUBLE(EVENT_DATA:price::STRING) AS listing_price,
+          LOWER(EVENT_DATA:storefrontAddress::STRING) AS seller_addr,
+          BLOCK_TIMESTAMP AS block_timestamp,
+          BLOCK_HEIGHT AS block_height,
+          TX_ID AS tx_id
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+        WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND EVENT_TYPE = 'ListingAvailable'
+          AND EVENT_DATA:nftType:typeID::STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
+          AND TX_SUCCEEDED = TRUE
+          AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+        ORDER BY BLOCK_TIMESTAMP DESC
+        LIMIT ${limitNum}
+      ),
+      completed AS (
+        SELECT DISTINCT
+          c.EVENT_DATA:listingResourceID::STRING AS listing_id,
+          c.BLOCK_TIMESTAMP AS completed_timestamp
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS c
+        WHERE c.EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND c.EVENT_TYPE = 'ListingCompleted'
+          AND c.TX_SUCCEEDED = TRUE
+      ),
+      removed AS (
+        SELECT DISTINCT
+          r.EVENT_DATA:listingResourceID::STRING AS listing_id,
+          r.BLOCK_TIMESTAMP AS removed_timestamp
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS r
+        WHERE r.EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND r.EVENT_TYPE = 'ListingRemoved'
+          AND r.TX_SUCCEEDED = TRUE
+      )
+      SELECT 
+        l.nft_id,
+        l.listing_id,
+        l.listing_price,
+        l.seller_addr,
+        l.block_timestamp,
+        l.block_height,
+        l.tx_id,
+        CASE WHEN c.listing_id IS NOT NULL AND c.completed_timestamp >= l.block_timestamp THEN TRUE ELSE FALSE END AS is_sold,
+        CASE WHEN r.listing_id IS NOT NULL AND r.removed_timestamp >= l.block_timestamp THEN TRUE ELSE FALSE END AS is_unlisted
+      FROM listings l
+      LEFT JOIN completed c ON l.listing_id = c.listing_id AND c.completed_timestamp >= l.block_timestamp
+      LEFT JOIN removed r ON l.listing_id = r.listing_id AND r.removed_timestamp >= l.block_timestamp
+      ORDER BY l.block_timestamp DESC
+    `;
+    
+    console.log(`[Sniper] Executing SQL query for listings from last 12 hours (cutoff: ${cutoffStr})...`);
+    const salesResult = await executeSql(eventsSql);
+    console.log(`[Sniper] SQL query returned ${salesResult?.length || 0} rows from Snowflake`);
+    
+    if (!salesResult || salesResult.length === 0) {
+      console.log("[Sniper] No listings found in Snowflake for last 12 hours, will populate as new listings come in");
+      return;
+    }
+    
+    console.log(`[Sniper] Processing ${salesResult.length} listings from Snowflake...`);
+    
+    // Get NFT IDs for metadata lookup
+    const nftIds = salesResult.map(r => r.NFT_ID || r.nft_id).filter(Boolean);
+    console.log(`[Sniper] Found ${nftIds.length} unique NFT IDs to look up metadata for`);
+    
+    // Get moment metadata
+    let momentData = {};
+    let editionIds = new Set();
+    
+    if (nftIds.length > 0) {
+      try {
+        const metaResult = await pgQuery(
+          `SELECT nft_id, edition_id, serial_number, first_name, last_name, 
+                  team_name, position, tier, set_name, series_name
+           FROM nft_core_metadata 
+           WHERE nft_id = ANY($1::text[])`,
+          [nftIds]
+        );
+        for (const row of metaResult.rows) {
+          momentData[row.nft_id] = row;
+          if (row.edition_id) editionIds.add(row.edition_id);
+        }
+        console.log(`[Sniper] Loaded metadata for ${Object.keys(momentData).length} moments, ${editionIds.size} unique editions`);
+      } catch (err) {
+        console.error("[Sniper] Error fetching metadata for preload:", err.message);
+      }
+    }
+    
+    // Get floor prices from cache (don't scrape on startup - too slow)
+    const floorPrices = {};
+    for (const editionId of editionIds) {
+      const cached = floorPriceCache.get(editionId);
+      if (cached && cached.floor) {
+        floorPrices[editionId] = { floor: cached.floor };
+      }
+    }
+    
+    // Build listing objects and add to in-memory array
+    let addedCount = 0;
+    let skippedNoEdition = 0;
+    let skippedNoPrice = 0;
+    
+    for (const row of salesResult) {
+      const nftId = row.NFT_ID || row.nft_id;
+      const moment = momentData[nftId] || {};
+      const editionId = moment.edition_id;
+      if (!editionId) {
+        skippedNoEdition++;
+        continue;
+      }
+      
+      const listingPrice = row.LISTING_PRICE || row.listing_price;
+      if (!listingPrice) {
+        skippedNoPrice++;
+        continue; // Need at least a listing price
+      }
+      
+      const prices = floorPrices[editionId] || {};
+      const currentFloor = prices.floor || null; // Allow null floor - will be populated later
+      
+      let dealPercent = null;
+      if (currentFloor && currentFloor > 0 && listingPrice) {
+        dealPercent = Math.round(((currentFloor - listingPrice) / currentFloor) * 1000) / 10;
+      }
+      
+      const timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
+      let listedAt = timestamp;
+      if (listedAt && typeof listedAt === 'string' && !listedAt.endsWith('Z')) {
+        listedAt = listedAt.replace(' ', 'T') + 'Z';
+      }
+      
+      const listing = {
+        nftId,
+        editionId,
+        serialNumber: moment.serial_number,
+        listingPrice,
+        floor: currentFloor,
+        dealPercent,
+        playerName: moment.first_name && moment.last_name 
+          ? `${moment.first_name} ${moment.last_name}` 
+          : null,
+        teamName: moment.team_name,
+        tier: moment.tier,
+        setName: moment.set_name,
+        seriesName: moment.series_name,
+        position: moment.position,
+        sellerName: row.SELLER_ADDR || row.seller_addr,
+        sellerAddr: (row.SELLER_ADDR || row.seller_addr)?.toLowerCase(),
+        listedAt: listedAt || new Date().toISOString(),
+        listingUrl: `https://nflallday.com/listing/moment/${editionId}`,
+        isSold: row.IS_SOLD || false,
+        isUnlisted: row.IS_UNLISTED || false
+      };
+      
+      addSniperListing(listing);
+      addedCount++;
+    }
+    
+    console.log(`[Sniper] Pre-populated ${sniperListings.length} listings in memory (added: ${addedCount}, skipped - no edition: ${skippedNoEdition}, skipped - no price: ${skippedNoPrice})`);
+    
+    // Mark sold/unlisted NFTs in the tracking sets
+    for (const listing of sniperListings) {
+      if (listing.isSold) {
+        soldNfts.add(listing.nftId);
+      } else if (listing.isUnlisted) {
+        unlistedNfts.add(listing.nftId);
+      }
+    }
+    console.log(`[Sniper] Marked ${soldNfts.size} sold and ${unlistedNfts.size} unlisted NFTs`);
+    
+  } catch (err) {
+    console.error("[Sniper] Error pre-loading listings:", err.message);
+    console.error("[Sniper] Stack:", err.stack);
+    // Don't throw - continue with empty array, watcher will populate it
+  }
+}
+
 // Start watching after server is ready
-setTimeout(() => {
-  watchForListings();
-}, 5000);
+// We'll initialize this in the app.listen callback to ensure server is fully ready
+let sniperInitialized = false;
+
+async function loadRecentListingsFromDB() {
+  try {
+    await ensureSniperListingsTable();
+    
+    // Load last 200 listings from database (fast - just a DB query)
+    const result = await pool.query(
+      `SELECT listing_data FROM sniper_listings 
+       ORDER BY updated_at DESC 
+       LIMIT 200`
+    );
+    
+    if (result.rows.length === 0) {
+      console.log("[Sniper] No listings found in database, will populate from watcher");
+      return;
+    }
+    
+    console.log(`[Sniper] Loading ${result.rows.length} recent listings from database...`);
+    
+    let loaded = 0;
+    let updated = 0;
+    for (const row of result.rows) {
+      try {
+        const listing = JSON.parse(row.listing_data);
+        if (listing.nftId) {
+          if (!seenListingNfts.has(listing.nftId)) {
+            // New listing - add it
+            seenListingNfts.add(listing.nftId);
+            sniperListings.push(listing);
+            
+            // Mark sold/unlisted in tracking sets
+            if (listing.isSold) soldNfts.add(listing.nftId);
+            if (listing.isUnlisted) unlistedNfts.add(listing.nftId);
+            
+            loaded++;
+          } else {
+            // Existing listing - update it with latest status (especially sold/unlisted and buyer)
+            const existingIndex = sniperListings.findIndex(l => l.nftId === listing.nftId);
+            if (existingIndex >= 0) {
+              // Merge: keep existing data but update with latest status
+              const existing = sniperListings[existingIndex];
+              sniperListings[existingIndex] = {
+                ...existing,
+                isSold: listing.isSold || existing.isSold,
+                isUnlisted: listing.isUnlisted || existing.isUnlisted,
+                buyerAddr: listing.buyerAddr || existing.buyerAddr,
+                buyerName: listing.buyerName || existing.buyerName
+              };
+              if (listing.isSold) soldNfts.add(listing.nftId);
+              if (listing.isUnlisted) unlistedNfts.add(listing.nftId);
+              updated++;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[Sniper] Error parsing listing from DB:", e.message);
+      }
+    }
+    
+    // Sort by listedAt (most recent first)
+    sniperListings.sort((a, b) => {
+      const aTime = new Date(a.listedAt || 0).getTime();
+      const bTime = new Date(b.listedAt || 0).getTime();
+      return bTime - aTime;
+    });
+    
+    console.log(`[Sniper] Loaded ${loaded} new listings, updated ${updated} existing listings from database (total: ${sniperListings.length})`);
+  } catch (err) {
+    console.error("[Sniper] Error loading from database:", err.message);
+    // Continue anyway - watcher will populate
+  }
+}
+
+async function initializeSniper() {
+  if (sniperInitialized) return;
+  sniperInitialized = true;
+  
+  console.log("[Sniper] Starting sniper initialization...");
+  try {
+    // Quickly load recent listings from database (fast!)
+    console.log("[Sniper] Loading listings from database...");
+    await loadRecentListingsFromDB();
+    console.log(`[Sniper] After DB load: ${sniperListings.length} listings in memory`);
+    
+    // Start watching immediately - it will find new listings and update the array
+    watchForListings();
+    console.log("[Sniper] Watcher started - listings will populate as they're found");
+  } catch (err) {
+    console.error("[Sniper] Error starting sniper:", err.message);
+    console.error("[Sniper] Stack:", err.stack);
+    // Still try to start the watcher
+    watchForListings();
+  }
+}
 
 // API endpoint to get sniper listings with filtering
 app.get("/api/sniper-deals", async (req, res) => {
   try {
+    console.log(`[Sniper Deals API] Request received. Current listings in memory: ${sniperListings.length}`);
+    
     // Get filter params
     const { team, player, tier, minDiscount, maxPrice, maxSerial, dealsOnly } = req.query;
     
     let filtered = [...sniperListings];
+    console.log(`[Sniper Deals API] After copying array: ${filtered.length} listings`);
+    
+    // If no listings, return quickly without expensive operations
+    if (filtered.length === 0) {
+      return res.json({
+        ok: true,
+        listings: [],
+        total: 0,
+        filtered: 0,
+        dealsCount: 0,
+        watching: isWatchingListings,
+        lastCheckedBlock,
+        floorCacheSize: floorPriceCache.size,
+        availableTeams: [],
+        availableTiers: [],
+        timestamp: new Date().toISOString()
+      });
+    }
     
     // Apply filters
     if (team) {
@@ -4175,6 +4634,8 @@ app.get("/api/sniper-deals", async (req, res) => {
     
     // Count deals
     const dealsCount = enrichedListings.filter(l => l.dealPercent > 0).length;
+    
+    console.log(`[Sniper Deals API] Returning ${enrichedListings.length} enriched listings (total in memory: ${sniperListings.length}, watching: ${isWatchingListings})`);
     
     return res.json({
       ok: true,
@@ -4334,10 +4795,21 @@ app.get("/api/sniper-listings", async (req, res) => {
     const limitNum = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const hoursAgo = parseInt(req.query.hours, 10) || 1; // Last 1 hour of listings by default
     
-    await ensureSnowflakeConnected();
+    console.log(`[Sniper Listings API] Requested: ${hoursAgo} hours, limit: ${limitNum}`);
+    
+    try {
+      await ensureSnowflakeConnected();
+    } catch (err) {
+      console.error("[Sniper Listings API] Snowflake connection error:", err);
+      return res.status(500).json({
+        ok: false,
+        error: "Failed to connect to Snowflake: " + (err.message || String(err))
+      });
+    }
     
     const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
     const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
+    console.log(`[Sniper Listings API] Cutoff time: ${cutoffStr}`);
     
     // Query ListingAvailable events for NFL All Day NFTs
     // Filter for nftType containing AllDay contract
@@ -4361,12 +4833,21 @@ app.get("/api/sniper-listings", async (req, res) => {
       ),
       completed AS (
         SELECT DISTINCT
-          EVENT_DATA:listingResourceID::STRING AS listing_id
-        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
-        WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
-          AND EVENT_TYPE = 'ListingCompleted'
-          AND TX_SUCCEEDED = TRUE
-          AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+          c.EVENT_DATA:listingResourceID::STRING AS listing_id,
+          c.BLOCK_TIMESTAMP AS completed_timestamp
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS c
+        WHERE c.EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND c.EVENT_TYPE = 'ListingCompleted'
+          AND c.TX_SUCCEEDED = TRUE
+      ),
+      removed AS (
+        SELECT DISTINCT
+          r.EVENT_DATA:listingResourceID::STRING AS listing_id,
+          r.BLOCK_TIMESTAMP AS removed_timestamp
+        FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS r
+        WHERE r.EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+          AND r.EVENT_TYPE = 'ListingRemoved'
+          AND r.TX_SUCCEEDED = TRUE
       )
       SELECT 
         l.nft_id,
@@ -4376,24 +4857,65 @@ app.get("/api/sniper-listings", async (req, res) => {
         l.block_timestamp,
         l.block_height,
         l.tx_id,
-        CASE WHEN c.listing_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_sold
+        CASE WHEN c.listing_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_sold,
+        CASE WHEN r.listing_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_unlisted
       FROM listings l
-      LEFT JOIN completed c ON l.listing_id = c.listing_id
-      WHERE c.listing_id IS NULL  -- Only show unsold listings
+      LEFT JOIN completed c ON l.listing_id = c.listing_id AND c.completed_timestamp >= l.block_timestamp
+      LEFT JOIN removed r ON l.listing_id = r.listing_id AND r.removed_timestamp >= l.block_timestamp
+      WHERE c.listing_id IS NULL AND r.listing_id IS NULL  -- Only show active listings (not sold or unlisted)
       ORDER BY l.block_timestamp DESC
       LIMIT ${limitNum}
     `;
     
-    console.log(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
+    console.log(`[Sniper Listings API] Querying active listings from last ${hoursAgo} hours (cutoff: ${cutoffStr})...`);
     
-    const salesResult = await executeSql(eventsSql);
-    console.log(`[Sniper] Found ${salesResult?.length || 0} active listings`);
+    // First, get a count of total listings (before filtering) for debugging
+    const countSql = `
+      SELECT COUNT(*) as total_count
+      FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+      WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
+        AND EVENT_TYPE = 'ListingAvailable'
+        AND EVENT_DATA:nftType:typeID::STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
+        AND TX_SUCCEEDED = TRUE
+        AND BLOCK_TIMESTAMP >= '${cutoffStr}'
+    `;
+    
+    let totalCount = 0;
+    try {
+      const countResult = await executeSql(countSql);
+      totalCount = countResult[0]?.TOTAL_COUNT || 0;
+      console.log(`[Sniper Listings API] Total listings created in last ${hoursAgo} hours: ${totalCount}`);
+    } catch (err) {
+      console.warn("[Sniper Listings API] Could not get total count:", err.message);
+    }
+    
+    let salesResult;
+    try {
+      salesResult = await executeSql(eventsSql);
+      console.log(`[Sniper Listings API] Found ${salesResult?.length || 0} active listings (out of ${totalCount} total)`);
+    } catch (err) {
+      console.error("[Sniper Listings API] SQL execution error:", err);
+      console.error("[Sniper Listings API] Error details:", {
+        code: err.code,
+        sqlState: err.sqlState,
+        message: err.message
+      });
+      return res.status(500).json({
+        ok: false,
+        error: "Failed to query listings: " + (err.message || String(err)),
+        details: err.code || err.sqlState || ""
+      });
+    }
     
     if (!salesResult || salesResult.length === 0) {
+      console.log(`[Sniper Listings API] No active listings found in last ${hoursAgo} hours (${totalCount} total were created, but all are sold/unlisted)`);
       return res.json({
         ok: true,
         listings: [],
-        message: "No active listings found"
+        message: `No active listings found in last ${hoursAgo} hours`,
+        totalCreated: totalCount,
+        hoursQueried: hoursAgo,
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -4540,6 +5062,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         serialNumber,
         listingPrice: snowflakeListingPrice, // What this was listed for (from Snowflake)
         currentFloor,                         // Current floor price (scraped)
+        avgSale: prices.avgSale || null,      // Average sale price if available
         dealPercent,                          // % below floor (positive = deal!)
         
         playerName: moment.first_name && moment.last_name 
@@ -4555,6 +5078,8 @@ app.get("/api/sniper-listings", async (req, res) => {
         sellerAddr,
         isLowSerial,
         listedAt: timestamp,
+        isSold: row.IS_SOLD || false,
+        isUnlisted: row.IS_UNLISTED || false,
         
         // Direct link to buy
         listingUrl: `https://nflallday.com/listing/moment/${editionId}`
@@ -4812,7 +5337,7 @@ async function setupInsightsRefresh() {
       }
     } else {
       const age = await pool.query(`SELECT EXTRACT(EPOCH FROM (now() - updated_at)) / 3600 AS hours_old FROM insights_snapshot WHERE id = 1;`);
-      const hoursOld = age.rows[0]?.hours_old || 0;
+      const hoursOld = Number(age.rows[0]?.hours_old) || 0;
       console.log(`📊 Insights snapshot exists (${hoursOld.toFixed(1)} hours old). Will auto-refresh every 6 hours.`);
     }
     
@@ -4847,4 +5372,7 @@ app.listen(port, async () => {
   setTimeout(() => {
     setupInsightsRefresh();
   }, 2000); // Wait 2 seconds for server to be fully ready
+  
+  // Initialize sniper after server is ready
+  setTimeout(initializeSniper, 3000);
 });
