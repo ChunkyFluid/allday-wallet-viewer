@@ -297,39 +297,21 @@
     <body>
         <div id="app-header"></div>
         <script src="/layout.js"></script>
-        <!-- Flow Client Library - Simple script tag (standard approach) -->
-        <script src="https://unpkg.com/@onflow/fcl@latest/dist/fcl.js"></script>
-        <script>
-            // Configure FCL when it loads (official Flow documentation pattern)
-            (function() {
-                function configureFCL() {
-                    if (window.fcl && typeof window.fcl.config === 'function') {
-                        window.fcl.config()
-                            .put("accessNode.api", "https://rest-mainnet.onflow.org")
-                            .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
-                            .put("app.detail.title", "Chunky's NFLAD Viewer")
-                            .put("app.detail.icon", window.location.origin + "/favicon.ico");
-                        console.log('✅ FCL configured');
-                        return true;
-                    }
-                    return false;
-                }
-                
-                // Try immediately
-                if (!configureFCL()) {
-                    // Wait for script to load
-                    let attempts = 0;
-                    const checkInterval = setInterval(() => {
-                        attempts++;
-                        if (configureFCL() || attempts > 50) {
-                            clearInterval(checkInterval);
-                            if (attempts > 50) {
-                                console.warn('⚠️ FCL not loaded after 5 seconds');
-                            }
-                        }
-                    }, 100);
-                }
-            })();
+        <!-- Flow Client Library - Use ES module approach (v2) -->
+        <script type="module">
+            // Load FCL as ES module (browser-compatible)
+            import * as fcl from 'https://cdn.jsdelivr.net/npm/@onflow/fcl@1.12.2/dist/fcl.esm.min.js';
+            
+            // Configure FCL (official Flow documentation pattern)
+            fcl.config()
+                .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                .put("app.detail.title", "Chunky's NFLAD Viewer")
+                .put("app.detail.icon", window.location.origin + "/favicon.ico");
+            
+            // Expose FCL globally for non-module scripts
+            window.fcl = fcl;
+            console.log('✅ FCL loaded and configured');
         </script>
         
         <div class="app-shell">
