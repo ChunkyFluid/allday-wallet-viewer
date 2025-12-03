@@ -1111,6 +1111,17 @@
         </div>
 
         <div class="filter-group">
+          <label class="filter-label">Status</label>
+          <select class="filter-select" id="filter-status">
+            <option value="active">Active Only</option>
+            <option value="all">All (Including Sold/Delisted)</option>
+            <option value="sold">Sold Only</option>
+            <option value="unlisted">Delisted Only</option>
+            <option value="sold-unlisted">Sold & Delisted</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
           <label class="filter-label">Min Discount</label>
           <select class="filter-select" id="filter-min-discount">
             <option value="">Any</option>
@@ -1288,6 +1299,7 @@
     const filterPlayer = document.getElementById('filter-player');
     const filterTeam = document.getElementById('filter-team');
     const filterMarketplace = document.getElementById('filter-marketplace');
+    const filterStatus = document.getElementById('filter-status');
     const sortBy = document.getElementById('sort-by');
 
     // View toggle
@@ -1442,12 +1454,14 @@
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         try {
-          // Build query params including marketplace filter
+          // Build query params including marketplace and status filters
           const params = new URLSearchParams();
           if (filterMarketplace.value && filterMarketplace.value !== 'all') {
             params.append('marketplace', filterMarketplace.value);
           }
-          // Add other filters if needed...
+          if (filterStatus.value && filterStatus.value !== 'active') {
+            params.append('status', filterStatus.value);
+          }
           
           const response = await fetch(`/api/sniper-deals?${params.toString()}`, { signal: controller.signal });
           clearTimeout(timeoutId);
@@ -1600,8 +1614,18 @@
     function getFilteredListings() {
       let filtered = [...listings];
 
-      // Filter out sold and unlisted items by default - they shouldn't be shown as available
-      filtered = filtered.filter(l => !l.isSold && !l.isUnlisted);
+      // Status filter (sold/unlisted)
+      const statusFilter = filterStatus.value;
+      if (statusFilter === 'active') {
+        filtered = filtered.filter(l => !l.isSold && !l.isUnlisted);
+      } else if (statusFilter === 'sold') {
+        filtered = filtered.filter(l => l.isSold);
+      } else if (statusFilter === 'unlisted') {
+        filtered = filtered.filter(l => l.isUnlisted);
+      } else if (statusFilter === 'sold-unlisted') {
+        filtered = filtered.filter(l => l.isSold || l.isUnlisted);
+      }
+      // 'all' shows everything (no filter applied)
 
       // Deals only filter
       const dealsOnly = filterDealsOnly.value;
@@ -1840,7 +1864,7 @@
             </div>
             
             <a href="${l.listingUrl || '#'}" target="_blank" class="btn-snipe" style="${l.isSold ? 'background: #6b7280; opacity: 0.7;' : (l.isUnlisted ? 'background: #9ca3af; opacity: 0.7;' : '')}">
-              ${l.isSold ? 'SOLD' : (l.isUnlisted ? 'UNLISTED' : '🎯 Snipe')}
+              ${l.isSold ? '✅ SOLD' : (l.isUnlisted ? '❌ DELISTED' : '🎯 Snipe')}
             </a>
           </div>
         `;
@@ -1880,8 +1904,8 @@
         // Button style
         let btnBg = '#3b82f6';
         let btnText = 'View';
-        if (l.isSold) { btnBg = '#6b7280'; btnText = 'SOLD'; }
-        else if (l.isUnlisted) { btnBg = '#9ca3af'; btnText = 'UNLISTED'; }
+        if (l.isSold) { btnBg = '#6b7280'; btnText = '✅ SOLD'; }
+        else if (l.isUnlisted) { btnBg = '#9ca3af'; btnText = '❌ DELISTED'; }
         else if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
         else if (isDeal) { btnBg = '#4ade80'; btnText = '⚡ BUY'; }
         
@@ -1972,11 +1996,11 @@
             <div class="mobile-card-right">
               ${l.isSold ? `
                 <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700;">${formatPrice(l.listingPrice)}</div>
-                <div style="color: #ef4444; font-size: 0.75rem; font-weight: 600;">SOLD</div>
+                <div style="color: #ef4444; font-size: 0.75rem; font-weight: 600;">✅ SOLD</div>
                 ${l.buyerName || l.buyerAddr ? `<div style="font-size: 0.7rem; color: #9ca3af; margin-top: 4px;">Buyer: ${l.buyerName || l.buyerAddr}</div>` : ''}
               ` : l.isUnlisted ? `
                 <div style="color: #6b7280; font-size: 0.9rem; font-weight: 700;">${formatPrice(l.listingPrice)}</div>
-                <div style="color: #9ca3af; font-size: 0.75rem; font-weight: 600;">UNLISTED</div>
+                <div style="color: #9ca3af; font-size: 0.75rem; font-weight: 600;">❌ DELISTED</div>
               ` : `
                 <div class="mobile-card-price" style="color: ${isDeal ? '#22c55e' : '#9ca3af'};">${formatPrice(l.listingPrice)}</div>
                 ${l.avgSale ? `<div style="font-size: 0.7rem; color: #9ca3af; font-family: 'JetBrains Mono', monospace;">ASP: ${formatPrice(l.avgSale)}</div>` : ''}
@@ -2041,7 +2065,7 @@
     });
 
     // Filter change listeners - reset to page 1 when filters change
-    [filterDealsOnly, filterMinDiscount, filterOwned, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, sortBy].forEach(el => {
+    [filterDealsOnly, filterMinDiscount, filterOwned, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, filterStatus, sortBy].forEach(el => {
       el.addEventListener('change', () => {
         currentPage = 1; // Reset to first page when filters change
         renderListings();
