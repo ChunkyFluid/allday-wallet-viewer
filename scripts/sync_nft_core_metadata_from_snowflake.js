@@ -1,50 +1,16 @@
 // scripts/sync_nft_core_metadata_from_snowflake.js
 import * as dotenv from "dotenv";
-import snowflake from "snowflake-sdk";
 import { pgQuery } from "../db.js";
+import { executeSnowflakeWithRetry, delay, createSnowflakeConnection } from "./snowflake-utils.js";
 
 dotenv.config();
 
 // Large enough for throughput, small enough for memory / query time.
 const BATCH_SIZE = 100000;
+const BATCH_DELAY_MS = parseInt(process.env.SNOWFLAKE_BATCH_DELAY_MS || '500', 10); // Delay between batches
 
-function createSnowflakeConnection() {
-    const connection = snowflake.createConnection({
-        account: process.env.SNOWFLAKE_ACCOUNT,
-        username: process.env.SNOWFLAKE_USERNAME,
-        password: process.env.SNOWFLAKE_PASSWORD,
-        warehouse: process.env.SNOWFLAKE_WAREHOUSE,
-        database: process.env.SNOWFLAKE_DATABASE,
-        schema: process.env.SNOWFLAKE_SCHEMA,
-        role: process.env.SNOWFLAKE_ROLE
-    });
-
-    return new Promise((resolve, reject) => {
-        connection.connect((err, conn) => {
-            if (err) {
-                console.error("❌ Snowflake connect error:", err);
-                return reject(err);
-            }
-            console.log("✅ Connected to Snowflake as", conn.getId());
-            resolve(connection);
-        });
-    });
-}
-
-function executeSnowflake(connection, sqlText) {
-    return new Promise((resolve, reject) => {
-        connection.execute({
-            sqlText,
-            complete(err, stmt, rows) {
-                if (err) {
-                    console.error("❌ Snowflake query error:", err);
-                    return reject(err);
-                }
-                resolve(rows || []);
-            }
-        });
-    });
-}
+// Check for --incremental flag
+const isIncremental = process.argv.includes('--incremental');
 
 function escapeLiteral(str) {
     if (str == null) return null;
@@ -82,12 +48,17 @@ async function syncMetadata() {
     const schema = process.env.SNOWFLAKE_SCHEMA;
 
     console.log("Using Snowflake", `${db}.${schema}`);
+    console.log("Mode:", isIncremental ? "INCREMENTAL (upsert only)" : "FULL REFRESH (truncate + reload)");
 
     const connection = await createSnowflakeConnection();
     await ensureMetadataTable();
 
-    console.log("Truncating Neon nft_core_metadata (full snapshot sync)...");
-    await pgQuery(`TRUNCATE TABLE nft_core_metadata;`);
+    if (!isIncremental) {
+        console.log("Truncating Neon nft_core_metadata (full snapshot sync)...");
+        await pgQuery(`TRUNCATE TABLE nft_core_metadata;`);
+    } else {
+        console.log("Incremental mode: skipping truncate, will upsert only");
+    }
 
     // Keyset pagination over nft_id instead of OFFSET/LIMIT for better scaling.
     let lastNftId = null;
@@ -129,7 +100,7 @@ async function syncMetadata() {
         console.log(
             `Fetching metadata batch from Snowflake: after_nft_id=${lastNftId || "START"}, limit=${BATCH_SIZE}...`
         );
-        const rows = await executeSnowflake(connection, sql);
+        const rows = await executeSnowflakeWithRetry(connection, sql);
 
         console.log(`Snowflake returned ${rows.length} metadata rows for this batch.`);
         if (!rows.length) {
@@ -239,6 +210,11 @@ async function syncMetadata() {
         lastNftId = nftIdLast;
 
         console.log(`Upserted ${total} nft_core_metadata rows so far... last_nft_id=${lastNftId}`);
+        
+        // Add delay between batches to reduce load on Snowflake
+        if (BATCH_DELAY_MS > 0) {
+            await delay(BATCH_DELAY_MS);
+        }
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM nft_core_metadata;`);

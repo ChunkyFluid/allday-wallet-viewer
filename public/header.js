@@ -41,16 +41,34 @@
       const data = await res.json();
 
       if (data && data.ok && data.user) {
-        // Show wallet address for Dapper users, email for regular users
-        let displayText = data.user.email;
-        if (data.user.email && data.user.email.startsWith("dapper:")) {
-          const walletAddr = data.user.email.replace("dapper:", "");
-          // Show shortened version: 0x1234...5678
+        // Show display name if available, otherwise email or wallet address
+        let displayText;
+        if (data.user.display_name && data.user.display_name.trim()) {
+          // Use display_name if available (this is what we want to show)
+          displayText = data.user.display_name;
+        } else if (data.user.default_wallet_address) {
+          // Fallback: show shortened wallet address without "flow:" prefix
+          const walletAddr = data.user.default_wallet_address;
           if (walletAddr.length > 10) {
             displayText = walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4);
           } else {
             displayText = walletAddr;
           }
+        } else if (data.user.email) {
+          // Handle Flow wallet addresses (flow:0x... or dapper:0x...)
+          if (data.user.email.startsWith("flow:") || data.user.email.startsWith("dapper:")) {
+            const walletAddr = data.user.email.replace(/^(flow|dapper):/, "");
+            // Show shortened version: 0x1234...5678
+            if (walletAddr.length > 10) {
+              displayText = walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4);
+            } else {
+              displayText = walletAddr;
+            }
+          } else {
+            displayText = data.user.email;
+          }
+        } else {
+          displayText = "Account";
         }
         
         link.href = "/login.html";

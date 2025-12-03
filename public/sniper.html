@@ -1170,6 +1170,15 @@
           </select>
         </div>
 
+        <div class="filter-group">
+          <label class="filter-label">Marketplace</label>
+          <select class="filter-select" id="filter-marketplace">
+            <option value="all">All Marketplaces</option>
+            <option value="nflad">NFL AllDay Only</option>
+            <option value="flowty">Flowty Only</option>
+          </select>
+        </div>
+
         <div class="filters-actions">
           <button class="btn-refresh" id="btn-refresh">
             <span class="refresh-icon">↻</span>
@@ -1278,6 +1287,7 @@
     const filterMaxSerial = document.getElementById('filter-max-serial');
     const filterPlayer = document.getElementById('filter-player');
     const filterTeam = document.getElementById('filter-team');
+    const filterMarketplace = document.getElementById('filter-marketplace');
     const sortBy = document.getElementById('sort-by');
 
     // View toggle
@@ -1432,7 +1442,14 @@
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         try {
-          const response = await fetch('/api/sniper-deals', { signal: controller.signal });
+          // Build query params including marketplace filter
+          const params = new URLSearchParams();
+          if (filterMarketplace.value && filterMarketplace.value !== 'all') {
+            params.append('marketplace', filterMarketplace.value);
+          }
+          // Add other filters if needed...
+          
+          const response = await fetch(`/api/sniper-deals?${params.toString()}`, { signal: controller.signal });
           clearTimeout(timeoutId);
           
           if (!response.ok) {
@@ -1583,6 +1600,9 @@
     function getFilteredListings() {
       let filtered = [...listings];
 
+      // Filter out sold and unlisted items by default - they shouldn't be shown as available
+      filtered = filtered.filter(l => !l.isSold && !l.isUnlisted);
+
       // Deals only filter
       const dealsOnly = filterDealsOnly.value;
       if (dealsOnly === 'deals') {
@@ -1639,6 +1659,12 @@
       const team = filterTeam.value;
       if (team) {
         filtered = filtered.filter(l => l.teamName?.includes(team));
+      }
+
+      // Marketplace filter
+      const marketplace = filterMarketplace.value;
+      if (marketplace && marketplace !== 'all') {
+        filtered = filtered.filter(l => l.marketplace === marketplace);
       }
 
       // Sort
@@ -1762,9 +1788,16 @@
           ? `<span style="display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);" title="You own ${ownedCount} of this moment">x${ownedCount}</span>`
           : '';
 
+        const marketplaceBadge = l.marketplace === 'flowty' 
+          ? `<div style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(139, 92, 246, 0.9); color: white; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 5;">Flowty</div>`
+          : l.marketplace === 'nflad'
+          ? `<div style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(59, 130, 246, 0.9); color: white; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 5;">NFLAD</div>`
+          : '';
+        
         return `
           <div class="listing-card ${soldClass}">
             <div class="card-image">
+              ${marketplaceBadge}
               ${isSpecialSerial ? `
                 <div class="serial-badge low-serial">#${l.serialNumber}</div>
               ` : `

@@ -17,8 +17,8 @@ pushd "%PROJECT_DIR%" || (
   exit /b 1
 )
 
-echo 1^) Quick refresh  (wallets + profiles + prices + top wallets snapshot)
-echo 2^) Full refresh   (metadata + wallets + profiles + prices + snapshots)
+echo 1^) Incremental refresh  (new holdings only, no truncate - FAST, KEEPS DATA AVAILABLE)
+echo 2^) Full refresh   (truncate everything + reload - SLOW, LOCKS DATA)
 echo Q^) Quit
 echo.
 set /p CHOICE=Select option (1/2/Q): 
@@ -52,9 +52,11 @@ if errorlevel 1 (
 
 goto :eof
 
-:: --------- Option 1: Quick refresh ----------
+:: --------- Option 1: Incremental refresh (default - fast, keeps data available) ----------
 :QUICK
-call :RUNSTEP "Sync wallet holdings from Snowflake" "node scripts\sync_wallet_holdings_from_snowflake.js"
+call :RUNSTEP "Sync NEW wallet holdings from Snowflake (incremental)" "node scripts\sync_wallet_holdings_from_snowflake.js --incremental"
+call :RUNSTEP "Clean up removed holdings (sold/transferred NFTs)" "node scripts\cleanup_removed_holdings.js"
+call :RUNSTEP "Sync NEW metadata from Snowflake (incremental)" "node scripts\sync_nft_core_metadata_from_snowflake.js --incremental"
 call :RUNSTEP "Sync wallet profiles from Dapper" "node scripts\sync_wallet_profiles_from_dapper.js"
 call :RUNSTEP "Load edition prices CSV into edition_price_scrape" "node scripts\load_edition_prices_from_csv.js"
 call :RUNSTEP "Refresh editions_snapshot" "node etl_editions_snapshot.js"
@@ -62,6 +64,7 @@ call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
+call :RUNSTEP "Refresh wallet_summary_snapshot" "node etl_wallet_summary_snapshot.js"
 call :RUNSTEP "Refresh explorer_filters_snapshot" "node etl_explorer_filters_snapshot.js"
 goto END
 
@@ -76,6 +79,7 @@ call :RUNSTEP "Refresh top_wallets_snapshot" "node etl_top_wallets_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_team_snapshot" "node etl_top_wallets_by_team_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_tier_snapshot" "node etl_top_wallets_by_tier_snapshot.js"
 call :RUNSTEP "Refresh top_wallets_by_value_snapshot" "node etl_top_wallets_by_value_snapshot.js"
+call :RUNSTEP "Refresh wallet_summary_snapshot" "node etl_wallet_summary_snapshot.js"
 call :RUNSTEP "Refresh explorer_filters_snapshot" "node etl_explorer_filters_snapshot.js"
 goto END
 

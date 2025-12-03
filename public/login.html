@@ -409,15 +409,28 @@
                         <div id="wallet-status" class="status" style="margin-top: 0.5rem;"></div>
                     </div>
 
-                    <!-- Display Name -->
-                    <div class="settings-section">
+                    <!-- Display Name (Dapper users only) or Link Dapper (Email users) -->
+                    <div class="settings-section" id="display-name-section">
                         <h3>👤 Display Name</h3>
                         <div class="current-value" id="current-name">Not set</div>
-                        <div class="settings-row">
-                            <input type="text" id="name-input" placeholder="Your display name" maxlength="50" />
-                            <button type="button" id="btn-save-name" class="btn-primary">Save</button>
+                        <div id="dapper-name-display" style="display: none;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+                                Your display name is linked to your Dapper account and cannot be changed.
+                            </div>
                         </div>
-                        <div id="name-status" class="status" style="margin-top: 0.5rem;"></div>
+                        <div id="link-dapper-section" style="display: none; margin-top: 0.75rem;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                                Link your Dapper account to get a display name.
+                            </div>
+                            <button type="button" id="btn-link-dapper" class="btn-flow" style="width: 100%;">
+                                <svg width="18" height="18" viewBox="0 0 18 18" style="margin-right: 0.5rem;">
+                                    <path fill="#00EF8B" d="M9 0L0 5v8l9 5 9-5V5L9 0z"/>
+                                    <path fill="#00D972" d="M9 0v18l9-5V5L9 0z"/>
+                                </svg>
+                                Link Dapper Account
+                            </button>
+                            <div id="link-dapper-status" class="status" style="margin-top: 0.5rem;"></div>
+                        </div>
                     </div>
 
                     <!-- Change Password -->
@@ -521,14 +534,35 @@
                     walletEl.classList.add("empty");
                 }
 
+                // Check if user is logged in with Dapper (email starts with "flow:")
+                const isDapperUser = user.email && (user.email.startsWith("flow:") || user.email.startsWith("dapper:"));
+                
                 const nameEl = document.getElementById("current-name");
-                if (user.display_name) {
-                    nameEl.textContent = user.display_name;
-                    nameEl.classList.remove("empty");
-                    document.getElementById("name-input").value = user.display_name;
+                const dapperNameDisplay = document.getElementById("dapper-name-display");
+                const linkDapperSection = document.getElementById("link-dapper-section");
+                
+                if (isDapperUser) {
+                    // Dapper user - show display name as read-only
+                    if (user.display_name) {
+                        nameEl.textContent = user.display_name;
+                        nameEl.classList.remove("empty");
+                    } else {
+                        nameEl.textContent = "Not set (fetching...)";
+                        nameEl.classList.add("empty");
+                    }
+                    dapperNameDisplay.style.display = "block";
+                    linkDapperSection.style.display = "none";
                 } else {
-                    nameEl.textContent = "Not set";
-                    nameEl.classList.add("empty");
+                    // Email user - show link Dapper button
+                    if (user.display_name) {
+                        nameEl.textContent = user.display_name;
+                        nameEl.classList.remove("empty");
+                    } else {
+                        nameEl.textContent = "Not set";
+                        nameEl.classList.add("empty");
+                    }
+                    dapperNameDisplay.style.display = "none";
+                    linkDapperSection.style.display = "block";
                 }
             }
 
@@ -594,17 +628,15 @@
                 }
             });
 
-            // Flow Wallet Authentication
-            const btnFlowWallet = document.getElementById("btn-flow-wallet");
-            if (btnFlowWallet) {
-                btnFlowWallet.addEventListener("click", async () => {
-                    setStatus(loginStatus, "Connecting wallet...", null);
+            // Reusable Dapper authentication function
+            async function authenticateWithDapper(statusElement, redirectOnSuccess = true) {
+                setStatus(statusElement, "Connecting wallet...", null);
                     
                     try {
                         // Wait for FCL to be available (bundle loads asynchronously)
                         let fclModule = window.fcl;
                         if (!fclModule) {
-                            setStatus(loginStatus, "Loading Flow library...", null);
+                            setStatus(statusElement, "Loading Flow library...", null);
                             // Wait up to 5 seconds for FCL to load
                             for (let i = 0; i < 50 && !fclModule; i++) {
                                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -628,7 +660,7 @@
                         if (!fcl || typeof fcl.config !== 'function') {
                             console.error('FCL not accessible. window.fcl:', window.fcl);
                             console.error('Extracted fcl:', fcl);
-                            setStatus(loginStatus, "Flow library not loaded. Please refresh the page.", "error");
+                            setStatus(statusElement, "Flow library not loaded. Please refresh the page.", "error");
                             return;
                         }
                         
@@ -648,42 +680,66 @@
                         const authnEndpoint = await fcl.config.get("discovery.authn.endpoint");
                         console.log("Verified discovery.authn.endpoint:", authnEndpoint);
                         if (!authnEndpoint) {
-                            setStatus(loginStatus, "FCL configuration error. Please refresh the page.", "error");
+                            setStatus(statusElement, "FCL configuration error. Please refresh the page.", "error");
                             return;
                         }
                         
                         // Authenticate with Dapper wallet only using Discovery API
-                        setStatus(loginStatus, "Opening Dapper wallet...", null);
+                        setStatus(statusElement, "Checking for available wallets...", null);
                         
                         let user;
                         try {
                             // Get available auth services using Discovery API
-                            const servicesResult = await fcl.discovery.authn.snapshot();
-                            console.log("Discovery snapshot result:", servicesResult);
-                            console.log("Type:", typeof servicesResult);
-                            console.log("Is array?", Array.isArray(servicesResult));
-                            
-                            // Handle different response structures
+                            // Discovery service may need time to initialize, so retry with backoff
+                            let servicesResult = null;
                             let services = [];
-                            if (Array.isArray(servicesResult)) {
-                                services = servicesResult;
-                            } else if (servicesResult && Array.isArray(servicesResult.results)) {
-                                services = servicesResult.results;
-                            } else if (servicesResult && servicesResult.services && Array.isArray(servicesResult.services)) {
-                                services = servicesResult.services;
-                            } else if (servicesResult && typeof servicesResult === 'object') {
-                                // Try to extract services from object
-                                services = Object.values(servicesResult).filter(item => 
-                                    item && typeof item === 'object' && (item.type === 'authn' || item.provider)
-                                );
+                            const maxRetries = 3;
+                            const retryDelay = 500; // Start with 500ms delay
+                            
+                            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                                if (attempt > 0) {
+                                    // Wait before retrying
+                                    await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+                                    setStatus(statusElement, `Checking for available wallets... (${attempt + 1}/${maxRetries})`, null);
+                                }
+                                
+                                try {
+                                    servicesResult = await fcl.discovery.authn.snapshot();
+                                    console.log(`Discovery snapshot result (attempt ${attempt + 1}):`, servicesResult);
+                                    console.log("Type:", typeof servicesResult);
+                                    console.log("Is array?", Array.isArray(servicesResult));
+                                    
+                                    // Handle different response structures
+                                    services = [];
+                                    if (Array.isArray(servicesResult)) {
+                                        services = servicesResult;
+                                    } else if (servicesResult && Array.isArray(servicesResult.results)) {
+                                        services = servicesResult.results;
+                                    } else if (servicesResult && servicesResult.services && Array.isArray(servicesResult.services)) {
+                                        services = servicesResult.services;
+                                    } else if (servicesResult && typeof servicesResult === 'object') {
+                                        // Try to extract services from object
+                                        services = Object.values(servicesResult).filter(item => 
+                                            item && typeof item === 'object' && (item.type === 'authn' || item.provider)
+                                        );
+                                    }
+                                    
+                                    console.log("Extracted services array:", services);
+                                    console.log("Services count:", services.length);
+                                    
+                                    // If we got services, break out of retry loop
+                                    if (Array.isArray(services) && services.length > 0) {
+                                        break;
+                                    }
+                                } catch (snapshotErr) {
+                                    console.warn(`Discovery snapshot attempt ${attempt + 1} failed:`, snapshotErr);
+                                    // Continue to next retry
+                                }
                             }
                             
-                            console.log("Extracted services array:", services);
-                            console.log("Services count:", services.length);
-                            
                             if (!Array.isArray(services) || services.length === 0) {
-                                console.error("No services found. Full result:", servicesResult);
-                                setStatus(loginStatus, "No wallets available. Please check your connection.", "error");
+                                console.error("No services found after retries. Full result:", servicesResult);
+                                setStatus(statusElement, "No wallets available. Please check your connection.", "error");
                                 return;
                             }
                             
@@ -708,7 +764,7 @@
                                         endpoint: s.endpoint
                                     };
                                 }));
-                                setStatus(loginStatus, "Dapper wallet not available. Please ensure Dapper is installed.", "error");
+                                setStatus(statusElement, "Dapper wallet not available. Please ensure Dapper is installed.", "error");
                                 return;
                             }
                             
@@ -718,7 +774,7 @@
                             user = await fcl.authenticate({ service: dapperService });
                         } catch (authErr) {
                             console.error("FCL authentication error:", authErr);
-                            setStatus(loginStatus, "Authentication cancelled or failed: " + (authErr.message || String(authErr)), "error");
+                            setStatus(statusElement, "Authentication cancelled or failed: " + (authErr.message || String(authErr)), "error");
                             return;
                         }
                         
@@ -748,7 +804,7 @@
                             
                             // If we couldn't detect provider, assume it's not Dapper and reject
                             if (walletProvider !== 'dapper') {
-                                setStatus(loginStatus, "Only Dapper wallets are supported. Please use Dapper Wallet.", "error");
+                                setStatus(statusElement, "Only Dapper wallets are supported. Please use Dapper Wallet.", "error");
                                 // Unauthenticate to clear the session
                                 try {
                                     await fcl.unauthenticate();
@@ -758,9 +814,34 @@
                                 return;
                             }
                             
-                            setStatus(loginStatus, "Authenticating with Dapper...", null);
+                            setStatus(statusElement, "Fetching Dapper profile...", null);
                             
-                            // Send wallet address to backend (Dapper wallet only)
+                            // Fetch Dapper username from their profile API
+                            let dapperUsername = null;
+                            try {
+                                const profileUrl = `https://open.meetdapper.com/profile?address=${user.addr}`;
+                                const profileRes = await fetch(profileUrl, {
+                                    headers: {
+                                        "user-agent": "allday-wallet-viewer/1.0",
+                                        accept: "application/json"
+                                    }
+                                });
+                                
+                                if (profileRes.ok) {
+                                    const profileData = await profileRes.json();
+                                    if (profileData && profileData.displayName && typeof profileData.displayName === "string") {
+                                        dapperUsername = profileData.displayName.trim();
+                                        console.log("Fetched Dapper username:", dapperUsername);
+                                    }
+                                }
+                            } catch (profileErr) {
+                                console.warn("Could not fetch Dapper profile (username will be null):", profileErr);
+                                // Continue even if profile fetch fails - username is optional
+                            }
+                            
+                            setStatus(statusElement, "Authenticating with Dapper...", null);
+                            
+                            // Send wallet address and Dapper username to backend
                             const res = await fetch("/api/login-flow", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -769,7 +850,8 @@
                                     wallet_address: user.addr,
                                     signed_message: user.signedMessage || null,
                                     signature: user.signature || null,
-                                    wallet_provider: "dapper"
+                                    wallet_provider: "dapper",
+                                    dapper_username: dapperUsername
                                 })
                             });
                             
@@ -777,20 +859,41 @@
                             console.log("Login response:", data);
                             
                             if (res.ok && data.ok) {
-                                setStatus(loginStatus, "Connected! ✨", "success");
-                                setTimeout(() => {
-                                    window.location.href = "/";
-                                }, 1000);
+                                setStatus(statusElement, "Connected! ✨", "success");
+                                if (redirectOnSuccess) {
+                                    setTimeout(() => {
+                                        window.location.href = "/";
+                                    }, 1000);
+                                } else {
+                                    // If not redirecting (e.g., linking from settings), refresh user data
+                                    setTimeout(() => checkLoginStatus(), 1000);
+                                }
                             } else {
-                                setStatus(loginStatus, data.error || "Authentication failed", "error");
+                                setStatus(statusElement, data.error || "Authentication failed", "error");
                             }
                         } else {
-                            setStatus(loginStatus, "Wallet connection cancelled", "error");
+                            setStatus(statusElement, "Wallet connection cancelled", "error");
                         }
                     } catch (err) {
                         console.error("Flow wallet auth error:", err);
-                        setStatus(loginStatus, err.message || "Failed to connect wallet", "error");
+                        setStatus(statusElement, err.message || "Failed to connect wallet", "error");
                     }
+                }
+            
+            // Flow Wallet Authentication button (login page)
+            const btnFlowWallet = document.getElementById("btn-flow-wallet");
+            if (btnFlowWallet) {
+                btnFlowWallet.addEventListener("click", async () => {
+                    await authenticateWithDapper(loginStatus, true);
+                });
+            }
+            
+            // Link Dapper Account button (settings page)
+            const btnLinkDapper = document.getElementById("btn-link-dapper");
+            if (btnLinkDapper) {
+                btnLinkDapper.addEventListener("click", async () => {
+                    const linkDapperStatus = document.getElementById("link-dapper-status");
+                    await authenticateWithDapper(linkDapperStatus, false);
                 });
             }
 
@@ -838,44 +941,7 @@
                 }
             });
 
-            // Save display name
-            document.getElementById("btn-save-name").addEventListener("click", async () => {
-                const statusEl = document.getElementById("name-status");
-                const input = document.getElementById("name-input");
-                const name = (input.value || "").trim();
-
-                if (!name) {
-                    setStatus(statusEl, "Enter a display name", "error");
-                    return;
-                }
-
-                if (name.length > 50) {
-                    setStatus(statusEl, "Name too long (max 50 chars)", "error");
-                    return;
-                }
-
-                setStatus(statusEl, "Saving...", null);
-
-                try {
-                    const res = await fetch("/api/me/name", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        credentials: "include",
-                        body: JSON.stringify({ display_name: name })
-                    });
-
-                    const data = await res.json();
-                    if (res.ok && data.ok) {
-                        setStatus(statusEl, "Saved! ✓", "success");
-                        document.getElementById("current-name").textContent = name;
-                        document.getElementById("current-name").classList.remove("empty");
-                    } else {
-                        setStatus(statusEl, data.error || "Failed to save", "error");
-                    }
-                } catch (err) {
-                    setStatus(statusEl, "Error saving name", "error");
-                }
-            });
+            // Display name is now locked to Dapper username - no manual editing
 
             // Change password
             document.getElementById("btn-change-password").addEventListener("click", async () => {

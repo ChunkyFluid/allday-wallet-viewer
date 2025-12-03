@@ -1062,17 +1062,45 @@
         const res = await fetch("/api/me");
         const data = await res.json();
 
-        if (data && data.user) {
-          // Logged in: show email and point to login/account page
+        if (data && data.ok && data.user) {
           link.href = "/login.html";
-          link.textContent = data.user.email;
+          // Show display name if available, otherwise wallet address or email
+          let displayText = "Account";
+          if (data.user.display_name && data.user.display_name.trim()) {
+            displayText = data.user.display_name;
+          } else if (data.user.default_wallet_address) {
+            const walletAddr = data.user.default_wallet_address;
+            if (walletAddr.length > 10) {
+              displayText = walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4);
+            } else {
+              displayText = walletAddr;
+            }
+          } else if (data.user.email) {
+            let email = data.user.email;
+            if (email.startsWith("flow:") || email.startsWith("dapper:")) {
+              const walletAddr = email.replace(/^(flow|dapper):/, "");
+              if (walletAddr.length > 10) {
+                displayText = walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4);
+              } else {
+                displayText = walletAddr;
+              }
+            } else {
+              displayText = email;
+            }
+          }
+          link.textContent = displayText;
+          link.title = data.user.default_wallet_address 
+            ? `Logged in · Default wallet: ${data.user.default_wallet_address}`
+            : "Logged in";
         } else {
-          // Not logged in
           link.href = "/login.html";
           link.textContent = "Login";
+          link.title = "";
         }
       } catch (err) {
         console.error("updateNavAccount error:", err);
+        link.href = "/login.html";
+        link.textContent = "Login";
       }
     }
 

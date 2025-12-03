@@ -25,6 +25,9 @@
           ${navLink("/top-holders.html", "Leaderboard")}
           ${navLink("/explorer.html", "Browse")}
           <a href="/sniper.html" class="${path === '/sniper.html' ? 'active nav-hot' : 'nav-hot'}">🎯 Sniper</a>
+          ${navLink("/playbook.html", "Playbook")}
+          ${navLink("/challenges.html", "Challenges")}
+          ${navLink("/offers.html", "Offers")}
           ${navLink("/insights.html", "Insights")}
           ${navLink("/faq.html", "FAQ")}
           ${navLink("/contact.html", "Contact")}
@@ -48,16 +51,41 @@
             const res = await fetch("/api/me");
             const data = await res.json();
 
-            if (data && data.ok && data.user) {
+            if (data && data.ok && data.user && data.user.default_wallet_address) {
                 link.href = "/login.html";
-                link.textContent = "⚙️ Account";
-                link.title = data.user.email;
+                
+                // Fetch display name from wallet_profiles (same way wallet page does it)
+                const wallet = data.user.default_wallet_address.toLowerCase();
+                try {
+                    const profileRes = await fetch(`/api/wallet-profile?wallet=${encodeURIComponent(wallet)}`);
+                    const profileData = await profileRes.json();
+                    
+                    if (profileData && profileData.ok && profileData.profile && profileData.profile.display_name) {
+                        link.textContent = profileData.profile.display_name;
+                    } else {
+                        // Fallback to shortened wallet address
+                        const walletAddr = wallet.replace(/^(flow|dapper):/, "");
+                        link.textContent = walletAddr.length > 10 
+                            ? walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4)
+                            : walletAddr;
+                    }
+                } catch (profileErr) {
+                    // Fallback to shortened wallet address if profile fetch fails
+                    const walletAddr = wallet.replace(/^(flow|dapper):/, "");
+                    link.textContent = walletAddr.length > 10 
+                        ? walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4)
+                        : walletAddr;
+                }
+                
+                link.title = `Logged in · Wallet: ${wallet}`;
             } else {
                 link.href = "/login.html";
                 link.textContent = "Login";
             }
         } catch (err) {
             console.error("updateNavAccount error:", err);
+            link.href = "/login.html";
+            link.textContent = "Login";
         }
     }
 

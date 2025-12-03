@@ -1,52 +1,15 @@
 // scripts/sync_wallet_holdings_from_snowflake.js
 import * as dotenv from "dotenv";
-import snowflake from "snowflake-sdk";
 import { pgQuery } from "../db.js";
+import { executeSnowflakeWithRetry, delay, createSnowflakeConnection } from "./snowflake-utils.js";
 
 dotenv.config();
 
 const BATCH_SIZE = 100000;
+const BATCH_DELAY_MS = parseInt(process.env.SNOWFLAKE_BATCH_DELAY_MS || '500', 10); // Delay between batches
 
 // Check for --incremental flag
 const isIncremental = process.argv.includes('--incremental');
-
-function createSnowflakeConnection() {
-    const connection = snowflake.createConnection({
-        account: process.env.SNOWFLAKE_ACCOUNT,
-        username: process.env.SNOWFLAKE_USERNAME,
-        password: process.env.SNOWFLAKE_PASSWORD,
-        warehouse: process.env.SNOWFLAKE_WAREHOUSE,
-        database: process.env.SNOWFLAKE_DATABASE,
-        schema: process.env.SNOWFLAKE_SCHEMA,
-        role: process.env.SNOWFLAKE_ROLE
-    });
-
-    return new Promise((resolve, reject) => {
-        connection.connect((err, conn) => {
-            if (err) {
-                console.error("❌ Snowflake connect error:", err);
-                return reject(err);
-            }
-            console.log("✅ Connected to Snowflake as", conn.getId());
-            resolve(connection);
-        });
-    });
-}
-
-function executeSnowflake(connection, sqlText) {
-    return new Promise((resolve, reject) => {
-        connection.execute({
-            sqlText,
-            complete(err, stmt, rows) {
-                if (err) {
-                    console.error("❌ Snowflake query error:", err);
-                    return reject(err);
-                }
-                resolve(rows || []);
-            }
-        });
-    });
-}
 
 function escapeLiteral(str) {
     if (str == null) return null;
@@ -112,9 +75,11 @@ async function syncWalletHoldings() {
         let whereConditions = [];
         
         // For incremental, filter by timestamp
+        // Include records where last_event_ts > minTimestamp OR last_event_ts IS NULL
+        // (NULL timestamps need to be synced too)
         if (minTimestamp) {
             const tsFormatted = formatTimestampForSnowflake(minTimestamp);
-            whereConditions.push(`last_event_ts > '${escapeLiteral(tsFormatted)}'::timestamp_ntz`);
+            whereConditions.push(`(last_event_ts > '${escapeLiteral(tsFormatted)}'::timestamp_ntz OR last_event_ts IS NULL)`);
         }
         
         // Keyset pagination
@@ -143,7 +108,7 @@ async function syncWalletHoldings() {
         console.log(
             `Fetching holdings batch: after=(${lastWallet || "START"}, ${lastNftId || "START"}), limit=${BATCH_SIZE}...`
         );
-        const rows = await executeSnowflake(connection, sql);
+        const rows = await executeSnowflakeWithRetry(connection, sql);
 
         console.log(`Snowflake returned ${rows.length} rows for this batch.`);
         if (!rows.length) {
@@ -211,6 +176,11 @@ async function syncWalletHoldings() {
         lastNftId = String(lastRow.NFT_ID ?? lastRow.nft_id);
 
         console.log(`Upserted ${total} wallet_holdings rows so far... last=(${lastWallet}, ${lastNftId})`);
+        
+        // Add delay between batches to reduce load on Snowflake
+        if (BATCH_DELAY_MS > 0) {
+            await delay(BATCH_DELAY_MS);
+        }
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM wallet_holdings;`);

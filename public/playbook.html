@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playbook | NFL All Day</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="header.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --playbook-bg: #050815;
+      --playbook-card: #0b1020;
+      --playbook-border: #1b2236;
+      --text: #f8f9ff;
+      --text-muted: #8c95b8;
+      --accent-purple: #6f42c1;
+      --accent-cyan: #0dcaf0;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #101526 0, #050815 55%);
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .playbook-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .page-header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-header h1::before {
+      content: "📋";
+      -webkit-text-fill-color: initial;
+    }
+
+    .coming-soon {
+      text-align: center;
+      padding: 4rem 2rem;
+      background: var(--playbook-card);
+      border: 1px solid var(--playbook-border);
+      border-radius: 12px;
+    }
+
+    .coming-soon-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    .coming-soon h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .coming-soon p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .playbook-container {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+  <script src="/layout.js"></script>
+  <main class="app-main">
+    <div class="playbook-container">
+      <div class="page-header">
+        <h1>Playbook</h1>
+      </div>
+
+      <div class="coming-soon">
+        <div class="coming-soon-icon">📋</div>
+        <h2>Coming Soon</h2>
+        <p>The Playbook feature is under development. Check back soon!</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

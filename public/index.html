@@ -961,31 +961,7 @@
       </main>
     </div>
 
-    <script>
-      (function () {
-        async function updateNavAccount() {
-          const link = document.getElementById("nav-account-link");
-          if (!link) return;
-
-          try {
-            const res = await fetch("/api/me");
-            const data = await res.json();
-
-            if (data && data.user) {
-              link.href = "/login.html";
-              link.textContent = data.user.email;
-            } else {
-              link.href = "/login.html";
-              link.textContent = "Login";
-            }
-          } catch (err) {
-            console.error("updateNavAccount error:", err);
-          }
-        }
-
-        updateNavAccount();
-      })();
-    </script>
+    <!-- Nav account is handled by layout.js -->
 
     <script>
       async function maybeLoadDefaultWallet() {
