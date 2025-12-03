@@ -1279,6 +1279,7 @@
     let isLoadingListings = false; // Track if listings are currently being fetched
     let currentPage = 1; // Current page number
     const PAGE_SIZE = 20; // Listings per page
+    let pendingRefresh = false; // Track if a refresh is queued
 
     // Elements
     const listingsGrid = document.getElementById('listings-grid');
@@ -1425,8 +1426,16 @@
     
     // Fetch all listings
     async function fetchListings() {
+      if (isLoadingListings) {
+        console.log('[Sniper] Already loading, skipping...');
+        pendingRefresh = true;
+        return;
+      }
+      
       btnRefresh.classList.add('loading');
       isLoadingListings = true;
+      pendingRefresh = false;
+      
       if (statusEl) {
         statusEl.textContent = 'Loading listings...';
         statusEl.className = '';
@@ -1451,7 +1460,7 @@
         // Use real-time endpoint (fast - reads from in-memory array)
         // Add timeout to prevent hanging
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased for slow connections)
         
         try {
           // Build query params including marketplace and status filters
@@ -1593,15 +1602,40 @@
         statusEl.className = dealsCount > 0 ? 'success' : '';
         
         console.log('[Sniper] Render complete, listings array length:', listings.length);
+        
+        // If there's a pending refresh, trigger it now
+        if (pendingRefresh) {
+          pendingRefresh = false;
+          setTimeout(() => fetchListings(), 100);
+        }
 
       } catch (err) {
         console.error('Error fetching listings:', err);
         isLoadingListings = false;
-        statusEl.textContent = 'Error: ' + err.message;
-        statusEl.className = 'error';
+        
+        // Only show error message if it's not a timeout during auto-refresh
+        // (timeouts during auto-refresh are expected if server is slow)
+        const isAutoRefresh = autoRefreshCheckbox && autoRefreshCheckbox.checked;
+        const isTimeout = err.message && err.message.includes('timed out');
+        
+        if (!isAutoRefresh || !isTimeout) {
+          statusEl.textContent = 'Error: ' + err.message;
+          statusEl.className = 'error';
+        } else {
+          // Silently handle timeout during auto-refresh
+          statusEl.textContent = 'Refreshing...';
+          statusEl.className = '';
+        }
+        
         document.getElementById('live-dot').style.background = '#ef4444';
         // Still render even on error (will show empty state)
         renderListings();
+        
+        // If there's a pending refresh, trigger it now (after a delay)
+        if (pendingRefresh) {
+          pendingRefresh = false;
+          setTimeout(() => fetchListings(), 1000);
+        }
       } finally {
         btnRefresh.classList.remove('loading');
       }
@@ -2033,7 +2067,7 @@
     function startAutoRefresh() {
       if (autoRefreshInterval) clearInterval(autoRefreshInterval);
       
-      countdownValue = 3;
+      countdownValue = 5;
       countdownEl.textContent = `${countdownValue}s`;
 
       autoRefreshInterval = setInterval(() => {
@@ -2047,8 +2081,11 @@
         countdownEl.textContent = `${countdownValue}s`;
 
         if (countdownValue <= 0) {
-          fetchListings();
-          countdownValue = 3;
+          // Only trigger if not already loading (prevents stacking)
+          if (!isLoadingListings) {
+            fetchListings();
+          }
+          countdownValue = 5; // Increased to 5 seconds to reduce load
         }
       }, 1000);
     }

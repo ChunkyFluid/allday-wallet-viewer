@@ -4964,7 +4964,8 @@ app.get("/api/sniper-deals", async (req, res) => {
     // 'all' shows everything (no filter)
     
     // If we don't have many listings in memory, also check database (for fresh page loads)
-    if (filtered.length < 50) {
+    // Only query DB if we have very few listings (less than 10) to avoid slow queries on every request
+    if (filtered.length < 10 && statusFilter === 'active') {
       try {
         await ensureSniperListingsTable();
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
@@ -5007,8 +5008,20 @@ app.get("/api/sniper-deals", async (req, res) => {
               listing.buyerAddr = row.buyer_address;
             }
             
-            // Only add if not sold and not unlisted
-            if (!listing.isSold && !listing.isUnlisted) {
+            // Apply status filter when adding from database
+            if (statusFilter === 'active' && (!listing.isSold && !listing.isUnlisted)) {
+              filtered.push(listing);
+              memoryNftIds.add(listing.nftId);
+            } else if (statusFilter === 'sold' && listing.isSold) {
+              filtered.push(listing);
+              memoryNftIds.add(listing.nftId);
+            } else if (statusFilter === 'unlisted' && listing.isUnlisted && !listing.isSold) {
+              filtered.push(listing);
+              memoryNftIds.add(listing.nftId);
+            } else if (statusFilter === 'sold-unlisted' && (listing.isSold || listing.isUnlisted)) {
+              filtered.push(listing);
+              memoryNftIds.add(listing.nftId);
+            } else if (statusFilter === 'all') {
               filtered.push(listing);
               memoryNftIds.add(listing.nftId);
             }
