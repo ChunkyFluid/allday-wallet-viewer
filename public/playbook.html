@@ -16,6 +16,9 @@
       --text-muted: #8c95b8;
       --accent-purple: #6f42c1;
       --accent-cyan: #0dcaf0;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
     }
 
     body {
@@ -59,7 +62,179 @@
       -webkit-text-fill-color: initial;
     }
 
-    .coming-soon {
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--playbook-card);
+      border: 1px solid var(--playbook-border);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warning);
+    }
+
+    .status-indicator.active {
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .error-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      color: var(--danger);
+      font-size: 0.9rem;
+    }
+
+    .error-banner.hidden {
+      display: none;
+    }
+
+    .slates-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .slate-card {
+      background: var(--playbook-card);
+      border: 1px solid var(--playbook-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .slate-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(111, 66, 193, 0.2);
+      border-color: var(--accent-purple);
+    }
+
+    .slate-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 1rem;
+    }
+
+    .slate-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .slate-status {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .slate-status.active {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .slate-status.upcoming {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .slate-status.completed {
+      background: rgba(107, 114, 128, 0.2);
+      color: var(--text-muted);
+      border: 1px solid rgba(107, 114, 128, 0.3);
+    }
+
+    .slate-dates {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .slate-dates div {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .kickoffs-list {
+      margin-top: 1rem;
+    }
+
+    .kickoff-item {
+      padding: 0.75rem;
+      background: rgba(27, 34, 54, 0.5);
+      border: 1px solid var(--playbook-border);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kickoff-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .kickoff-name {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .kickoff-difficulty {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .kickoff-difficulty.easy {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--success);
+    }
+
+    .kickoff-difficulty.medium {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+
+    .kickoff-difficulty.hard {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state {
       text-align: center;
       padding: 4rem 2rem;
       background: var(--playbook-card);
@@ -67,26 +242,53 @@
       border-radius: 12px;
     }
 
-    .coming-soon-icon {
+    .empty-state-icon {
       font-size: 4rem;
       margin-bottom: 1rem;
     }
 
-    .coming-soon h2 {
+    .empty-state h2 {
       font-size: 1.5rem;
       font-weight: 600;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
       color: var(--text);
     }
 
-    .coming-soon p {
+    .empty-state p {
       color: var(--text-muted);
       font-size: 1rem;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, #6f42c1, #007bff);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .refresh-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
+    }
+
+    .refresh-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
     }
 
     @media (max-width: 768px) {
       .playbook-container {
         padding: 1rem;
+      }
+
+      .slates-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -98,14 +300,391 @@
     <div class="playbook-container">
       <div class="page-header">
         <h1>Playbook</h1>
+        <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
       </div>
 
-      <div class="coming-soon">
-        <div class="coming-soon-icon">📋</div>
-        <h2>Coming Soon</h2>
-        <p>The Playbook feature is under development. Check back soon!</p>
+      <div class="error-banner hidden" id="error-banner"></div>
+
+      <div class="status-bar">
+        <div class="status-indicator" id="status-indicator"></div>
+        <span id="status-text">Loading playbook data...</span>
+        <span style="margin-left: auto; color: var(--text-muted); font-size: 0.8rem;" id="last-updated"></span>
+      </div>
+
+      <div id="content-area">
+        <div class="loading">Loading slates...</div>
       </div>
     </div>
   </main>
+
+  <script>
+    let slates = [];
+    let isLoading = false;
+
+    const contentArea = document.getElementById('content-area');
+    const errorBanner = document.getElementById('error-banner');
+    const statusIndicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+    const lastUpdated = document.getElementById('last-updated');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    function formatDate(dateString) {
+      if (!dateString) return '—';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    function formatRelativeTime(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = date - now;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 0) return 'Ended';
+      if (diffMins < 60) return `in ${diffMins}m`;
+      if (diffHours < 24) return `in ${diffHours}h`;
+      return `in ${diffDays}d`;
+    }
+
+    function getStatusClass(status) {
+      if (!status) return 'upcoming';
+      const s = status.toLowerCase();
+      if (s === 'active' || s === 'live') return 'active';
+      if (s === 'completed' || s === 'ended') return 'completed';
+      return 'upcoming';
+    }
+
+    function renderSlates() {
+      if (slates.length === 0) {
+        contentArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h2>No Kickoff Slates Available</h2>
+            <p>Check back later for new slates and challenges!</p>
+          </div>
+        `;
+        return;
+      }
+
+      contentArea.innerHTML = `
+        <div class="slates-grid">
+          ${slates.map(slate => {
+            const kickoffs = slate.kickoffs || [];
+            const statusClass = getStatusClass(slate.status);
+            
+            return `
+              <div class="slate-card">
+                <div class="slate-header">
+                  <h3 class="slate-title">${slate.name || 'Unnamed Slate'}</h3>
+                  <span class="slate-status ${statusClass}">${slate.status || 'Unknown'}</span>
+                </div>
+                
+                <div class="slate-dates">
+                  <div>📅 Start: ${formatDate(slate.startDate)}</div>
+                  <div>📅 End: ${formatDate(slate.endDate)}</div>
+                </div>
+
+                ${kickoffs.length > 0 ? `
+                  <div class="kickoffs-list">
+                    <strong style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">
+                      Kickoffs (${kickoffs.length}):
+                    </strong>
+                    ${kickoffs.map(kickoff => `
+                      <div class="kickoff-item">
+                        <div>
+                          <div class="kickoff-name">${kickoff.name || 'Unnamed Kickoff'}</div>
+                          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            ${kickoff.numParticipants ? `${kickoff.numParticipants} participants` : ''}
+                            ${kickoff.submissionDeadline ? ` • Deadline: ${formatRelativeTime(kickoff.submissionDeadline)}` : ''}
+                          </div>
+                        </div>
+                        ${kickoff.difficulty ? `<span class="kickoff-difficulty ${kickoff.difficulty.toLowerCase()}">${kickoff.difficulty}</span>` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : '<div style="color: var(--text-muted); font-size: 0.85rem;">No kickoffs available</div>'}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function showError(message, details = '') {
+      errorBanner.textContent = `⚠️ ${message}${details ? `: ${details}` : ''}`;
+      errorBanner.classList.remove('hidden');
+      statusIndicator.classList.remove('active');
+      statusText.textContent = 'Error loading data';
+      statusIndicator.style.background = 'var(--danger)';
+    }
+
+    function hideError() {
+      errorBanner.classList.add('hidden');
+    }
+
+    async function fetchViaProxy() {
+      try {
+        // Try fetching via our server proxy endpoint that mimics browser better
+        const response = await fetch('/api/kickoff/slates?first=50&useBrowserHeaders=true', {
+          credentials: 'include',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.ok) {
+          return data;
+        }
+        
+        throw new Error(data.error || 'Proxy request failed');
+      } catch (err) {
+        console.error('Proxy fetch error:', err);
+        throw err;
+      }
+    }
+    
+    async function fetchViaScraping() {
+      try {
+        // Try HTML scraping fallback
+        const response = await fetch('/api/kickoff/slates?first=50&useScraping=true', {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.ok) {
+          return data;
+        }
+        
+        throw new Error(data.error || 'Scraping request failed');
+      } catch (err) {
+        console.error('Scraping fetch error:', err);
+        throw err;
+      }
+    }
+    
+    async function fetchSlatesDirectly() {
+      try {
+        // Try using an iframe approach - embed the playbook page and scrape it
+        // This is a workaround for CORS issues
+        return new Promise((resolve, reject) => {
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = 'https://nflallday.com/kickoffs';
+          iframe.onload = function() {
+            try {
+              // This won't work due to CORS, but we can try
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+              // Scrape data from iframe (limited by CORS)
+              reject(new Error('Direct browser fetch blocked by CORS'));
+            } catch (e) {
+              reject(new Error('Cannot access iframe content due to CORS'));
+            }
+          };
+          iframe.onerror = () => reject(new Error('Failed to load iframe'));
+          document.body.appendChild(iframe);
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            reject(new Error('Direct fetch timeout'));
+          }, 5000);
+        });
+      } catch (err) {
+        console.error('Direct fetch error:', err);
+        throw err;
+      }
+    }
+
+    async function fetchSlates() {
+      if (isLoading) return;
+      
+      isLoading = true;
+      refreshBtn.disabled = true;
+      statusText.textContent = 'Loading slates...';
+      statusIndicator.style.background = 'var(--warning)';
+      hideError();
+
+      try {
+        let data;
+        let useDirect = false;
+        
+        // Try server endpoint first
+        try {
+          const response = await fetch('/api/kickoff/slates?first=50', {
+            credentials: 'include'
+          });
+
+          data = await response.json();
+
+          // Check if data came from HTML scraping
+          if (data.ok && data.scraped) {
+            console.log('[Playbook] ✅ Successfully loaded data via HTML scraping!');
+            statusText.textContent = 'Loaded via HTML scraping';
+          }
+
+          // If we got 403 and scraping didn't work, try other methods
+          if ((!data.ok && (data.error?.includes('403') || data.error?.includes('Forbidden'))) || response.status === 403) {
+            console.log('[Playbook] Server request blocked (403) and scraping failed, trying proxy...');
+            statusText.textContent = 'Server blocked, trying alternative methods...';
+            useDirect = true;
+          }
+        } catch (serverErr) {
+          console.log('[Playbook] Server request failed, trying direct browser fetch...');
+          statusText.textContent = 'Trying direct connection...';
+          useDirect = true;
+        }
+        
+        // Try improved proxy if server failed
+        if (useDirect || !data || !data.ok) {
+          try {
+            console.log('[Playbook] Trying improved proxy with browser headers...');
+            statusText.textContent = 'Trying improved proxy...';
+            data = await fetchViaProxy();
+            if (data.ok) {
+              statusText.textContent = 'Loaded via improved proxy';
+            }
+          } catch (proxyErr) {
+            console.error('Proxy fetch failed, trying HTML scraping...');
+            
+            // Last resort: try HTML scraping
+            try {
+              statusText.textContent = 'Trying HTML scraping fallback...';
+              data = await fetchViaScraping();
+              if (data.ok) {
+                statusText.textContent = 'Loaded via HTML scraping';
+              }
+            } catch (scrapeErr) {
+              console.error('All methods failed:', scrapeErr);
+              // Show error with helpful message
+              if (useDirect && data && data.error) {
+                throw new Error(data.error);
+              }
+              // Show a helpful message with direct link
+              contentArea.innerHTML = `
+                <div class="empty-state">
+                  <div class="empty-state-icon">🔒</div>
+                  <h2>Access Restricted</h2>
+                  <p style="margin-bottom: 1.5rem;">
+                    The NFL All Day API is blocking automated requests with strict anti-bot protection.
+                    To view the Playbook, please visit the official site directly.
+                  </p>
+                  <a href="https://nflallday.com/kickoffs" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+                    🏈 Open Playbook on NFL All Day
+                  </a>
+                  <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem; background: rgba(111, 66, 193, 0.5);">
+                    🔄 Try Again
+                  </button>
+                  <p style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted); max-width: 600px; margin-left: auto; margin-right: auto;">
+                    <strong>Why is this blocked?</strong><br>
+                    NFL All Day uses advanced bot detection that blocks server-side requests. 
+                    For the best experience, access the Playbook directly on nflallday.com where your browser session is recognized.
+                  </p>
+                </div>
+              `;
+              throw new Error('All access methods blocked - please use the direct link above');
+            }
+          }
+        }
+
+        if (!data || !data.ok) {
+          throw new Error(data?.error || 'Failed to fetch slates');
+        }
+
+        if (data.edges && data.edges.length > 0) {
+          slates = data.edges.map(edge => edge.node);
+          renderSlates();
+          statusIndicator.classList.add('active');
+          statusIndicator.style.background = 'var(--success)';
+          statusText.textContent = `Loaded ${slates.length} slate${slates.length !== 1 ? 's' : ''}${data.cached ? ' (cached)' : ''}`;
+          lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        } else {
+          slates = [];
+          renderSlates();
+          statusIndicator.style.background = 'var(--text-muted)';
+          statusText.textContent = 'No slates available';
+        }
+      } catch (err) {
+        console.error('Error fetching slates:', err);
+        
+        // Check if it's a 403 or authentication error
+        if (err.message.includes('403') || err.message.includes('Forbidden') || err.message.includes('Access denied')) {
+          showError(
+            'Access Denied',
+            'The NFL All Day API is blocking requests. Try this: 1) Open nflallday.com in a new tab and make sure you are logged in, 2) Come back here and refresh. Your browser cookies will help authenticate the request.'
+          );
+        } else if (err.message.includes('503') || err.message.includes('Unable to connect')) {
+          showError(
+            'Service Unavailable',
+            'Unable to connect to the NFL All Day API. The service may be temporarily unavailable. Please try again later.'
+          );
+        } else if (err.message.includes('All access methods blocked')) {
+          // Special handling - error UI already shown
+          hideError();
+        } else if (err.message.includes('Both server and browser')) {
+          showError(
+            'Connection Failed',
+            err.message + ' Try opening nflallday.com in another tab first to establish a session.'
+          );
+        } else {
+          showError('Error loading playbook', err.message);
+        }
+        
+        // Still show cached data if we have it
+        if (slates.length > 0) {
+          renderSlates();
+        } else if (!err.message.includes('All access methods blocked')) {
+          // Only show default error UI if we haven't already shown a custom one
+          contentArea.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">⚠️</div>
+              <h2>Unable to Load Playbook</h2>
+              <p style="margin-bottom: 1rem;">${err.message}</p>
+              <a href="https://nflallday.com/kickoffs" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+                🏈 View on NFL All Day
+              </a>
+              <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem;">
+                🔄 Try Again
+              </button>
+            </div>
+          `;
+        }
+      } finally {
+        isLoading = false;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    refreshBtn.addEventListener('click', fetchSlates);
+
+    // Initial load
+    fetchSlates();
+
+    // Auto-refresh every 5 minutes
+    setInterval(() => {
+      if (!isLoading) {
+        fetchSlates();
+      }
+    }, 5 * 60 * 1000);
+  </script>
 </body>
 </html>

@@ -81,6 +81,140 @@ function ensureConnected() {
 const FLOW_WS_URL = "wss://rest-mainnet.onflow.org/v1/ws";
 const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
 
+// ------------------ FindLab API Integration ------------------
+// Alternative data source for Flow blockchain data - often faster and more reliable than direct Flow REST API
+
+const FINDLAB_API_BASE = "https://api.find.xyz";
+const FINDLAB_API_TIMEOUT = 10000; // 10 seconds
+
+// FindLab API wrapper functions with error handling and timeout
+async function findlabRequest(endpoint, options = {}) {
+  const url = `${FINDLAB_API_BASE}${endpoint}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FINDLAB_API_TIMEOUT);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+        ...options.headers
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`FindLab API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('FindLab API request timed out');
+    }
+    throw err;
+  }
+}
+
+// Get latest block height from FindLab API (faster alternative to Flow REST API)
+async function getLatestBlockHeightFindLab() {
+  try {
+    const data = await findlabRequest('/flow/v1/block?limit=1');
+    if (data && data.data && data.data.length > 0) {
+      const height = parseInt(data.data[0].height || 0);
+      if (height > 0) {
+        return height;
+      }
+    }
+    console.warn('[FindLab] Block height data structure unexpected:', JSON.stringify(data).substring(0, 200));
+    return null;
+  } catch (err) {
+    console.warn('[FindLab] Failed to get latest block height:', err.message);
+    return null;
+  }
+}
+
+// Get NFT holdings for an address using FindLab API
+async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDay') {
+  try {
+    // FindLab API format: /flow/v1/account/{address}/nft/{nft_type}
+    const encodedAddress = encodeURIComponent(address);
+    const encodedNftType = encodeURIComponent(nftType);
+    const data = await findlabRequest(`/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`);
+    
+    if (data.data && Array.isArray(data.data)) {
+      // Extract NFT IDs from the response
+      // Response format may vary, so we handle multiple possible structures
+      const nftIds = data.data.map(item => {
+        if (typeof item === 'string' || typeof item === 'number') return String(item);
+        return item.id || item.nft_id || item.identifier || String(item);
+      }).filter(Boolean);
+      
+      return nftIds;
+    }
+    
+    return [];
+  } catch (err) {
+    console.warn(`[FindLab] Failed to get NFTs for ${address}:`, err.message);
+    return null;
+  }
+}
+
+// Get specific NFT item data from FindLab API
+async function getNFTItemFindLab(nftType, nftId) {
+  try {
+    const encodedNftType = encodeURIComponent(nftType);
+    const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/item/${nftId}`);
+    
+    if (data.data) {
+      return data.data;
+    }
+    
+    return null;
+  } catch (err) {
+    console.warn(`[FindLab] Failed to get NFT item ${nftType}/${nftId}:`, err.message);
+    return null;
+  }
+}
+
+// Get account transaction history from FindLab API
+async function getAccountTransactionsFindLab(address, limit = 50) {
+  try {
+    const encodedAddress = encodeURIComponent(address);
+    const data = await findlabRequest(`/flow/v1/account/${encodedAddress}/transaction?limit=${Math.min(limit, 100)}`);
+    
+    if (data.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    
+    return [];
+  } catch (err) {
+    console.warn(`[FindLab] Failed to get transactions for ${address}:`, err.message);
+    return null;
+  }
+}
+
+// Get NFT transfers from FindLab API
+async function getNFTTransfersFindLab(nftType, limit = 50) {
+  try {
+    const encodedNftType = encodeURIComponent(nftType);
+    const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/transfer?limit=${Math.min(limit, 100)}`);
+    
+    if (data.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    
+    return [];
+  } catch (err) {
+    console.warn(`[FindLab] Failed to get NFT transfers for ${nftType}:`, err.message);
+    return null;
+  }
+}
+
 // Cache of recent live events (keep last 200)
 let liveEventsCache = [];
 const MAX_LIVE_EVENTS = 200;
@@ -120,12 +254,11 @@ function connectToFlowWebSocket() {
       
       // Subscribe to AllDay events
       const subscribeMsg = {
-        subscription_id: `allday-events-${Date.now()}`,
+        subscription_id: `ad-${Date.now().toString().slice(-12)}`, // Max 20 chars: "ad-" + 12 digits = 15 chars
         action: "subscribe",
         topic: "events",
         arguments: {
-          event_types: ALLDAY_EVENT_TYPES,
-          start_block_status: "finalized"
+          event_types: ALLDAY_EVENT_TYPES
         }
       };
       console.log("Sending subscription:", JSON.stringify(subscribeMsg));
@@ -138,12 +271,8 @@ function connectToFlowWebSocket() {
         const rawData = data.toString();
         const msg = JSON.parse(rawData);
         
-        // Log all incoming messages for debugging
-        console.log("Flow WS message received:", JSON.stringify(msg).substring(0, 500));
-        
-        // Handle subscription confirmation
+        // Handle subscription confirmation (silently)
         if (msg.subscription_id && !msg.events) {
-          console.log(`Subscription confirmed: ${msg.subscription_id}`);
           return;
         }
         
@@ -1222,9 +1351,20 @@ access(all) fun main(address: Address): [UInt64] {
 
 // Fetch wallet's AllDay NFTs - use database snapshot (fast) 
 // Live blockchain queries are too slow for real-time use
+// Now with FindLab API as a faster alternative
 async function fetchLiveWalletNFTs(walletAddress) {
-  // For now, return null to use database - live queries are too slow
-  // TODO: Set up a background job to keep wallet_holdings updated
+  // Try FindLab API first (faster than direct Flow REST API)
+  try {
+    const nftIds = await getWalletNFTsFindLab(walletAddress, 'A.e4cf4bdc1751c65d.AllDay');
+    if (nftIds && nftIds.length >= 0) {
+      console.log(`[LiveWallet] FindLab API returned ${nftIds.length} NFTs for ${walletAddress}`);
+      return nftIds;
+    }
+  } catch (err) {
+    console.warn(`[LiveWallet] FindLab API failed, falling back to database:`, err.message);
+  }
+  
+  // Fallback to database - live queries via Flow REST API are too slow
   return null;
 }
 
@@ -2859,6 +2999,109 @@ app.get("/api/test-flow-events", async (req, res) => {
   }
 });
 
+// Test endpoint for FindLab API integration
+app.get("/api/test-findlab", async (req, res) => {
+  try {
+    const testType = req.query.type || 'block';
+    const results = {};
+    
+    // Test 1: Get latest block height
+    if (testType === 'block' || testType === 'all') {
+      try {
+        const height = await getLatestBlockHeightFindLab();
+        results.blockHeight = {
+          success: true,
+          height: height,
+          source: 'FindLab API'
+        };
+      } catch (err) {
+        results.blockHeight = {
+          success: false,
+          error: err.message
+        };
+      }
+    }
+    
+    // Test 2: Get wallet NFTs (if address provided)
+    if ((testType === 'wallet' || testType === 'all') && req.query.address) {
+      try {
+        const address = req.query.address.trim();
+        const nftIds = await getWalletNFTsFindLab(address, 'A.e4cf4bdc1751c65d.AllDay');
+        results.walletNFTs = {
+          success: true,
+          address: address,
+          count: nftIds ? nftIds.length : 0,
+          nftIds: nftIds ? nftIds.slice(0, 10) : null, // First 10 only
+          source: 'FindLab API'
+        };
+      } catch (err) {
+        results.walletNFTs = {
+          success: false,
+          error: err.message
+        };
+      }
+    }
+    
+    // Test 3: Get NFT item (if nftId provided)
+    if ((testType === 'nft' || testType === 'all') && req.query.nftId) {
+      try {
+        const nftId = req.query.nftId.trim();
+        const nftData = await getNFTItemFindLab('A.e4cf4bdc1751c65d.AllDay', nftId);
+        results.nftItem = {
+          success: true,
+          nftId: nftId,
+          data: nftData,
+          source: 'FindLab API'
+        };
+      } catch (err) {
+        results.nftItem = {
+          success: false,
+          error: err.message
+        };
+      }
+    }
+    
+    // Test 4: Get account transactions (if address provided)
+    if ((testType === 'transactions' || testType === 'all') && req.query.address) {
+      try {
+        const address = req.query.address.trim();
+        const transactions = await getAccountTransactionsFindLab(address, 10);
+        results.transactions = {
+          success: true,
+          address: address,
+          count: transactions ? transactions.length : 0,
+          transactions: transactions ? transactions.slice(0, 5) : null, // First 5 only
+          source: 'FindLab API'
+        };
+      } catch (err) {
+        results.transactions = {
+          success: false,
+          error: err.message
+        };
+      }
+    }
+    
+    return res.json({
+      ok: true,
+      message: 'FindLab API test results',
+      tests: results,
+      usage: {
+        blockHeight: '/api/test-findlab?type=block',
+        walletNFTs: '/api/test-findlab?type=wallet&address=0x...',
+        nftItem: '/api/test-findlab?type=nft&nftId=123456',
+        transactions: '/api/test-findlab?type=transactions&address=0x...',
+        all: '/api/test-findlab?type=all&address=0x...&nftId=123456'
+      }
+    });
+  } catch (err) {
+    console.error("GET /api/test-findlab error:", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to test FindLab API: " + (err.message || String(err))
+    });
+  }
+});
+
 // Test endpoint to check what events exist in Snowflake
 app.get("/api/test-snowflake-events", async (req, res) => {
   try {
@@ -3176,9 +3419,24 @@ async function getLatestBlockHeight() {
     return cachedLatestBlockHeight;
   }
   
+  // Try FindLab API first (often faster and more reliable)
+  try {
+    const height = await getLatestBlockHeightFindLab();
+    if (height && height > 0) {
+      cachedLatestBlockHeight = height;
+      lastBlockHeightFetch = now;
+      return height;
+    }
+  } catch (err) {
+    console.warn("[BlockHeight] FindLab API failed, trying Flow REST API:", err.message);
+  }
+  
+  // Fallback to Flow REST API
   try {
     // Query the public Flow REST API for the latest block
-    const res = await fetch("https://rest-mainnet.onflow.org/v1/blocks?height=sealed");
+    const res = await fetch("https://rest-mainnet.onflow.org/v1/blocks?height=sealed", {
+      signal: AbortSignal.timeout(5000)
+    });
     if (res.ok) {
       const data = await res.json();
       const block = Array.isArray(data) ? data[0] : data;
@@ -3759,6 +4017,7 @@ async function persistSniperListing(listing) {
       VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
       ON CONFLICT (nft_id) 
       DO UPDATE SET 
+        listing_id = COALESCE($2, sniper_listings.listing_id),
         listing_data = $4, 
         updated_at = NOW(),
         is_sold = $6,
@@ -3885,6 +4144,47 @@ async function markListingAsSold(nftId, buyerAddr = null) {
     );
   } catch (e) {
     // Ignore update errors
+  }
+}
+
+// Reset all listings to unsold (useful after fixing verification logic)
+async function resetAllListingsToUnsold() {
+  try {
+    console.log('[Sniper] Resetting all listings to unsold...');
+    
+    // Update database
+    const result = await pgQuery(
+      `UPDATE sniper_listings 
+       SET is_sold = FALSE, buyer_address = NULL, updated_at = NOW()
+       WHERE is_sold = TRUE`
+    );
+    
+    console.log(`[Sniper] ✅ Reset ${result.rowCount || 0} listings to unsold in database`);
+    
+    // Clear in-memory soldNfts
+    soldNfts.clear();
+    console.log('[Sniper] ✅ Cleared in-memory soldNfts map');
+    
+    // Reset isSold flag on all in-memory listings
+    let resetCount = 0;
+    for (const listing of sniperListings) {
+      if (listing.isSold) {
+        listing.isSold = false;
+        listing.buyerAddr = null;
+        listing.buyerName = null;
+        resetCount++;
+      }
+    }
+    
+    console.log(`[Sniper] ✅ Reset ${resetCount} listings to unsold in memory`);
+    
+    return {
+      databaseReset: result.rowCount || 0,
+      memoryReset: resetCount
+    };
+  } catch (err) {
+    console.error('[Sniper] Error resetting listings to unsold:', err.message);
+    throw err;
   }
 }
 
@@ -4084,35 +4384,54 @@ async function watchForListings() {
   
   const checkForNewListings = async () => {
     try {
-      // Get latest block height from Flow REST API
-      const heightRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=sealed`, {
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
-      if (!heightRes.ok) {
-        console.error(`[Sniper] Failed to get block height: ${heightRes.status} ${heightRes.statusText}`);
+      // Get latest block height (try FindLab API first, fallback to Flow REST API)
+      let currentBlock = await getLatestBlockHeightFindLab();
+      if (currentBlock && currentBlock > 0) {
+        // Successfully got block height from FindLab
+      } else {
+        // Fallback to Flow REST API
+        try {
+          const heightRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=sealed`, {
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+          });
+          if (!heightRes.ok) {
+            console.error(`[Sniper] Failed to get block height from Flow REST API: ${heightRes.status} ${heightRes.statusText}`);
+            return;
+          }
+          const heightData = await heightRes.json();
+          const block = Array.isArray(heightData) ? heightData[0] : heightData;
+          currentBlock = parseInt(block?.header?.height || 0);
+          if (currentBlock > 0) {
+            // Successfully got from Flow REST API fallback
+          }
+        } catch (err) {
+          console.error(`[Sniper] Error fetching block height from Flow REST API:`, err.message);
+          return;
+        }
+      }
+      
+      if (!currentBlock || currentBlock <= 0) {
+        console.error(`[Sniper] Invalid block height after all attempts: ${currentBlock}`);
         return;
       }
       
-      const heightData = await heightRes.json();
-      const latestHeight = parseInt(heightData[0]?.header?.height || 0);
-      
       if (lastCheckedBlock === 0) {
         // Start from 100 blocks ago to catch any recent listings
-        lastCheckedBlock = Math.max(0, latestHeight - 100);
-        console.log(`[Sniper] 🔴 Starting watcher from block ${lastCheckedBlock} (current: ${latestHeight})`);
+        lastCheckedBlock = Math.max(0, currentBlock - 100);
+        console.log(`[Sniper] 🔴 Starting watcher from block ${lastCheckedBlock} (current: ${currentBlock})`);
       }
       
-      if (latestHeight <= lastCheckedBlock) {
+      if (currentBlock <= lastCheckedBlock) {
         // No new blocks, but log occasionally to show it's alive
         if (Date.now() % 30000 < 3000) { // Every ~30 seconds
-          console.log(`[Sniper] ⏳ Waiting for new blocks... (checked: ${lastCheckedBlock}, latest: ${latestHeight})`);
+          console.log(`[Sniper] ⏳ Waiting for new blocks... (checked: ${lastCheckedBlock}, latest: ${currentBlock})`);
         }
         return;
       }
       
       // Query for ListingAvailable and ListingCompleted events in new blocks
       const startHeight = lastCheckedBlock + 1;
-      const endHeight = Math.min(latestHeight, startHeight + 50); // Max 50 blocks at a time
+      const endHeight = Math.min(currentBlock, startHeight + 50); // Max 50 blocks at a time
       
       // Fetch all three event types in parallel with timeouts
       const fetchOptions = { signal: AbortSignal.timeout(10000) }; // 10 second timeout per request
@@ -4273,6 +4592,75 @@ async function watchForListings() {
               
               if (!targetNftId) continue;
               
+              // CRITICAL: We MUST find a matching listing before marking as sold
+              // Only mark as sold if:
+              // 1. We have the listing in our system (memory or database)
+              // 2. The listingResourceId matches exactly (most reliable)
+              // 3. The sale event happened AFTER the listing was created
+              
+              let existingListing = null;
+              
+              // First, try to find by listingResourceId (most reliable)
+              if (listingResourceId) {
+                existingListing = sniperListings.find(l => l.listingId === listingResourceId);
+                
+                // If not in memory, check database
+                if (!existingListing) {
+                  try {
+                    const dbResult = await pgQuery(
+                      `SELECT nft_id, listing_id, listed_at, is_sold 
+                       FROM sniper_listings 
+                       WHERE listing_id = $1 
+                       AND is_sold = FALSE 
+                       LIMIT 1`,
+                      [listingResourceId]
+                    );
+                    if (dbResult.rows.length > 0) {
+                      const dbRow = dbResult.rows[0];
+                      existingListing = {
+                        nftId: dbRow.nft_id,
+                        listingId: dbRow.listing_id,
+                        listedAt: dbRow.listed_at,
+                        isSold: dbRow.is_sold
+                      };
+                    }
+                  } catch (e) {
+                    // Ignore DB errors
+                  }
+                }
+              }
+              
+              // If we don't have a listingResourceId match, we CANNOT reliably mark as sold
+              // (an NFT could have been sold and relisted, so matching by nftId alone is unsafe)
+              if (!existingListing) {
+                console.log(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system - skipping`);
+                continue;
+              }
+              
+              // If already marked as sold, skip
+              if (existingListing.isSold) {
+                continue;
+              }
+              
+              // Verify the sale happened AFTER the listing was created
+              if (existingListing.listedAt) {
+                const listedAtDate = new Date(existingListing.listedAt);
+                const eventTimestamp = block.block_timestamp || event.timestamp || block.timestamp;
+                const eventDate = eventTimestamp ? new Date(eventTimestamp) : null;
+                
+                if (eventDate && !isNaN(eventDate.getTime()) && !isNaN(listedAtDate.getTime())) {
+                  // Add a small buffer (2 minutes) to account for timing variations
+                  const bufferMs = 2 * 60 * 1000;
+                  if (eventDate.getTime() < (listedAtDate.getTime() - bufferMs)) {
+                    console.log(`[Sniper] ⏭️  Skipping old ListingCompleted for listing ${listingResourceId} - event was ${Math.round((listedAtDate.getTime() - eventDate.getTime()) / 1000 / 60)} minutes before listing`);
+                    continue;
+                  }
+                } else {
+                  // Can't verify timing - be very cautious, but if we have exact listingId match, it's probably valid
+                  console.log(`[Sniper] ⚠️  Cannot verify timing for listing ${listingResourceId}, but proceeding with exact listingId match`);
+                }
+              }
+              
               // Extract buyer address from the event
               let buyerAddr = getField('purchaser')?.toString()?.toLowerCase() || 
                              getField('buyer')?.toString()?.toLowerCase() ||
@@ -4339,14 +4727,24 @@ async function watchForListings() {
                 }
               }
               
+              // We have exact listingResourceId match - this is very reliable
+              // Buyer address is preferred but not required for exact listingResourceId matches
+              // (listingResourceId is unique per listing, so if it matches, it's definitely sold)
               
-              // Mark this NFT as sold with buyer info
-              await markListingAsSold(targetNftId, buyerAddr);
-              if (buyerAddr) {
-                console.log(`[Sniper] ✅ Marked ${targetNftId} as sold to ${buyerAddr}`);
+              if (buyerAddr && buyerAddr.trim() !== '' && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
+                // We have a valid buyer address
+                await markListingAsSold(targetNftId, buyerAddr);
+                console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as sold to ${buyerAddr}`);
+              } else if (listingResourceId && existingListing && existingListing.listingId === listingResourceId) {
+                // Exact listingResourceId match but no buyer - still mark as sold (listingResourceId is unique)
+                await markListingAsSold(targetNftId, null);
+                console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as sold (buyer unknown, but exact listingId match)`);
               } else {
-                console.log(`[Sniper] ✅ Marked ${targetNftId} as sold (buyer unknown)`);
+                // No buyer and no exact listingResourceId match - skip to avoid false positive
+                console.log(`[Sniper] ⚠️  ListingCompleted for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no buyer and no exact listingId match - skipping`);
+                continue;
               }
+              
               soldCount++;
               
             } catch (e) {
@@ -4440,7 +4838,7 @@ async function watchForListings() {
       
       // Log every 10 blocks even if no events (to show it's working)
       if ((startHeight % 10 === 0) || (alldayCount > 0 || soldCount > 0 || unlistedCount > 0)) {
-        console.log(`[Sniper] Checked blocks ${startHeight}-${endHeight}, current block: ${latestHeight}, listings in memory: ${sniperListings.length}`);
+        console.log(`[Sniper] Checked blocks ${startHeight}-${endHeight}, current block: ${currentBlock}, listings in memory: ${sniperListings.length}`);
       }
       
       lastCheckedBlock = endHeight;
@@ -4475,19 +4873,48 @@ async function watchForListings() {
 
 async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
   try {
-    if (!nftId || !sellerAddr) return null;
+    if (!nftId || !sellerAddr || !listedAt) return null;
     
     const listedAtDate = new Date(listedAt);
-    const latestHeightRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=sealed`, {
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!latestHeightRes.ok) return null;
+    if (isNaN(listedAtDate.getTime())) {
+      console.warn(`[Verify] Invalid listedAt date for ${nftId}: ${listedAt}`);
+      return null;
+    }
     
-    const latestHeightData = await latestHeightRes.json();
-    const latestHeight = parseInt(latestHeightData[0]?.header?.height || 0);
+    // Try FindLab API first for block height (faster and more reliable)
+    let latestHeight = await getLatestBlockHeightFindLab();
+    if (!latestHeight || latestHeight <= 0) {
+      // Fallback to Flow REST API
+      try {
+        const latestHeightRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=sealed`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        if (!latestHeightRes.ok) {
+          console.warn(`[Verify] Failed to get block height: ${latestHeightRes.status}`);
+          return null;
+        }
+        const latestHeightData = await latestHeightRes.json();
+        latestHeight = parseInt(latestHeightData[0]?.header?.height || 0);
+        if (!latestHeight || latestHeight <= 0) {
+          console.warn(`[Verify] Invalid block height returned: ${latestHeight}`);
+          return null;
+        }
+      } catch (err) {
+        console.warn(`[Verify] Error fetching block height:`, err.message);
+        return null;
+      }
+    }
     
-    const sevenDaysOfBlocks = 302400;
-    const startHeight = Math.max(0, latestHeight - sevenDaysOfBlocks);
+    // Estimate the block height when the listing was created
+    // Flow produces ~2 blocks per second, so calculate approximate block height at listing time
+    const now = Date.now();
+    const secondsSinceListing = Math.max(0, (now - listedAtDate.getTime()) / 1000);
+    const blocksSinceListing = Math.floor(secondsSinceListing * 2); // ~2 blocks/second
+    const estimatedListedAtBlock = Math.max(0, latestHeight - blocksSinceListing);
+    
+    // Only check events that happened AFTER the listing was created
+    // Use a small buffer (50 blocks = ~25 seconds) to account for timing variations
+    const startHeight = Math.max(0, estimatedListedAtBlock - 50);
     
     const fetchOptions = { signal: AbortSignal.timeout(8000) };
     
@@ -4499,6 +4926,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       return f.value;
     };
     
+    // Query for ListingCompleted events only after the listing was created
     const completedRes = await fetch(
       `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingCompleted&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
@@ -4508,6 +4936,13 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       const completedData = await completedRes.json();
       for (const block of completedData) {
         if (!block.events) continue;
+        const blockHeight = parseInt(block.block_height || block.height || 0);
+        
+        // CRITICAL: Only consider events that happened AFTER the listing was created
+        if (blockHeight < estimatedListedAtBlock) {
+          continue; // This event happened before the listing, ignore it
+        }
+        
         for (const event of block.events) {
           try {
             let payload = event.payload;
@@ -4521,10 +4956,19 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
             const eventListingId = getField(fields, 'listingResourceID')?.toString();
             const eventNftId = getField(fields, 'nftID')?.toString();
             
-            const matches = (listingId && eventListingId === listingId) || 
-                           (eventNftId === nftId);
+            // STRICT MATCHING: 
+            // 1. If we have listingId, require exact listingId match (most reliable)
+            // 2. If no listingId in our data, we CANNOT safely match by nftId alone
+            //    (NFT could have been sold and relisted multiple times)
+            let matches = false;
+            if (listingId && eventListingId) {
+              // We have both listingIds - they must match exactly
+              matches = (eventListingId === listingId) && (eventNftId === nftId);
+            }
+            // REMOVED: else if (eventNftId === nftId) - this was causing false positives!
+            // If we don't have listingId in our data, we cannot safely verify which listing was sold
             
-            if (matches) {
+            if (matches && blockHeight >= estimatedListedAtBlock) {
               let buyerAddr = null;
               const txId = event.transaction_id || block.transactions?.[0]?.id;
               if (txId) {
@@ -4536,13 +4980,36 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
                     const txData = await txRes.json();
                     if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
                       buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
+                    } else if (txData?.payload?.payer) {
+                      buyerAddr = txData.payload.payer?.toLowerCase();
                     }
                   }
                 } catch (e) {
                 }
               }
               
-              return { isSold: true, isUnlisted: false, buyerAddr };
+              // If we have exact listingResourceId match, it's definitely sold (even without buyer)
+              // listingResourceId is unique per listing, so this is very reliable
+              if (listingId && eventListingId === listingId) {
+                if (buyerAddr && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
+                  console.log(`[Verify] ✅ Found ListingCompleted for listing ${listingId} (nft: ${nftId}) - buyer: ${buyerAddr}`);
+                  return { isSold: true, isUnlisted: false, buyerAddr };
+                } else {
+                  // Exact listingResourceId match but no buyer - still mark as sold (listingResourceId is unique)
+                  console.log(`[Verify] ✅ Found ListingCompleted for listing ${listingId} (nft: ${nftId}) - exact listingId match, marking as sold (buyer unknown)`);
+                  return { isSold: true, isUnlisted: false, buyerAddr: null };
+                }
+              } else if (eventNftId === nftId && !listingId) {
+                // Only nftId match and we don't have listingId in our data - require buyer address
+                if (buyerAddr && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
+                  console.log(`[Verify] ✅ Found ListingCompleted for nft ${nftId} (no listingId in our data) - buyer: ${buyerAddr}`);
+                  return { isSold: true, isUnlisted: false, buyerAddr };
+                } else {
+                  console.log(`[Verify] ⚠️  Found ListingCompleted for nft ${nftId} but no listingId in our data and no buyer (txId: ${txId || 'none'}) - skipping to avoid false positive`);
+                }
+              } else {
+                console.log(`[Verify] ⚠️  Match conditions not met: listingId=${listingId}, eventListingId=${eventListingId}, nftId=${nftId}, eventNftId=${eventNftId}`);
+              }
             }
           } catch (e) {
           }
@@ -4550,6 +5017,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       }
     }
     
+    // Query for ListingRemoved events only after the listing was created
     const removedRes = await fetch(
       `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingRemoved&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
@@ -4559,6 +5027,13 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       const removedData = await removedRes.json();
       for (const block of removedData) {
         if (!block.events) continue;
+        const blockHeight = parseInt(block.block_height || block.height || 0);
+        
+        // Only consider events that happened AFTER the listing was created
+        if (blockHeight < estimatedListedAtBlock) {
+          continue;
+        }
+        
         for (const event of block.events) {
           try {
             let payload = event.payload;
@@ -4572,10 +5047,14 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
             const eventListingId = getField(fields, 'listingResourceID')?.toString();
             const eventNftId = getField(fields, 'nftID')?.toString();
             
-            const matches = (listingId && eventListingId === listingId) || 
-                           (eventNftId === nftId);
+            // STRICT MATCHING: Only match if we have exact listingId match
+            let matches = false;
+            if (listingId && eventListingId) {
+              matches = (eventListingId === listingId) && (eventNftId === nftId);
+            }
+            // REMOVED: else if (eventNftId === nftId) - this causes false positives for delisted items too!
             
-            if (matches) {
+            if (matches && blockHeight >= estimatedListedAtBlock) {
               return { isSold: false, isUnlisted: true, buyerAddr: null };
             }
           } catch (e) {
@@ -4690,7 +5169,13 @@ async function verifyExistingListingsStatus() {
           }
           
           if (status.isSold) {
-            await markListingAsSold(item.nftId, status.buyerAddr);
+            // Mark as sold - buyer address is optional if we have exact listingResourceId match
+            await markListingAsSold(item.nftId, status.buyerAddr || null);
+            if (status.buyerAddr) {
+              console.log(`[Sniper Verify] ✅ Marked ${item.nftId} (listing ${item.listingId || 'unknown'}) as sold to ${status.buyerAddr}`);
+            } else {
+              console.log(`[Sniper Verify] ✅ Marked ${item.nftId} (listing ${item.listingId || 'unknown'}) as sold (buyer unknown, but exact listingId match)`);
+            }
             updated++;
           } else if (status.isUnlisted) {
             await markListingAsUnlisted(item.nftId);
@@ -4943,6 +5428,230 @@ async function initializeSniper() {
 }
 
 // API endpoint to get sniper listings with filtering
+// Debug endpoint to find a listing by player name and serial
+app.get("/api/sniper/find-listing", async (req, res) => {
+  try {
+    const { player, serial } = req.query;
+    
+    if (!player && !serial) {
+      return res.status(400).json({
+        ok: false,
+        error: "Please provide player name (e.g., ?player=Tony Dorsett&serial=44)"
+      });
+    }
+    
+    // Search in database
+    let query = `
+      SELECT sl.nft_id, sl.listing_id, sl.listed_at, sl.is_sold, sl.is_unlisted, 
+             sl.buyer_address, sl.listing_data, sl.updated_at,
+             m.serial_number, m.first_name, m.last_name, m.team_name, m.tier
+      FROM sniper_listings sl
+      JOIN nft_core_metadata m ON m.nft_id = sl.nft_id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramCount = 1;
+    
+    if (player) {
+      const playerLower = player.toLowerCase();
+      query += ` AND (LOWER(m.first_name || ' ' || m.last_name) LIKE $${paramCount} OR LOWER(m.last_name) LIKE $${paramCount})`;
+      params.push(`%${playerLower}%`);
+      paramCount++;
+    }
+    
+    if (serial) {
+      query += ` AND m.serial_number = $${paramCount}`;
+      params.push(parseInt(serial));
+      paramCount++;
+    }
+    
+    query += ` ORDER BY sl.listed_at DESC LIMIT 10`;
+    
+    const result = await pgQuery(query, params);
+    
+    if (result.rows.length === 0) {
+      return res.json({
+        ok: true,
+        found: false,
+        message: "No listings found matching criteria"
+      });
+    }
+    
+    // For each found listing, get verification details
+    const listings = [];
+    for (const row of result.rows) {
+      const listingData = typeof row.listing_data === 'string' 
+        ? JSON.parse(row.listing_data) 
+        : row.listing_data;
+      
+      const listing = {
+        nftId: row.nft_id,
+        listingId: row.listing_id,
+        serialNumber: row.serial_number,
+        playerName: `${row.first_name} ${row.last_name}`,
+        team: row.team_name,
+        tier: row.tier,
+        listedAt: row.listed_at,
+        isSold: row.is_sold,
+        isUnlisted: row.is_unlisted,
+        buyerAddress: row.buyer_address,
+        updatedAt: row.updated_at,
+        sellerAddr: listingData?.sellerAddr || listingData?.seller_addr,
+        listingPrice: listingData?.listingPrice
+      };
+      
+      // If it's marked as sold, let's verify why
+      if (row.is_sold && row.listing_id) {
+        try {
+          const status = await verifyListingStatusFast(
+            row.nft_id,
+            row.listing_id,
+            row.listed_at,
+            listing.sellerAddr
+          );
+          listing.verificationResult = status;
+        } catch (e) {
+          listing.verificationError = e.message;
+        }
+      }
+      
+      listings.push(listing);
+    }
+    
+    return res.json({
+      ok: true,
+      found: true,
+      count: listings.length,
+      listings: listings
+    });
+  } catch (err) {
+    console.error("[API] Error finding listing:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to find listing: " + (err.message || String(err))
+    });
+  }
+});
+
+// Manual verification endpoint for a specific listing
+app.get("/api/sniper/verify-listing", async (req, res) => {
+  try {
+    const { nftId, listingId } = req.query;
+    
+    if (!nftId && !listingId) {
+      return res.status(400).json({
+        ok: false,
+        error: "Please provide either nftId or listingId"
+      });
+    }
+    
+    // Find the listing
+    let listing = null;
+    if (listingId) {
+      listing = sniperListings.find(l => l.listingId === listingId);
+      if (!listing) {
+        const dbResult = await pgQuery(
+          `SELECT nft_id, listing_id, listed_at, seller_addr, listing_data 
+           FROM sniper_listings 
+           WHERE listing_id = $1 LIMIT 1`,
+          [listingId]
+        );
+        if (dbResult.rows.length > 0) {
+          const row = dbResult.rows[0];
+          listing = {
+            nftId: row.nft_id,
+            listingId: row.listing_id,
+            listedAt: row.listed_at,
+            sellerAddr: row.seller_addr
+          };
+        }
+      }
+    } else if (nftId) {
+      listing = sniperListings.find(l => l.nftId === nftId);
+      if (!listing) {
+        const dbResult = await pgQuery(
+          `SELECT nft_id, listing_id, listed_at, seller_addr 
+           FROM sniper_listings 
+           WHERE nft_id = $1 
+           ORDER BY listed_at DESC 
+           LIMIT 1`,
+          [nftId]
+        );
+        if (dbResult.rows.length > 0) {
+          const row = dbResult.rows[0];
+          listing = {
+            nftId: row.nft_id,
+            listingId: row.listing_id,
+            listedAt: row.listed_at,
+            sellerAddr: row.seller_addr
+          };
+        }
+      }
+    }
+    
+    if (!listing) {
+      return res.status(404).json({
+        ok: false,
+        error: "Listing not found in our system"
+      });
+    }
+    
+    // Verify status
+    const status = await verifyListingStatusFast(
+      listing.nftId,
+      listing.listingId,
+      listing.listedAt,
+      listing.sellerAddr
+    );
+    
+    if (status && status.isSold) {
+      // Mark as sold if verified
+      await markListingAsSold(listing.nftId, status.buyerAddr || null);
+    } else if (status && status.isUnlisted) {
+      await markListingAsUnlisted(listing.nftId);
+    }
+    
+    return res.json({
+      ok: true,
+      listing: {
+        nftId: listing.nftId,
+        listingId: listing.listingId,
+        listedAt: listing.listedAt,
+        sellerAddr: listing.sellerAddr
+      },
+      verification: status || { isSold: false, isUnlisted: false },
+      message: status 
+        ? (status.isSold ? "Listing verified as SOLD" : status.isUnlisted ? "Listing verified as DELISTED" : "Listing is still ACTIVE")
+        : "Could not verify listing status"
+    });
+  } catch (err) {
+    console.error("[API] Error verifying listing:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to verify listing: " + (err.message || String(err))
+    });
+  }
+});
+
+// Reset all listings to unsold (useful after fixing verification logic)
+app.post("/api/sniper/reset-all-unsold", async (req, res) => {
+  try {
+    const result = await resetAllListingsToUnsold();
+    return res.json({
+      ok: true,
+      message: "All listings reset to unsold",
+      databaseReset: result.databaseReset,
+      memoryReset: result.memoryReset
+    });
+  } catch (err) {
+    console.error("[API] Error resetting listings to unsold:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to reset listings: " + (err.message || String(err))
+    });
+  }
+});
+
 app.get("/api/sniper-deals", async (req, res) => {
   try {
     // Get filter params
@@ -5828,7 +6537,7 @@ async function setupInsightsRefresh() {
       }
     } else {
       const age = await pool.query(`SELECT EXTRACT(EPOCH FROM (now() - updated_at)) / 3600 AS hours_old FROM insights_snapshot WHERE id = 1;`);
-      const hoursOld = age.rows[0]?.hours_old || 0;
+      const hoursOld = parseFloat(age.rows[0]?.hours_old || 0);
       console.log(`📊 Insights snapshot exists (${hoursOld.toFixed(1)} hours old). Will auto-refresh every 6 hours.`);
     }
     
@@ -5870,7 +6579,7 @@ const CACHE_TTL = 2 * 60 * 1000; // Cache for 2 minutes
 let graphqlRequestCount = 0;
 let graphqlRequestWindowStart = Date.now();
 const GRAPHQL_RATE_LIMIT_WINDOW = 60000; // 1 minute
-const GRAPHQL_MAX_REQUESTS_PER_WINDOW = 1; // Max 1 request per minute
+const GRAPHQL_MAX_REQUESTS_PER_WINDOW = 5; // Max 5 requests per minute (increased from 1)
 
 // Helper function to create cache key from query and variables
 function createCacheKey(query, variables) {
@@ -5924,7 +6633,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
   graphqlRequestCount++;
   
   // Add a small delay before making request (helps avoid bot detection)
-  await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between requests
+  await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay between requests (increased to reduce 403s)
 
   try {
     const headers = {
@@ -6067,10 +6776,221 @@ function isResponseCached(query, variables) {
 // PLAYBOOK/KICKOFF API ENDPOINTS
 // ============================================================
 
+// Scrape kickoff slates from HTML (fallback when GraphQL is blocked)
+async function scrapeKickoffSlatesFromHTML() {
+  try {
+    // Try multiple possible URLs for kickoff page
+    const urls = [
+      'https://nflallday.com/kickoffs',
+      'https://www.nflallday.com/kickoffs',
+      'https://nflallday.com/kickoffs/',
+      'https://www.nflallday.com/kickoffs/'
+    ];
+    
+    let response = null;
+    let lastError = null;
+    
+    for (const url of urls) {
+      try {
+        response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://nflallday.com/",
+            "Accept-Encoding": "gzip, deflate, br"
+          },
+          redirect: 'follow'
+        });
+        
+        if (response.ok) {
+          console.log(`[Scrape] Successfully fetched ${url}`);
+          break;
+        } else {
+          lastError = new Error(`HTTP ${response.status}: ${response.statusText} for ${url}`);
+        }
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw lastError || new Error(`Failed to fetch kickoffs page. All URLs returned errors.`);
+    }
+    
+    const html = await response.text();
+    
+    // Try to find embedded JSON data in script tags (Next.js pattern)
+    const nextDataMatch = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
+    if (nextDataMatch) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        console.log('[Scrape] Found Next.js embedded data');
+        
+        // Navigate through Next.js data structure to find kickoff data
+        // The structure is typically in props.pageProps or props.initialState
+        const pageProps = nextData.props?.pageProps;
+        const initialState = nextData.props?.initialState;
+        
+        // Try to find GraphQL query result data
+        // Look for searchKickoffSlates in various locations
+        let slatesData = null;
+        
+        // Check common locations for GraphQL data in Next.js apps
+        if (pageProps?.data?.searchKickoffSlates) {
+          slatesData = pageProps.data.searchKickoffSlates;
+        } else if (pageProps?.searchKickoffSlates) {
+          slatesData = pageProps.searchKickoffSlates;
+        } else if (pageProps?.dehydratedState?.queries) {
+          // React Query / TanStack Query dehydrated state
+          for (const query of pageProps.dehydratedState.queries) {
+            if (query.queryKey?.[0] === 'SearchKickoffSlates' && query.state?.data) {
+              slatesData = query.state.data.searchKickoffSlates || query.state.data;
+              console.log('[Scrape] Found data in dehydratedState queries');
+              break;
+            }
+          }
+        } else if (initialState?.apollo?.ROOT_QUERY) {
+          // Apollo Client cache structure
+          const apolloCache = initialState.apollo.ROOT_QUERY;
+          const slateKeys = Object.keys(apolloCache).filter(k => k.includes('searchKickoffSlates'));
+          if (slateKeys.length > 0) {
+            // Extract from Apollo cache (more complex parsing needed)
+            console.log('[Scrape] Found Apollo cache, but needs custom extraction');
+          }
+        }
+        
+        // Also try to find data in window.__APOLLO_STATE__ or similar
+        const apolloStateMatch = html.match(/window\.__APOLLO_STATE__\s*=\s*({.+?});/s);
+        if (apolloStateMatch && !slatesData) {
+          try {
+            const apolloState = JSON.parse(apolloStateMatch[1]);
+            console.log('[Scrape] Found window.__APOLLO_STATE__');
+            // Apollo state is keyed by query hash, need to search for searchKickoffSlates
+            const allKeys = Object.keys(apolloState);
+            const slateQueryKeys = allKeys.filter(k => k.includes('searchKickoffSlates') || k.includes('SearchKickoffSlates'));
+            if (slateQueryKeys.length > 0) {
+              // Try to extract edges/nodes from Apollo cache
+              for (const key of slateQueryKeys) {
+                const queryData = apolloState[key];
+                if (queryData?.edges) {
+                  slatesData = queryData;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log('[Scrape] Could not parse Apollo state:', e.message);
+          }
+        }
+        
+        if (slatesData && slatesData.edges) {
+          console.log(`[Scrape] Successfully extracted ${slatesData.edges.length} slates from HTML`);
+          return {
+            ok: true,
+            ...slatesData,
+            scraped: true
+          };
+        } else {
+          console.log('[Scrape] Found Next.js data but no kickoff slates structure');
+          // Log structure for debugging
+          console.log('[Scrape] Available keys:', Object.keys(nextData.props || {}));
+        }
+      } catch (e) {
+        console.log('[Scrape] Could not parse Next.js data:', e.message);
+      }
+    } else {
+      console.log('[Scrape] No __NEXT_DATA__ script tag found');
+    }
+    
+    // Try regex pattern matching for slate data in HTML (less reliable but fallback)
+    // Look for JSON-like structures in script tags
+    const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+    if (scriptMatches) {
+      for (const script of scriptMatches) {
+        // Look for patterns like "searchKickoffSlates" or "edges"
+        if (script.includes('searchKickoffSlates') || script.includes('kickoff')) {
+          // Try to extract JSON
+          const jsonMatch = script.match(/\{[\s\S]*"searchKickoffSlates"[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const data = JSON.parse(jsonMatch[0]);
+              if (data.searchKickoffSlates) {
+                console.log('[Scrape] Found slates in script tag');
+                return {
+                  ok: true,
+                  ...data.searchKickoffSlates,
+                  scraped: true
+                };
+              }
+            } catch (e) {
+              // Not valid JSON, continue
+            }
+          }
+        }
+      }
+    }
+    
+    return { ok: false, error: 'Could not extract kickoff slate data from HTML. The page structure may have changed.' };
+  } catch (err) {
+    console.error('[Scrape] Error scraping kickoff page:', err.message);
+    throw err;
+  }
+}
+
 // Get all kickoff slates
 app.get("/api/kickoff/slates", async (req, res) => {
   try {
-    const { after = "", first = 50, statuses } = req.query;
+    const { after = "", first = 50, statuses, useClientProxy = "false", useBrowserHeaders = "false", useScraping = "false" } = req.query;
+    
+    // If client proxy is requested, return instructions for browser-side fetch
+    if (useClientProxy === "true") {
+      return res.json({
+        ok: true,
+        useClientProxy: true,
+        graphqlUrl: NFLAD_GRAPHQL_URL,
+        query: `
+          query SearchKickoffSlates($input: SearchKickoffSlatesInput!) {
+            searchKickoffSlates(input: $input) {
+              edges {
+                node {
+                  id
+                  name
+                  startDate
+                  endDate
+                  status
+                  kickoffs {
+                    id
+                    name
+                    slateID
+                    difficulty
+                    status
+                    submissionDeadline
+                    gamesStartAt
+                    completedAt
+                    numParticipants
+                  }
+                }
+                cursor
+              }
+              pageInfo {
+                endCursor
+                hasNextPage
+              }
+              totalCount
+            }
+          }
+        `,
+        variables: {
+          input: {
+            after,
+            first: parseInt(first, 10),
+            ...(statuses && { filters: { byStatuses: statuses.split(",") } })
+          }
+        }
+      });
+    }
     
     const query = `
       query SearchKickoffSlates($input: SearchKickoffSlatesInput!) {
@@ -6114,15 +7034,78 @@ app.get("/api/kickoff/slates", async (req, res) => {
     };
     
     try {
+      // Try GraphQL first
       const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
-      res.json({ ok: true, ...data.searchKickoffSlates, cached: isResponseCached(query, variables) });
+      if (data && data.searchKickoffSlates) {
+        return res.json({ ok: true, ...data.searchKickoffSlates, cached: isResponseCached(query, variables) });
+      } else {
+        throw new Error('GraphQL returned invalid data structure');
+      }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error for kickoff slates:", graphqlErr.message);
-      res.status(503).json({ 
+      
+      // Check if we have cached data we can return even on error
+      const cacheKey = createCacheKey(query, variables);
+      const cached = graphqlCache.get(cacheKey);
+      
+      if (cached && Date.now() < cached.expiresAt) {
+        console.log("[API] Returning cached data despite error");
+        return res.json({ 
+          ok: true, 
+          ...cached.data.searchKickoffSlates, 
+          cached: true,
+          error: "Using cached data due to API error",
+          errorDetails: graphqlErr.message
+        });
+      }
+      
+      // Determine error status code based on error message
+      let statusCode = 503;
+      let errorMsg = "Unable to connect to NFL All Day API";
+      
+      if (graphqlErr.message.includes("403") || graphqlErr.message.includes("Forbidden")) {
+        statusCode = 403;
+        errorMsg = "Access denied by NFL All Day API. This may be due to rate limiting, authentication requirements, or bot detection.";
+      } else if (graphqlErr.message.includes("429") || graphqlErr.message.includes("rate limit")) {
+        statusCode = 429;
+        errorMsg = "Rate limited by NFL All Day API. Please try again later.";
+      }
+      
+      // If GraphQL fails with 403, automatically try HTML scraping as fallback
+      if (statusCode === 403) {
+        console.log("[API] GraphQL blocked (403), automatically attempting HTML scraping fallback...");
+        try {
+          const scrapedData = await scrapeKickoffSlatesFromHTML();
+          if (scrapedData.ok) {
+            console.log("[API] HTML scraping succeeded! Returning scraped data.");
+            return res.json(scrapedData);
+          } else {
+            console.log("[API] HTML scraping found no data:", scrapedData.error);
+          }
+        } catch (scrapeErr) {
+          console.error("[API] HTML scraping failed:", scrapeErr.message);
+        }
+      } else if (useScraping === "true") {
+        // Also try scraping if explicitly requested
+        console.log("[API] HTML scraping explicitly requested...");
+        try {
+          const scrapedData = await scrapeKickoffSlatesFromHTML();
+          if (scrapedData.ok) {
+            return res.json(scrapedData);
+          }
+        } catch (scrapeErr) {
+          console.error("[API] HTML scraping failed:", scrapeErr.message);
+        }
+      }
+      
+      // Return suggestion to use scraping or client proxy on 403
+      res.status(statusCode).json({ 
         ok: false, 
-        error: "Unable to connect to NFL All Day API. Please check if the GraphQL endpoint URL is correct.",
+        error: errorMsg,
         details: graphqlErr.message,
-        hint: "Set NFLAD_GRAPHQL_URL environment variable or check server logs for details"
+        useClientProxy: true,
+        useScraping: true,
+        hint: statusCode === 403 ? "The API is blocking requests. Try adding ?useScraping=true to use HTML scraping, or access nflallday.com in your browser first to establish a session." : "Set NFLAD_GRAPHQL_URL environment variable or check server logs for details"
       });
     }
   } catch (err) {
