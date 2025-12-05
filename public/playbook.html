@@ -9,16 +9,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --playbook-bg: #050815;
-      --playbook-card: #0b1020;
-      --playbook-border: #1b2236;
+      --bg: #050815;
+      --card: #0b1020;
+      --card-hover: #0f1628;
+      --border: #1b2236;
       --text: #f8f9ff;
       --text-muted: #8c95b8;
-      --accent-purple: #6f42c1;
-      --accent-cyan: #0dcaf0;
-      --success: #22c55e;
-      --warning: #f59e0b;
+      --accent: #22c55e;
+      --purple: #6f42c1;
+      --cyan: #0dcaf0;
+      --gold: #fbbf24;
       --danger: #ef4444;
+      --diff-free: #22c55e;
+      --diff-common: #60a5fa;
+      --diff-rare: #a78bfa;
+      --diff-legendary: #fbbf24;
     }
 
     body {
@@ -29,8 +34,8 @@
       margin: 0;
     }
 
-    .playbook-container {
-      max-width: 1400px;
+    .container {
+      max-width: 1200px;
       margin: 0 auto;
       padding: 2rem;
     }
@@ -39,7 +44,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       flex-wrap: wrap;
       gap: 1rem;
     }
@@ -52,500 +57,389 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
     }
 
-    .page-header h1::before {
-      content: "📋";
-      -webkit-text-fill-color: initial;
-    }
-
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.75rem 1rem;
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
+    .last-updated {
+      color: var(--text-muted);
       font-size: 0.85rem;
     }
 
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--warning);
-    }
-
-    .status-indicator.active {
-      background: var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .error-banner {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: 8px;
-      padding: 1rem;
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
       margin-bottom: 1.5rem;
-      color: var(--danger);
-      font-size: 0.9rem;
+      flex-wrap: wrap;
     }
 
-    .error-banner.hidden {
-      display: none;
+    .tab {
+      padding: 0.6rem 1.2rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s;
     }
 
-    .slates-grid {
+    .tab:hover { border-color: var(--purple); color: var(--text); }
+    .tab.active { background: var(--purple); border-color: var(--purple); color: white; }
+
+    /* Kickoff Cards */
+    .kickoffs-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
+      gap: 1rem;
     }
 
-    .slate-card {
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
+    .kickoff-card {
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 1.5rem;
-      transition: transform 0.2s, box-shadow 0.2s;
+      padding: 1.25rem;
+      transition: all 0.2s;
     }
 
-    .slate-card:hover {
+    .kickoff-card:hover {
+      border-color: var(--purple);
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(111, 66, 193, 0.2);
-      border-color: var(--accent-purple);
     }
 
-    .slate-header {
+    .kickoff-header {
       display: flex;
       justify-content: space-between;
-      align-items: start;
+      align-items: flex-start;
       margin-bottom: 1rem;
+      gap: 1rem;
     }
 
-    .slate-title {
-      font-size: 1.25rem;
+    .kickoff-title {
+      font-size: 1.1rem;
       font-weight: 600;
-      color: var(--text);
-      margin: 0;
+      margin: 0 0 0.25rem 0;
     }
 
-    .slate-status {
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
+    .kickoff-meta {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+    }
+
+    .difficulty-badge {
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
     }
 
-    .slate-status.active {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-    }
+    .diff-free { background: rgba(34, 197, 94, 0.2); color: var(--diff-free); }
+    .diff-common { background: rgba(96, 165, 250, 0.2); color: var(--diff-common); }
+    .diff-rare { background: rgba(167, 139, 250, 0.2); color: var(--diff-rare); }
+    .diff-legendary { background: rgba(251, 191, 36, 0.2); color: var(--diff-legendary); }
 
-    .slate-status.upcoming {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-
-    .slate-status.completed {
-      background: rgba(107, 114, 128, 0.2);
-      color: var(--text-muted);
-      border: 1px solid rgba(107, 114, 128, 0.3);
-    }
-
-    .slate-dates {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    .slate-dates div {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .kickoffs-list {
-      margin-top: 1rem;
-    }
-
-    .kickoff-item {
-      padding: 0.75rem;
-      background: rgba(27, 34, 54, 0.5);
-      border: 1px solid var(--playbook-border);
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .kickoff-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .kickoff-name {
-      font-weight: 500;
-      color: var(--text);
-    }
-
-    .kickoff-difficulty {
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.7rem;
+    .status-badge {
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
       font-weight: 600;
-      text-transform: uppercase;
     }
 
-    .kickoff-difficulty.easy {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
+    .status-live { background: rgba(34, 197, 94, 0.2); color: var(--accent); }
+    .status-upcoming { background: rgba(96, 165, 250, 0.2); color: var(--cyan); }
+    .status-completed { background: rgba(140, 149, 184, 0.2); color: var(--text-muted); }
+
+    .deadline {
+      color: var(--text-muted);
     }
 
-    .kickoff-difficulty.medium {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
+    .play-btn {
+      padding: 0.5rem 1rem;
+      background: linear-gradient(135deg, var(--purple), #007bff);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s;
     }
 
-    .kickoff-difficulty.hard {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--danger);
+    .play-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
     }
 
+    /* Slots/Requirements */
+    .slots-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .slot {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.6rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      font-size: 0.75rem;
+    }
+
+    .slot-pos {
+      font-weight: 600;
+      color: var(--cyan);
+    }
+
+    .slot-stat {
+      color: var(--text-muted);
+    }
+
+    .slot-value {
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state h2 {
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Loading */
     .loading {
       text-align: center;
       padding: 3rem;
       color: var(--text-muted);
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
-      border-radius: 12px;
-    }
-
-    .empty-state-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
-
-    .empty-state h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: var(--text);
-    }
-
-    .empty-state p {
-      color: var(--text-muted);
-      font-size: 1rem;
-    }
-
-    .refresh-btn {
-      background: linear-gradient(135deg, #6f42c1, #007bff);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .refresh-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
-    }
-
-    .refresh-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
     @media (max-width: 768px) {
-      .playbook-container {
-        padding: 1rem;
-      }
-
-      .slates-grid {
-        grid-template-columns: 1fr;
-      }
+      .container { padding: 1rem; }
+      .kickoff-header { flex-direction: column; }
+      .play-btn { width: 100%; text-align: center; }
     }
   </style>
 </head>
 <body>
   <div id="app-header"></div>
   <script src="/layout.js"></script>
-  <script src="/js/nflad-client.js"></script>
-  <main class="app-main">
-    <div class="playbook-container">
-      <div class="page-header">
-        <h1>Playbook</h1>
-        <div style="display: flex; gap: 1rem; align-items: center;">
-          <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
-          <a href="https://nflallday.com/games" target="_blank" style="background: var(--playbook-card); border: 1px solid var(--playbook-border); color: var(--text); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 500; text-decoration: none; font-size: 0.85rem;">
-            🏈 View on NFL All Day ↗
-          </a>
-        </div>
-      </div>
 
-      <div class="error-banner hidden" id="error-banner"></div>
+  <main class="container">
+    <div class="page-header">
+      <h1>🏈 Playbook</h1>
+      <span class="last-updated" id="lastUpdated"></span>
+    </div>
 
-      <div class="status-bar">
-        <div class="status-indicator" id="status-indicator"></div>
-        <span id="status-text">Loading playbook data...</span>
-        <span style="margin-left: auto; color: var(--text-muted); font-size: 0.8rem;" id="last-updated"></span>
-      </div>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="current">🏈 Current Week</button>
+      <button class="tab" data-tab="upcoming">📅 Upcoming</button>
+      <button class="tab" data-tab="completed">✅ Completed</button>
+      <button class="tab" data-tab="all">📋 All</button>
+    </div>
 
-      <div id="content-area">
-        <div class="loading">Loading slates...</div>
-      </div>
+    <div id="content" class="kickoffs-grid">
+      <div class="loading">Loading kickoffs...</div>
     </div>
   </main>
 
   <script>
-    let slates = [];
-    let isLoading = false;
+    const DIFFICULTY_LABELS = { 0: 'Free', 1: 'Common+', 2: 'Rare+', 3: 'Legendary+' };
+    const DIFFICULTY_CLASSES = { 0: 'diff-free', 1: 'diff-common', 2: 'diff-rare', 3: 'diff-legendary' };
+    const POSITION_LABELS = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', FLEX: 'FLEX' };
+    const STAT_LABELS = {
+      PASSES_SUCCEEDED_YARDS: 'Pass Yds',
+      RUSHING_YARDS: 'Rush Yds',
+      RECEIVING_YARDS: 'Rec Yds',
+      PASSES_ATTEMPTED: 'Pass Att',
+      PASSES_SUCCEEDED: 'Completions',
+      RUSHING_ATTEMPTS: 'Rush Att',
+      RECEPTIONS: 'Receptions',
+      TOUCHDOWNS: 'TDs',
+      FIELD_GOALS_SUCCEEDED: 'FGs',
+      FIELD_GOALS_SUCCEEDED_YARDS: 'FG Yds',
+      EXTRA_POINTS_SUCCEEDED: 'XPs'
+    };
 
-    const contentArea = document.getElementById('content-area');
-    const errorBanner = document.getElementById('error-banner');
-    const statusIndicator = document.getElementById('status-indicator');
-    const statusText = document.getElementById('status-text');
-    const lastUpdated = document.getElementById('last-updated');
-    const refreshBtn = document.getElementById('refresh-btn');
+    let kickoffs = [];
+    let currentTab = 'current';
 
-    function formatDate(dateString) {
-      if (!dateString) return '—';
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
+    function getKickoffStatus(kickoff) {
+      const now = new Date();
+      const deadline = kickoff.submissionDeadline ? new Date(kickoff.submissionDeadline) : null;
+      const completedAt = kickoff.completedAt ? new Date(kickoff.completedAt) : null;
+      const status = (kickoff.status || '').toUpperCase();
+
+      const isActuallyCompleted = completedAt && completedAt < now;
+      if (isActuallyCompleted) return 'completed';
+      if (status === 'FINISHED' || status === 'PROCESSED') return 'completed';
+      if (status === 'LIVE' || status === 'STARTED' || status === 'RUNNING' || status === 'ACTIVE') return 'live';
+      if (deadline && now > deadline && !isActuallyCompleted) return 'live';
+      if (deadline && now < deadline) return 'current';
+      return 'current';
+    }
+
+    function formatDeadline(deadline) {
+      if (!deadline) return '';
+      const d = new Date(deadline);
+      const now = new Date();
+      const diff = d - now;
+      
+      if (diff <= 0) return 'Closed';
+      
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      
+      if (days > 0) return `${days}d ${hours}h left`;
+      if (hours > 0) return `${hours}h left`;
+      return 'Closing soon';
+    }
+
+    function renderSlots(slots) {
+      if (!slots || slots.length === 0) return '<span class="slot">No requirements</span>';
+      
+      return slots.map(slot => {
+        const pos = slot.requirements?.[0]?.playerPositions?.[0] || 'ANY';
+        const stat = slot.stats?.[0];
+        const statLabel = stat ? (STAT_LABELS[stat.stat] || stat.stat) : '';
+        const value = stat?.valueNeeded || '';
+        
+        return `<span class="slot">
+          <span class="slot-pos">${POSITION_LABELS[pos] || pos}</span>
+          <span class="slot-stat">${statLabel}</span>
+          <span class="slot-value">${value}+</span>
+        </span>`;
+      }).join('');
+    }
+
+    function filterKickoffs() {
+      if (currentTab === 'all') return kickoffs;
+      
+      return kickoffs.filter(k => {
+        const status = getKickoffStatus(k);
+        if (currentTab === 'current') return status === 'current' || status === 'live';
+        if (currentTab === 'upcoming') return status === 'upcoming';
+        if (currentTab === 'completed') return status === 'completed';
+        return true;
       });
     }
 
-    function formatRelativeTime(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = date - now;
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
+    function renderKickoffs() {
+      const content = document.getElementById('content');
+      const filtered = filterKickoffs();
 
-      if (diffMins < 0) return 'Ended';
-      if (diffMins < 60) return `in ${diffMins}m`;
-      if (diffHours < 24) return `in ${diffHours}h`;
-      return `in ${diffDays}d`;
-    }
-
-    function getStatusClass(status) {
-      if (!status) return 'upcoming';
-      const s = status.toLowerCase();
-      if (s === 'active' || s === 'live' || s === 'running') return 'active';
-      if (s === 'completed' || s === 'ended' || s === 'finished' || s === 'processed') return 'completed';
-      return 'upcoming';
-    }
-
-    function getDifficultyClass(difficulty) {
-      if (difficulty === 0) return 'easy';
-      if (difficulty === 1) return 'easy';
-      if (difficulty === 2) return 'medium';
-      return 'hard';
-    }
-
-    function getDifficultyLabel(difficulty) {
-      if (difficulty === 0) return 'Free';
-      if (difficulty === 1) return 'Common+';
-      if (difficulty === 2) return 'Rare+';
-      if (difficulty === 3) return 'Legendary+';
-      return 'Unknown';
-    }
-
-    function renderSlates() {
-      if (slates.length === 0) {
-        contentArea.innerHTML = `
+      if (filtered.length === 0) {
+        content.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <h2>No Kickoff Slates Available</h2>
-            <p>Check back later for new slates and challenges!</p>
+            <h2>No kickoffs found</h2>
+            <p>Check another tab or visit NFL All Day directly.</p>
+            <a href="https://nflallday.com/games" target="_blank" class="play-btn" style="display: inline-block; margin-top: 1rem;">
+              View All on NFL All Day ↗
+            </a>
           </div>
         `;
         return;
       }
 
-      contentArea.innerHTML = `
-        <div class="slates-grid">
-          ${slates.map(slate => {
-            const kickoffs = slate.kickoffs || [];
-            const statusClass = getStatusClass(slate.status);
-            
-            return `
-              <div class="slate-card">
-                <div class="slate-header">
-                  <h3 class="slate-title">${slate.name || 'Unnamed Slate'}</h3>
-                  <span class="slate-status ${statusClass}">${slate.status || 'Unknown'}</span>
-                </div>
-                
-                <div class="slate-dates">
-                  <div>📅 Start: ${formatDate(slate.startDate)}</div>
-                  <div>📅 End: ${formatDate(slate.endDate)}</div>
-                </div>
-
-                ${kickoffs.length > 0 ? `
-                  <div class="kickoffs-list">
-                    <strong style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">
-                      Kickoffs (${kickoffs.length}):
-                    </strong>
-                    ${kickoffs.map(kickoff => `
-                      <div class="kickoff-item">
-                        <div>
-                          <div class="kickoff-name">${kickoff.name || 'Unnamed Kickoff'}</div>
-                          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            ${kickoff.numParticipants ? `${kickoff.numParticipants} participants` : ''}
-                            ${kickoff.submissionDeadline ? ` • Deadline: ${formatRelativeTime(kickoff.submissionDeadline)}` : ''}
-                          </div>
-                        </div>
-                        <span class="kickoff-difficulty ${getDifficultyClass(kickoff.difficulty)}">${getDifficultyLabel(kickoff.difficulty)}</span>
-                      </div>
-                    `).join('')}
-                  </div>
-                ` : '<div style="color: var(--text-muted); font-size: 0.85rem;">No kickoffs available</div>'}
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
-    }
-
-    function showError(message, details = '') {
-      errorBanner.textContent = `⚠️ ${message}${details ? `: ${details}` : ''}`;
-      errorBanner.classList.remove('hidden');
-      statusIndicator.classList.remove('active');
-      statusText.textContent = 'Error loading data';
-      statusIndicator.style.background = 'var(--danger)';
-    }
-
-    function hideError() {
-      errorBanner.classList.add('hidden');
-    }
-
-    async function fetchSlates() {
-      if (isLoading) return;
-      
-      isLoading = true;
-      refreshBtn.disabled = true;
-      statusText.textContent = 'Loading kickoffs...';
-      statusIndicator.style.background = 'var(--warning)';
-      hideError();
-
-      try {
-        // Try our server API first (may work for public data)
-        try {
-          console.log('[Playbook] Trying server /api/kickoffs...');
-          statusText.textContent = 'Fetching kickoffs...';
-          const kickoffsRes = await fetch('/api/kickoffs?first=20', { credentials: 'include' });
-          const kickoffsData = await kickoffsRes.json();
-          
-          if (kickoffsData.ok && kickoffsData.kickoffs && kickoffsData.kickoffs.length > 0) {
-            console.log(`[Playbook] ✅ Got ${kickoffsData.kickoffs.length} kickoffs`);
-            slates = [{
-              id: 'current',
-              name: 'Current Week Kickoffs',
-              status: 'ACTIVE',
-              kickoffs: kickoffsData.kickoffs
-            }];
-            renderSlates();
-            statusIndicator.classList.add('active');
-            statusIndicator.style.background = 'var(--success)';
-            statusText.textContent = `Loaded ${kickoffsData.kickoffs.length} kickoff${kickoffsData.kickoffs.length !== 1 ? 's' : ''}`;
-            lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
-            return;
-          }
-        } catch (serverErr) {
-          console.log('[Playbook] Server fetch failed:', serverErr.message);
-        }
+      content.innerHTML = filtered.map(k => {
+        const status = getKickoffStatus(k);
+        const diffClass = DIFFICULTY_CLASSES[k.difficulty] || 'diff-free';
+        const diffLabel = DIFFICULTY_LABELS[k.difficulty] || 'Free';
         
-        // If API fails, show helpful redirect UI
-        console.log('[Playbook] API unavailable, showing redirect UI');
-        contentArea.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <h2>Playbook Data</h2>
-            <p style="margin-bottom: 1rem; color: var(--text-muted);">
-              NFL All Day uses secure cookies for Playbook access.<br>
-              Click below to view your Playbook directly.
-            </p>
-            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-size: 1rem;">
-              <span>🏈</span> Open Playbook on NFL All Day <span style="font-size: 0.8rem;">↗</span>
-            </a>
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(111, 66, 193, 0.1); border-radius: 8px; border: 1px solid rgba(111, 66, 193, 0.3);">
-              <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--text);">📊 Quick Stats (from Flow)</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted);">
-                Your Playbook entries and scores are stored on the Flow blockchain and can be verified on-chain.
-              </p>
+        let statusBadge = '';
+        if (status === 'live') {
+          statusBadge = '<span class="status-badge status-live">🟢 LIVE</span>';
+        } else if (status === 'completed') {
+          statusBadge = '<span class="status-badge status-completed">Completed</span>';
+        }
+
+        const deadline = status !== 'completed' ? formatDeadline(k.submissionDeadline) : '';
+
+        return `
+          <div class="kickoff-card">
+            <div class="kickoff-header">
+              <div>
+                <h3 class="kickoff-title">${k.name}</h3>
+                <div class="kickoff-meta">
+                  <span class="difficulty-badge ${diffClass}">${diffLabel}</span>
+                  ${statusBadge}
+                  ${deadline ? `<span class="deadline">⏱️ ${deadline}</span>` : ''}
+                  ${k.numParticipants ? `<span class="deadline">👥 ${k.numParticipants.toLocaleString()}</span>` : ''}
+                </div>
+              </div>
+              <a href="https://nflallday.com/games/" target="_blank" class="play-btn">
+                Play on NFL All Day ↗
+              </a>
+            </div>
+            <div class="slots-container">
+              ${renderSlots(k.slots)}
             </div>
           </div>
         `;
-        statusIndicator.style.background = 'var(--accent-cyan)';
-        statusText.textContent = 'Click link above to view Playbook';
-        
+      }).join('');
+    }
+
+    async function fetchKickoffs() {
+      try {
+        const res = await fetch('/api/kickoffs/cached');
+        const data = await res.json();
+
+        if (data.ok && data.kickoffs && data.kickoffs.length > 0) {
+          kickoffs = data.kickoffs;
+          renderKickoffs();
+          
+          if (data.lastUpdated) {
+            const d = new Date(data.lastUpdated);
+            document.getElementById('lastUpdated').textContent = `Data from: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+          }
+        } else {
+          document.getElementById('content').innerHTML = `
+            <div class="empty-state">
+              <h2>No Data Available</h2>
+              <p>Visit NFL All Day directly to see the playbook.</p>
+              <a href="https://nflallday.com/games" target="_blank" class="play-btn" style="display: inline-block; margin-top: 1rem;">
+                Go to NFL All Day ↗
+              </a>
+            </div>
+          `;
+        }
       } catch (err) {
-        console.error('Error fetching slates:', err);
-        showError('Error loading playbook', err.message);
-        
-        contentArea.innerHTML = `
+        console.error('Error:', err);
+        document.getElementById('content').innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">⚠️</div>
-            <h2>Unable to Load Playbook</h2>
-            <p style="margin-bottom: 1rem;">${err.message}</p>
-            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
-              🏈 View on NFL All Day
+            <h2>Error Loading Data</h2>
+            <p>Visit NFL All Day directly.</p>
+            <a href="https://nflallday.com/games" target="_blank" class="play-btn" style="display: inline-block; margin-top: 1rem;">
+              Go to NFL All Day ↗
             </a>
-            <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem;">
-              🔄 Try Again
-            </button>
           </div>
         `;
-      } finally {
-        isLoading = false;
-        refreshBtn.disabled = false;
       }
     }
 
-    refreshBtn.addEventListener('click', fetchSlates);
-
-    // Initial load
-    fetchSlates();
-
-    // Auto-refresh every 5 minutes
-    setInterval(() => {
-      if (!isLoading) {
-        fetchSlates();
+    // Tab switching
+    document.getElementById('tabs').addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab')) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+        currentTab = e.target.dataset.tab;
+        renderKickoffs();
       }
-    }, 5 * 60 * 1000);
+    });
+
+    // Load on page load
+    fetchKickoffs();
   </script>
 </body>
 </html>

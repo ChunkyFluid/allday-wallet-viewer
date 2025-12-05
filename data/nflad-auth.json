@@ -1,0 +1,625 @@
+{
+  "cookies": [
+    {
+      "name": "_csrf",
+      "value": "dRPW1_mB6bhwo1j9ub9jbuZw",
+      "domain": "auth.meetdapper.com",
+      "path": "/usernamepassword/login",
+      "expires": 1765811964.228446,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "ajs_anonymous_id",
+      "value": "2c733a22-8e39-447a-85d0-c6b9def7fde0",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483963,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_fbp",
+      "value": "fb.1.1764945643457.187979195680379960",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1772723963,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "singular_device_id",
+      "value": "83fc4864-8d12-48b1-853f-4e10f47cb520",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483959,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "TDID",
+      "value": "ceeb32da-dff2-4093-ad5d-a28af5e723b4",
+      "domain": ".adsrvr.org",
+      "path": "/",
+      "expires": 1796483959.638499,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "bitoIsSecure",
+      "value": "ok",
+      "domain": ".bidr.io",
+      "path": "/",
+      "expires": 1799055643.716026,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "bito",
+      "value": "AADRK07SZd4AAAIPYZbEaw",
+      "domain": ".bidr.io",
+      "path": "/",
+      "expires": 1799057959.353328,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "CxtId",
+      "value": "a81bb1a0-9756-45ac-8c43-930aa6c6313d",
+      "domain": ".connextra.com",
+      "path": "/",
+      "expires": 1796483959.284035,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "state",
+      "value": "eyJyZXR1cm5UbyI6Imh0dHBzOi8vbmZsYWxsZGF5LmNvbS9nYW1lcyJ9.c4INigqoBzDEVnDtcmhpq9JQqnH7ncr6gaDMjXnKRyk",
+      "domain": "nflallday.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "did",
+      "value": "s%3Av0%3Ac53ca4d5-ba79-42f5-99c3-cf09dc66698c.5kr62HyAgHX%2FiHASaxtLFl%2BEmRzkhffCWdp3GmhpxhM",
+      "domain": "auth.meetdapper.com",
+      "path": "/",
+      "expires": 1796503614.788559,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "did_compat",
+      "value": "s%3Av0%3Ac53ca4d5-ba79-42f5-99c3-cf09dc66698c.5kr62HyAgHX%2FiHASaxtLFl%2BEmRzkhffCWdp3GmhpxhM",
+      "domain": "auth.meetdapper.com",
+      "path": "/",
+      "expires": 1796503614.788695,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_cfuvid",
+      "value": "pg20IAvFaVsUYxoB6X_0BuHfFR4BdBl4n8Zz5tWLmNw-1764946015448-0.0.1.1-604800000",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "mp_e96a97c871eb6ec13619c4e79f4ca033_mixpanel",
+      "value": "%7B%22distinct_id%22%3A%22%24device%3Ab21b5493-485e-4076-829b-d5fb0a0e7faf%22%2C%22%24device_id%22%3A%22b21b5493-485e-4076-829b-d5fb0a0e7faf%22%2C%22mp_lib%22%3A%22Segment%3A%20web%22%2C%22%24initial_referrer%22%3A%22https%3A%2F%2Fnflallday.com%2F%22%2C%22%24initial_referring_domain%22%3A%22nflallday.com%22%2C%22__mps%22%3A%7B%7D%2C%22__mpso%22%3A%7B%22%24initial_referrer%22%3A%22https%3A%2F%2Fnflallday.com%2F%22%2C%22%24initial_referring_domain%22%3A%22nflallday.com%22%7D%2C%22__mpus%22%3A%7B%7D%2C%22__mpa%22%3A%7B%7D%2C%22__mpu%22%3A%7B%7D%2C%22__mpr%22%3A%5B%5D%2C%22__mpap%22%3A%5B%5D%7D",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": 1796482017,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "ajs_anonymous_id",
+      "value": "069b6f16-2be2-4c69-ac9e-dc80a83a2975",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": 1796482017,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_iidt",
+      "value": "vHmMxtzLThr8XUTa7pGd1rCSoWDoxWM4c6pNC6oHe4LHKCBzSxtnGxDk6A34K7ZVePqzt8EoMqslitTrVAgkhdWatH/6iuNDuLBrzxavQfsOdlmbVozf",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": 1796482017.626692,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_vid_t",
+      "value": "ygpCC+dMzPi8MsIaIX+3pmUprKa1YKfe5IJV0f4IecnU3+UehTQFxPQs/67Gw+YFfZC0Tvduiqv4kY/SpcIndHVEl6ZnIQNAMGNWhSAOfvXikEd0jhqy",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": 1796482017,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_immortal|deviceToken",
+      "value": "eyJhbGciOiJkaXIiLCJjdHkiOiJKV1QiLCJlbmMiOiJBMTI4R0NNIiwidHlwIjoiSldUIn0..ivr6fewncfvF70_e.ricmjmDVcYLvK2YjlqBtb74VKigTO3V1IXe8upZwD_VICEE1Hx4ccMBm0Y8ovt1X8xTJ9wJJpfL6RgnYzJUWr-J-WkBMMDYi2QGwJmXvSafwlc4yKjwF_9GKJNlBfiTPlDcFiCN7pD3mKYQNkkCYUINtSMgkc-cgbC7ariD3_rLiGVfh16vfPm7UyVCTOl4x3qL693AL0tdol0cDF474AGuzwzei1iXMLKlrS8ClEZMG_0djk5PbGUVuZRomYlwMxIdMOfhQO8Q5e0Bosy3ffi4whKofwt7ilg.RvKfky-pnBbWYkyEpHSJ3Q",
+      "domain": "a.meetdapper.com",
+      "path": "/",
+      "expires": 1796482017,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__Host-GAPS",
+      "value": "1:2qxqr_v6O03t7G-di8A3Yy3r2G0svg:OMeMYTvj5qZdoIzD",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1799506018.184362,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OTZ",
+      "value": "8377367_76_76_104100_72_446760",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1767538019,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "NID",
+      "value": "527=ow5BqG-sJ9vj5qqHCsLroAPMRTqI5vldDxqBvauUz-5-xTQH23shsb1yoLcI5KACMkQq8UiWJe82-O6kfIV83Kb9FDx4qsyH9FCmIKNFGPS3m2BaCa6P6BaeSl61JTDr2utwy7iAPuUXuX2lNSGsGi1K3ohKLH8Apeo4tSjPe9VWamuWdNea3EH-IsN8B1bK4QOJImpq92A8ZrUsklUQoq0",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1780757219.577068,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "9..9dSErQlKkJj5V8sC7Zd8yvGY9lPUSiQwwbrKhGC0-1764947953-1.0.1.1-w2Zwdsb_I9ZxKOZiGhZT0xMNmL3ieMzqGUT9WuXAo1IZs0bbuTSR4OVO_KXFhHDjrHLpYyoszgOEag3WFqkptB_4HPK_OCVxByIRRwGj9.I",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1764949752.459737,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_iidt",
+      "value": "JyS2IGQdsUbli/6WhIvA0RDnrhwfDPg0jkj7aIL2+wOGaPZz2ILyz2gG47XoMzwcWQMIH8OoTQK+yLHhA5IlY5BO7SijmizOWpTbn5hLsu15JsuR8g==",
+      "domain": ".checkout.com",
+      "path": "/",
+      "expires": 1796483958.655445,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "mp_30bec96251c995414557b3262bc2e563_mixpanel",
+      "value": "%7B%22distinct_id%22%3A%22%24device%3A7afb9f45-f09d-4e59-95bb-5c6bbf085729%22%2C%22%24device_id%22%3A%227afb9f45-f09d-4e59-95bb-5c6bbf085729%22%2C%22mp_lib%22%3A%22Segment%3A%20web%22%2C%22%24initial_referrer%22%3A%22%24direct%22%2C%22%24initial_referring_domain%22%3A%22%24direct%22%2C%22__mps%22%3A%7B%7D%2C%22__mpso%22%3A%7B%7D%2C%22__mpus%22%3A%7B%7D%2C%22__mpa%22%3A%7B%7D%2C%22__mpu%22%3A%7B%7D%2C%22__mpr%22%3A%5B%5D%2C%22__mpap%22%3A%5B%5D%7D",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483963,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_hjSessionUser_3863073",
+      "value": "eyJpZCI6ImIzNjIxMDg1LWZlOWUtNWQzYi04YzQ2LWFjMTY1ZjMyMTg4NyIsImNyZWF0ZWQiOjE3NjQ5NDYwMTM3NTksImV4aXN0aW5nIjp0cnVlfQ==",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483958,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_hjSession_3863073",
+      "value": "eyJpZCI6IjZmN2YwZDY0LThmNzctNGU1Mi1hZGMxLTQwYzhlY2ZjMjMyZSIsImMiOjE3NjQ5NDc5NTg5NTIsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MX0=",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1764949758,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "DapperLabs",
+      "value": "P%7Cnflallday_homepage%7C1%7C202512051519",
+      "domain": ".connextra.com",
+      "path": "/",
+      "expires": 1796483959.284276,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "XANDR_PANID",
+      "value": "ByQwtZM7x4XRnfTOtpEtwnsYoU7CHdEo67mFB13d658DtaS1icF3M7MqdJ4gyibwTU6DhlNUHS8dAAYzbElEgUp6zuuReDxmGcrXSgSC0Zk.",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1772723959.758602,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://nflallday.com",
+      "_crHasCrossSiteAncestor": true
+    },
+    {
+      "name": "uuid2",
+      "value": "3546304692077917822",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1772723959.758784,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "TDCPM",
+      "value": "CAESFgoHcnViaWNvbhILCJrK563lhdo-EAUSFwoIYXBwbmV4dXMSCwia-9ai9obaPhAFGAEgAigCMgsIwManzYyH2j4QBTgBWgd1ejlpMDduYAI.",
+      "domain": ".adsrvr.org",
+      "path": "/",
+      "expires": 1796483959.638712,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "anj",
+      "value": "dTM7k!M4.FEVNsVF']wIg2In2wv.AJ!]tbPl@/ir%+@d.UZ+>8G9Kn!<yu5vB.4WZQ4QQ1HMWO?QNk2R:>Qc#[p#:6T+9z<uWYkr<QG=%9sk@3@'s>T$`aJ(",
+      "domain": ".adnxs.com",
+      "path": "/",
+      "expires": 1772723959.758736,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "OptanonAlertBoxClosed",
+      "value": "2025-12-05T15:19:20.328Z",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483960,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OptanonConsent",
+      "value": "isGpcEnabled=0&datestamp=Fri+Dec+05+2025+10%3A19%3A20+GMT-0500+(Eastern+Standard+Time)&version=202504.1.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=b7359df0-5753-437d-af10-7f0d509e0a00&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0003%3A1%2CC0002%3A1%2CC0004%3A1&intType=1",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483960,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "forterToken",
+      "value": "e04bf509aa1842b2b922476430c95b08_1764947952901__UDF43-mnf-a9c-r9c-s6_17ck_",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1799507961,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "ph_phc_kyoImaidodjwcYKroeNdrHNigpwlVg9posJgfJUq2wX_posthog",
+      "value": "%7B%22distinct_id%22%3A%22019aeef5-3dba-7be5-893a-f1d5c1357584%22%2C%22%24sesid%22%3A%5B1764947963584%2C%22019aef18-8593-723c-8c6a-cd346c80ce64%22%2C1764947953043%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Fnflallday.com%2Fgames%22%7D%7D",
+      "domain": ".nflallday.com",
+      "path": "/",
+      "expires": 1796483963,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "nonce",
+      "value": "AdVGXa7ocKqGS77-VZi_cX-K0c-RW-vkNj4dRgphs0U.uGWZjBChF035v2_Sid4UBvscsEUP3KEod4-RuhluN7E",
+      "domain": "nflallday.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "code_verifier",
+      "value": "3fMt8O6pxLhhcl7JpR28JPnIjEDFzOoSe_z_YKTnUoU.CGAx8Fk2sbBvtBlPjpI77CTsb1cvDcEUxHKAqTntc3o",
+      "domain": "nflallday.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_dd_s",
+      "value": "logs=1&id=cf61d98d-d7b0-4d0f-8138-6470f9a34960&created=1764947955977&expire=1764948863583",
+      "domain": "nflallday.com",
+      "path": "/",
+      "expires": 1764948863,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "auth0",
+      "value": "s%3Av1.gadzZXNzaW9ug6ZoYW5kbGXEQOOnfWiMhrK6GX8L455Rzc2cKB2K8lurjHIh8TrUgaSNOMpBQNA0b25AhfQ9RAlilkSP6LcIAg83qNyNF7PsHkamY29va2llg6dleHBpcmVz1_-oj9sAaTbsfK5vcmlnaW5hbE1heEFnZc4PcxQAqHNhbWVTaXRlpG5vbmWkc2JpZJLZIHFIT29ZeF9lYjhMTkRNbk1KQXlwRHR6VW1Xc2JJT1ZS2SBQVzlVcE11REZKYk1DVzNfWVljRU02di0wdXRLcFpDMQ.4tVNuJMf4R9dp02yuQx16ojN2CsKpw6gtv8qYScMoB0",
+      "domain": "auth.meetdapper.com",
+      "path": "/",
+      "expires": 1765207164.084066,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "auth0_compat",
+      "value": "s%3Av1.gadzZXNzaW9ug6ZoYW5kbGXEQOOnfWiMhrK6GX8L455Rzc2cKB2K8lurjHIh8TrUgaSNOMpBQNA0b25AhfQ9RAlilkSP6LcIAg83qNyNF7PsHkamY29va2llg6dleHBpcmVz1_-oj9sAaTbsfK5vcmlnaW5hbE1heEFnZc4PcxQAqHNhbWVTaXRlpG5vbmWkc2JpZJLZIHFIT29ZeF9lYjhMTkRNbk1KQXlwRHR6VW1Xc2JJT1ZS2SBQVzlVcE11REZKYk1DVzNfWVljRU02di0wdXRLcFpDMQ.4tVNuJMf4R9dp02yuQx16ojN2CsKpw6gtv8qYScMoB0",
+      "domain": "auth.meetdapper.com",
+      "path": "/",
+      "expires": 1765207164.084216,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__cf_bm",
+      "value": "Ji_P7TLMyI2P2CBOXrI6hi4MyNMNzfona67IRCpShCQ-1764947964-1.0.1.1-lMu.tuKTuSdDk7fyvVuUfWHuFOYLmWkzvU4ab_eqjU9RFp3db4kjrWeJAw08kxoGKBTIgvhWmyzSIyMdMRZwLq4v3qN7IjvSkzwbZYLu1NQ",
+      "domain": ".meetdapper.com",
+      "path": "/",
+      "expires": 1764949764.084306,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://auth.meetdapper.com",
+      "localStorage": [
+        {
+          "name": "i18nextLng",
+          "value": "en-US"
+        },
+        {
+          "name": "hasLoggedIn",
+          "value": "true"
+        },
+        {
+          "name": "ld:$anonUserId",
+          "value": "3e9eb920-d1e9-11f0-8a94-a399d8dbfe3c"
+        },
+        {
+          "name": "_vid_lr",
+          "value": "[[\"xR9MBhVTtesE\",\"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\"]]"
+        },
+        {
+          "name": "ld:6478fb9d99426a12d6d6131d:$diagnostics",
+          "value": "{\"dataSinceDate\":1764946015666,\"droppedEvents\":0,\"eventsInLastBatch\":0,\"streamInits\":[]}"
+        },
+        {
+          "name": "__mpq_e96a97c871eb6ec13619c4e79f4ca033_ev",
+          "value": "[{\"id\":\"ghnz3uxeduj9jfcw\",\"flushAfter\":1764946026306,\"payload\":{\"event\":\"Loaded a Page\",\"properties\":{\"$os\":\"Windows\",\"$browser\":\"Chrome\",\"$referrer\":\"https://nflallday.com/\",\"$referring_domain\":\"nflallday.com\",\"$current_url\":\"https://auth.meetdapper.com/login?state=hKFo2SBfRVJfSWg1bFVtbU40c1NxT3FNZTh1RHgwMHBuQm1BLaFupWxvZ2luo3RpZNkgUDBvTUdZc0lWbFhXQ0d5UzRaRlpBREZUOFplNWktcEKjY2lk2SAwN3NhRVlRTXpXQ2VyTTRadGY1WlhCSTJ1SjR0YVNuVg&client=07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV&protocol=oau\",\"$browser_version\":143,\"$screen_height\":720,\"$screen_width\":1280,\"mp_lib\":\"Segment: web\",\"$lib_version\":\"2.72.0\",\"$insert_id\":\"tt6bp4gi0cbhbo2q\",\"time\":1764946016.306,\"distinct_id\":\"$device:b21b5493-485e-4076-829b-d5fb0a0e7faf\",\"$device_id\":\"b21b5493-485e-4076-829b-d5fb0a0e7faf\",\"$initial_referrer\":\"https://nflallday.com/\",\"$initial_referring_domain\":\"nflallday.com\",\"path\":\"/login\",\"referrer\":\"https://nflallday.com/\",\"search\":\"?state=hKFo2SBfRVJfSWg1bFVtbU40c1NxT3FNZTh1RHgwMHBuQm1BLaFupWxvZ2luo3RpZNkgUDBvTUdZc0lWbFhXQ0d5UzRaRlpBREZUOFplNWktcEKjY2lk2SAwN3NhRVlRTXpXQ2VyTTRadGY1WlhCSTJ1SjR0YVNuVg&client=07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV&protocol=oauth2&scope=openid%20profile%20emai\",\"title\":\"NFL ALL DAY\",\"url\":\"https://auth.meetdapper.com/login?state=hKFo2SBfRVJfSWg1bFVtbU40c1NxT3FNZTh1RHgwMHBuQm1BLaFupWxvZ2luo3RpZNkgUDBvTUdZc0lWbFhXQ0d5UzRaRlpBREZUOFplNWktcEKjY2lk2SAwN3NhRVlRTXpXQ2VyTTRadGY1WlhCSTJ1SjR0YVNuVg&client=07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV&protocol=oau\",\"variationID\":1,\"client\":\"07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV\",\"name\":\"Account - Login - Page Loaded\",\"segment_source_name\":\"Dapper Web\",\"token\":\"e96a97c871eb6ec13619c4e79f4ca033\",\"mp_sent_by_lib_version\":\"2.72.0\"}}},{\"id\":\"w2a0tbo5yt4nfnwa\",\"flushAfter\":1764946027065,\"payload\":{\"event\":\"Account - Login - Clicked Google Login\",\"properties\":{\"$os\":\"Windows\",\"$browser\":\"Chrome\",\"$referrer\":\"https://nflallday.com/\",\"$referring_domain\":\"nflallday.com\",\"$current_url\":\"https://auth.meetdapper.com/login?state=hKFo2SBfRVJfSWg1bFVtbU40c1NxT3FNZTh1RHgwMHBuQm1BLaFupWxvZ2luo3RpZNkgUDBvTUdZc0lWbFhXQ0d5UzRaRlpBREZUOFplNWktcEKjY2lk2SAwN3NhRVlRTXpXQ2VyTTRadGY1WlhCSTJ1SjR0YVNuVg&client=07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV&protocol=oau\",\"$browser_version\":143,\"$screen_height\":720,\"$screen_width\":1280,\"mp_lib\":\"Segment: web\",\"$lib_version\":\"2.72.0\",\"$insert_id\":\"ny433eslkpa67bg9\",\"time\":1764946017.065,\"distinct_id\":\"$device:b21b5493-485e-4076-829b-d5fb0a0e7faf\",\"$device_id\":\"b21b5493-485e-4076-829b-d5fb0a0e7faf\",\"$initial_referrer\":\"https://nflallday.com/\",\"$initial_referring_domain\":\"nflallday.com\",\"variationID\":1,\"client\":\"07saEYQMzWCerM4Ztf5ZXBI2uJ4taSnV\",\"segment_source_name\":\"Dapper Web\",\"token\":\"e96a97c871eb6ec13619c4e79f4ca033\",\"mp_sent_by_lib_version\":\"2.72.0\"}}}]"
+        },
+        {
+          "name": "_vid_t",
+          "value": "ygpCC+dMzPi8MsIaIX+3pmUprKa1YKfe5IJV0f4IecnU3+UehTQFxPQs/67Gw+YFfZC0Tvduiqv4kY/SpcIndHVEl6ZnIQNAMGNWhSAOfvXikEd0jhqy"
+        },
+        {
+          "name": "theme-ui-color-mode",
+          "value": "theme.colors.modes.dark"
+        },
+        {
+          "name": "ajs_anonymous_id",
+          "value": "\"069b6f16-2be2-4c69-ac9e-dc80a83a2975\""
+        },
+        {
+          "name": "ajs_user_id",
+          "value": "null"
+        }
+      ]
+    },
+    {
+      "origin": "https://nflallday.com",
+      "localStorage": [
+        {
+          "name": "feh--c52",
+          "value": "0001764945641922cba6ba0ec5bc4f0312dbebed0c7556bf"
+        },
+        {
+          "name": "feh--1bda6",
+          "value": "00017649479571857be50a430fbfa1f8154c786ca3c26630"
+        },
+        {
+          "name": "__mpq_30bec96251c995414557b3262bc2e563_ev",
+          "value": "[]"
+        },
+        {
+          "name": "global_singular_id",
+          "value": "83fc4864-8d12-48b1-853f-4e10f47cb520"
+        },
+        {
+          "name": "feh--da4",
+          "value": "0001764945642003b405c436b7ac5a2c7e6ba9d6dd28ae99"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_first_page_visit_url",
+          "value": "https://nflallday.com/games"
+        },
+        {
+          "name": "feh--330df5",
+          "value": "00017649479558840b302a93dbeece3e313c647896c0c5e2"
+        },
+        {
+          "name": "ph_phc_kyoImaidodjwcYKroeNdrHNigpwlVg9posJgfJUq2wX_posthog",
+          "value": "{\"distinct_id\":\"019aeef5-3dba-7be5-893a-f1d5c1357584\",\"$sesid\":[1764947963584,\"019aef18-8593-723c-8c6a-cd346c80ce64\",1764947953043],\"$epp\":true,\"$initial_person_info\":{\"r\":\"$direct\",\"u\":\"https://nflallday.com/games\"},\"$initialization_time\":\"2025-12-05T15:19:13.042Z\",\"$configured_session_timeout_ms\":1800000,\"$client_session_props\":{\"sessionId\":\"019aef18-8593-723c-8c6a-cd346c80ce64\",\"props\":{\"r\":\"$direct\",\"u\":\"https://nflallday.com/games\"}},\"$device_id\":\"019aeef5-3dba-7be5-893a-f1d5c1357584\",\"$user_state\":\"anonymous\",\"$session_recording_enabled_server_side\":true,\"$console_log_recording_enabled_server_side\":false,\"$session_recording_network_payload_capture\":{\"capturePerformance\":{\"network_timing\":true,\"web_vitals\":false,\"web_vitals_allowed_metrics\":null}},\"$session_recording_masking\":null,\"$session_recording_canvas_recording\":{},\"$replay_sample_rate\":null,\"$replay_minimum_duration\":null,\"$replay_script_config\":null,\"$autocapture_disabled_server_side\":false,\"$heatmaps_enabled_server_side\":false,\"$web_vitals_enabled_server_side\":false,\"$web_vitals_allowed_metrics\":null,\"$exception_capture_enabled_server_side\":false,\"$error_tracking_suppression_rules\":[],\"$dead_clicks_enabled_server_side\":false,\"$active_feature_flags\":[],\"$enabled_feature_flags\":{},\"$feature_flag_payloads\":{},\"$feature_flag_details\":{},\"$feature_flag_request_id\":\"226edba5-48c3-4bfe-a271-4868fc4fe340\",\"$capture_rate_limit\":{\"tokens\":99,\"last\":1764947963584}}"
+        },
+        {
+          "name": "feh--8ff2b28",
+          "value": "000176494601143506bee2e6c204ed44c442998fe50a9a57"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_singular_session_id",
+          "value": "737223c9-cac2-4661-82e1-c210be216738"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_web_url",
+          "value": "https://nflallday.com/games"
+        },
+        {
+          "name": "feh--1bc22",
+          "value": "0001764945641455bf81059e226589b58fd3bf87f5095bb8"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_did_send_event.__PAGE_VISIT__",
+          "value": "true"
+        },
+        {
+          "name": "feh--e3a677a0",
+          "value": "0001764946011436a1b87221a13b15123b1c8b79a866f388"
+        },
+        {
+          "name": "forterToken",
+          "value": "e04bf509aa1842b2b922476430c95b08,1764947961538"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_singular_instance_id",
+          "value": "4f954641-9886-48c8-8758-4b03170db073"
+        },
+        {
+          "name": "lastExternalReferrer",
+          "value": "empty"
+        },
+        {
+          "name": "chakra-ui-color-mode",
+          "value": "dark"
+        },
+        {
+          "name": "ajs_anonymous_id",
+          "value": "\"2c733a22-8e39-447a-85d0-c6b9def7fde0\""
+        },
+        {
+          "name": "games-overview-seen",
+          "value": "true"
+        },
+        {
+          "name": "__mpq_30bec96251c995414557b3262bc2e563_pp",
+          "value": "[]"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_touchpoint_timestamp",
+          "value": "1764945644"
+        },
+        {
+          "name": "feh--19c44",
+          "value": "00017649479558900068034850e10465a559b00cc94074cc"
+        },
+        {
+          "name": "feh--1b2b8",
+          "value": "000176494564461095b03616099dde089e3f676a90eb7ed0"
+        },
+        {
+          "name": "topicsLastReferenceTime",
+          "value": "1764947963656"
+        },
+        {
+          "name": "feh--37d28a",
+          "value": "0001764945642181a66c3996684307220bf1e4c38436fc57"
+        },
+        {
+          "name": "feh--30cb83",
+          "value": "000176494601154675b8c0188bcaa4684b95ca0f14a1bf6e"
+        },
+        {
+          "name": "feh--6bc5339",
+          "value": "0001764946012944d820c625f86c47af580184e00cebf84b"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_last_event_timestamp",
+          "value": "1764947959"
+        },
+        {
+          "name": "lastExternalReferrerTime",
+          "value": "1764947958692"
+        },
+        {
+          "name": "loginIntent",
+          "value": "[1764947963593]"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_did_visit_site",
+          "value": "true"
+        },
+        {
+          "name": "feh--9fd29358",
+          "value": "0001764945641318cce16c45e622d9ceae4b626c9353ecec"
+        },
+        {
+          "name": "dapper_labs_0e587120_com.nflallday_singular_first_page_visit_occurred",
+          "value": "true"
+        },
+        {
+          "name": "ajs_user_id",
+          "value": "null"
+        }
+      ]
+    },
+    {
+      "origin": "https://risk.checkout.com",
+      "localStorage": [
+        {
+          "name": "_vid_lr",
+          "value": "[[\"Bi1encajzXMc\",\"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\"]]"
+        }
+      ]
+    },
+    {
+      "origin": "https://10z9q7146gtn.statuspage.io",
+      "localStorage": [
+        {
+          "name": "10z9q7146gtn.statuspage.io_dismissed",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "origin": "https://a.meetdapper.com",
+      "localStorage": [
+        {
+          "name": "_immortal|deviceToken",
+          "value": "eyJhbGciOiJkaXIiLCJjdHkiOiJKV1QiLCJlbmMiOiJBMTI4R0NNIiwidHlwIjoiSldUIn0..ivr6fewncfvF70_e.ricmjmDVcYLvK2YjlqBtb74VKigTO3V1IXe8upZwD_VICEE1Hx4ccMBm0Y8ovt1X8xTJ9wJJpfL6RgnYzJUWr-J-WkBMMDYi2QGwJmXvSafwlc4yKjwF_9GKJNlBfiTPlDcFiCN7pD3mKYQNkkCYUINtSMgkc-cgbC7ariD3_rLiGVfh16vfPm7UyVCTOl4x3qL693AL0tdol0cDF474AGuzwzei1iXMLKlrS8ClEZMG_0djk5PbGUVuZRomYlwMxIdMOfhQO8Q5e0Bosy3ffi4whKofwt7ilg.RvKfky-pnBbWYkyEpHSJ3Q"
+        }
+      ]
+    }
+  ]
+}

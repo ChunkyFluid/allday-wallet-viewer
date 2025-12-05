@@ -3343,9 +3343,7 @@ app.get("/api/me", async (req, res) => {
 
     return res.json({
       ok: true,
-      user: req.session.user,
-      hasNfladToken: !!req.session.nflad_token,
-      tokenLength: req.session.nflad_token ? req.session.nflad_token.length : 0
+      user: req.session.user
     });
   } catch (err) {
     console.error("GET /api/me error:", err);
@@ -7582,12 +7580,13 @@ function extractQueryName(query) {
 
 async function nfladGraphQLQuery(query, variables = {}, userToken = null, retries = 3, useCache = true, req = null) {
   const cacheKey = createCacheKey(query, variables);
+  const operationName = extractQueryName(query);
   
   // Check cache first
   if (useCache) {
     const cached = graphqlCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
-      console.log("[GraphQL Cache] Returning cached data for query:", extractQueryName(query) || "unknown");
+      console.log("[GraphQL Cache] Returning cached data for query:", operationName || "unknown");
       return cached.data;
     }
     
@@ -7619,7 +7618,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
   graphqlRequestCount++;
   
   // Add a small delay before making request (helps avoid bot detection)
-  await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay between requests (increased to reduce 403s)
+  await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay between requests
 
   try {
     const headers = {
@@ -7628,7 +7627,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
       "Accept-Language": "en-US,en;q=0.9",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       "Origin": "https://nflallday.com",
-      "Referer": "https://nflallday.com/",
+      "Referer": "https://nflallday.com/playbook",
       "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
       "sec-ch-ua-mobile": "?0",
       "sec-ch-ua-platform": '"Windows"',
@@ -7680,13 +7679,22 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
     console.log(`[GraphQL] Has token: ${!!userToken} (${userToken ? userToken.length : 0} chars)`);
     console.log(`[GraphQL] Has cookies: ${!!cookieString} (${cookieString ? cookieString.length : 0} chars)`);
     
+    // Build request body with operationName (required by NFL All Day API)
+    const operationName = extractQueryName(query);
+    const requestBody = {
+      query,
+      variables
+    };
+    
+    // Add operationName if we could extract it
+    if (operationName) {
+      requestBody.operationName = operationName;
+    }
+    
     const response = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        query,
-        variables
-      })
+      body: JSON.stringify(requestBody)
     });
     
     const responseText = await response.text();
@@ -7757,9 +7765,9 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
   }
 }
 
-// Get user's authentication token from session
+// Get user's authentication token from request headers
 function getUserToken(req) {
-  return req.headers["x-id-token"] || req.session?.nflad_token || null;
+  return req.headers["x-id-token"] || null;
 }
 
 // Helper to check if response is cached
@@ -7772,6 +7780,40 @@ function isResponseCached(query, variables) {
 // ============================================================
 // PLAYBOOK/KICKOFF API ENDPOINTS
 // ============================================================
+
+// Cached data files (populated by admin script: node scripts/refresh-kickoffs.js)
+const CACHED_KICKOFFS_FILE = path.join(__dirname, 'data', 'kickoffs.json');
+const CACHED_CHALLENGES_FILE = path.join(__dirname, 'data', 'challenges.json');
+
+// Get cached kickoffs data
+app.get("/api/kickoffs/cached", (req, res) => {
+  try {
+    if (fs.existsSync(CACHED_KICKOFFS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHED_KICKOFFS_FILE, 'utf8'));
+      res.json({ ok: true, ...data });
+    } else {
+      res.json({ ok: false, error: "No cached data available. Run: node scripts/refresh-kickoffs.js" });
+    }
+  } catch (err) {
+    console.error("Error reading cached kickoffs:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Get cached challenges data
+app.get("/api/challenges/cached", (req, res) => {
+  try {
+    if (fs.existsSync(CACHED_CHALLENGES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHED_CHALLENGES_FILE, 'utf8'));
+      res.json({ ok: true, ...data });
+    } else {
+      res.json({ ok: false, error: "No cached data available. Run: node scripts/refresh-kickoffs.js" });
+    }
+  } catch (err) {
+    console.error("Error reading cached challenges:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // Scrape kickoff slates from HTML (fallback when GraphQL is blocked)
 async function scrapeKickoffSlatesFromHTML() {
@@ -8883,22 +8925,6 @@ app.get("/api/tradeins/:idOrSlug", async (req, res) => {
 // ============================================================
 // OFFERS API ENDPOINTS
 // ============================================================
-
-// Store NFL All Day token in session
-app.post("/api/nflad-token", async (req, res) => {
-  try {
-    const { token } = req.body || {};
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ ok: false, error: "Missing token" });
-    }
-    
-    req.session.nflad_token = token;
-    res.json({ ok: true, message: "Token stored successfully" });
-  } catch (err) {
-    console.error("POST /api/nflad-token error:", err);
-    res.status(500).json({ ok: false, error: "Failed to store token" });
-  }
-});
 
 app.get("/api/offers/received", async (req, res) => {
   try {
