@@ -8496,6 +8496,140 @@ app.get("/api/kickoff/:kickoffId/player-prices", async (req, res) => {
   }
 });
 
+// Get player's weekly stats for kickoff slot analysis
+app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    const { stats, weeks = 5, orderBy = "DESC" } = req.query;
+    
+    // Parse stat categories - can be comma-separated or single
+    const statCategories = stats 
+      ? stats.split(",").map(s => s.trim().toUpperCase())
+      : ["TOUCHDOWNS", "RUSHING_YARDS", "RECEPTIONS_YARDS", "PASSES_SUCCEEDED_YARDS"];
+    
+    // Make parallel requests for each stat category
+    const statPromises = statCategories.map(async (statCategory) => {
+      const query = `
+        query GetPlayersWeeklyStats($input: GetPlayersWeeklyStatsInput!) {
+          getPlayersWeeklyStats(input: $input) {
+            statsByWeek {
+              stat
+              value
+              round
+              opponentTeamID
+              isHomeGame
+              gameStartAt
+              season
+            }
+          }
+        }
+      `;
+      
+      const variables = {
+        input: {
+          playerID: playerId,
+          statCategories: statCategory,
+          numberOfRounds: parseInt(weeks, 10),
+          orderBy: orderBy.toUpperCase()
+        }
+      };
+      
+      try {
+        const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 2, true, req);
+        return {
+          stat: statCategory,
+          weeks: data?.getPlayersWeeklyStats?.statsByWeek || []
+        };
+      } catch (err) {
+        console.error(`[API] Error fetching ${statCategory} for player ${playerId}:`, err.message);
+        return { stat: statCategory, weeks: [], error: err.message };
+      }
+    });
+    
+    const results = await Promise.all(statPromises);
+    
+    // Combine results into a structured response
+    const statsByCategory = {};
+    results.forEach(result => {
+      statsByCategory[result.stat] = result.weeks;
+    });
+    
+    res.json({ 
+      ok: true, 
+      playerId,
+      stats: statsByCategory,
+      categories: statCategories
+    });
+  } catch (err) {
+    console.error("[API] Error fetching player weekly stats:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Get weekly stats for multiple players (batch)
+app.post("/api/players/weekly-stats", async (req, res) => {
+  try {
+    const { playerIDs, stats, weeks = 5 } = req.body;
+    
+    if (!playerIDs || !Array.isArray(playerIDs) || playerIDs.length === 0) {
+      return res.status(400).json({ ok: false, error: "playerIDs array required in request body" });
+    }
+    
+    const statCategories = stats || ["TOUCHDOWNS"];
+    
+    // Limit to prevent abuse
+    const limitedPlayerIDs = playerIDs.slice(0, 20);
+    
+    const playerPromises = limitedPlayerIDs.map(async (playerId) => {
+      const query = `
+        query GetPlayersWeeklyStats($input: GetPlayersWeeklyStatsInput!) {
+          getPlayersWeeklyStats(input: $input) {
+            statsByWeek {
+              stat
+              value
+              round
+              opponentTeamID
+              isHomeGame
+              gameStartAt
+              season
+            }
+          }
+        }
+      `;
+      
+      const variables = {
+        input: {
+          playerID: playerId,
+          statCategories: statCategories[0], // Primary stat
+          numberOfRounds: parseInt(weeks, 10),
+          orderBy: "DESC"
+        }
+      };
+      
+      try {
+        const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 2, true, req);
+        return {
+          playerId,
+          stats: data?.getPlayersWeeklyStats?.statsByWeek || []
+        };
+      } catch (err) {
+        return { playerId, stats: [], error: err.message };
+      }
+    });
+    
+    const results = await Promise.all(playerPromises);
+    
+    res.json({ 
+      ok: true, 
+      players: results,
+      requestedStats: statCategories
+    });
+  } catch (err) {
+    console.error("[API] Error fetching batch player weekly stats:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ============================================================
 // CHALLENGES API ENDPOINTS
 // ============================================================

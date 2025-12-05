@@ -9,16 +9,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --playbook-bg: #050815;
-      --playbook-card: #0b1020;
-      --playbook-border: #1b2236;
+      --bg: #050815;
+      --card: #0b1020;
+      --card-hover: #0f1628;
+      --border: #1b2236;
       --text: #f8f9ff;
       --text-muted: #8c95b8;
-      --accent-purple: #6f42c1;
-      --accent-cyan: #0dcaf0;
-      --success: #22c55e;
-      --warning: #f59e0b;
+      --accent: #22c55e;
+      --purple: #6f42c1;
+      --cyan: #0dcaf0;
+      --gold: #fbbf24;
       --danger: #ef4444;
+      --orange: #f97316;
+      /* Difficulty colors */
+      --diff-free: #22c55e;
+      --diff-common: #60a5fa;
+      --diff-rare: #a78bfa;
+      --diff-legendary: #fbbf24;
     }
 
     body {
@@ -29,17 +36,22 @@
       margin: 0;
     }
 
-    .playbook-container {
+    .container {
       max-width: 1400px;
       margin: 0 auto;
       padding: 2rem;
+    }
+
+    .container.embed-mode {
+      max-width: 100%;
+      padding: 1rem;
     }
 
     .page-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       flex-wrap: wrap;
       gap: 1rem;
     }
@@ -57,9 +69,95 @@
       gap: 10px;
     }
 
-    .page-header h1::before {
-      content: "📋";
-      -webkit-text-fill-color: initial;
+    .header-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+      border: none;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple), #007bff);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-accent:hover {
+      background: #1ea550;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    /* View Mode Toggle */
+    .view-toggle {
+      display: flex;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .view-toggle button {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .view-toggle button:hover {
+      color: var(--text);
+    }
+
+    .view-toggle button.active {
+      background: var(--accent);
+      color: white;
     }
 
     .status-bar {
@@ -67,10 +165,10 @@
       align-items: center;
       gap: 1rem;
       padding: 0.75rem 1rem;
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       font-size: 0.85rem;
     }
 
@@ -78,12 +176,16 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--warning);
+      background: var(--gold);
     }
 
     .status-indicator.active {
-      background: var(--success);
+      background: var(--accent);
       animation: pulse 2s infinite;
+    }
+
+    .status-indicator.error {
+      background: var(--danger);
     }
 
     @keyframes pulse {
@@ -91,205 +193,319 @@
       50% { opacity: 0.5; }
     }
 
-    .error-banner {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      color: var(--danger);
-      font-size: 0.9rem;
-    }
-
-    .error-banner.hidden {
-      display: none;
-    }
-
-    .slates-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .slate-card {
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
+    /* Embed Container */
+    .embed-container {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 1.5rem;
-      transition: transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
     }
 
-    .slate-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(111, 66, 193, 0.2);
-      border-color: var(--accent-purple);
-    }
-
-    .slate-header {
+    .embed-header {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: start;
-      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: rgba(27, 34, 54, 0.5);
+      border-bottom: 1px solid var(--border);
     }
 
-    .slate-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--text);
-      margin: 0;
-    }
-
-    .slate-status {
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .slate-status.active {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-    }
-
-    .slate-status.upcoming {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-
-    .slate-status.completed {
-      background: rgba(107, 114, 128, 0.2);
-      color: var(--text-muted);
-      border: 1px solid rgba(107, 114, 128, 0.3);
-    }
-
-    .slate-dates {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+    .embed-header span {
       font-size: 0.85rem;
       color: var(--text-muted);
     }
 
-    .slate-dates div {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+    .embed-header a {
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-decoration: none;
     }
 
-    .kickoffs-list {
-      margin-top: 1rem;
+    .embed-header a:hover {
+      text-decoration: underline;
     }
 
-    .kickoff-item {
-      padding: 0.75rem;
-      background: rgba(27, 34, 54, 0.5);
-      border: 1px solid var(--playbook-border);
+    .embed-frame {
+      width: 100%;
+      height: calc(100vh - 220px);
+      min-height: 600px;
+      border: none;
+      background: #000;
+    }
+
+    .embed-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .embed-loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Info Banner */
+    .info-banner {
+      background: linear-gradient(135deg, rgba(111, 66, 193, 0.15), rgba(0, 123, 255, 0.15));
+      border: 1px solid rgba(111, 66, 193, 0.3);
       border-radius: 8px;
-      margin-bottom: 0.5rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .info-banner-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .info-banner-content h3 {
+      margin: 0 0 0.25rem 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .info-banner-content p {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* API View Styles */
+    .api-view {
+      display: none;
+    }
+
+    .api-view.active {
+      display: block;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      padding: 0.6rem 1.2rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .difficulty-filters {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .diff-filter {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .diff-filter.free { background: rgba(34, 197, 94, 0.2); color: var(--diff-free); border-color: rgba(34, 197, 94, 0.3); }
+    .diff-filter.common { background: rgba(96, 165, 250, 0.2); color: var(--diff-common); border-color: rgba(96, 165, 250, 0.3); }
+    .diff-filter.rare { background: rgba(167, 139, 250, 0.2); color: var(--diff-rare); border-color: rgba(167, 139, 250, 0.3); }
+    .diff-filter.legendary { background: rgba(251, 191, 36, 0.2); color: var(--diff-legendary); border-color: rgba(251, 191, 36, 0.3); }
+
+    .diff-filter.active { opacity: 1; transform: scale(1.05); }
+    .diff-filter:not(.active) { opacity: 0.5; }
+    .diff-filter:hover { opacity: 1; }
+
+    .kickoffs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .kickoff-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .kickoff-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .kickoff-card.difficulty-0 { border-top: 3px solid var(--diff-free); }
+    .kickoff-card.difficulty-1 { border-top: 3px solid var(--diff-common); }
+    .kickoff-card.difficulty-2 { border-top: 3px solid var(--diff-rare); }
+    .kickoff-card.difficulty-3 { border-top: 3px solid var(--diff-legendary); }
+
+    .kickoff-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .kickoff-title-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-    }
-
-    .kickoff-item:last-child {
-      margin-bottom: 0;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
     }
 
     .kickoff-name {
-      font-weight: 500;
-      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
     }
 
     .kickoff-difficulty {
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .difficulty-0 .kickoff-difficulty { background: rgba(34, 197, 94, 0.2); color: var(--diff-free); }
+    .difficulty-1 .kickoff-difficulty { background: rgba(96, 165, 250, 0.2); color: var(--diff-common); }
+    .difficulty-2 .kickoff-difficulty { background: rgba(167, 139, 250, 0.2); color: var(--diff-rare); }
+    .difficulty-3 .kickoff-difficulty { background: rgba(251, 191, 36, 0.2); color: var(--diff-legendary); }
+
+    .kickoff-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .kickoff-meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .kickoff-status {
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
       font-weight: 600;
       text-transform: uppercase;
     }
 
-    .kickoff-difficulty.easy {
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
+    .kickoff-status.open, .kickoff-status.scheduled { background: rgba(34, 197, 94, 0.2); color: var(--accent); }
+    .kickoff-status.started { background: rgba(249, 115, 22, 0.2); color: var(--orange); }
+    .kickoff-status.finished, .kickoff-status.processed { background: rgba(107, 114, 128, 0.2); color: var(--text-muted); }
+
+    .kickoff-body {
+      padding: 1rem;
     }
 
-    .kickoff-difficulty.medium {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
+    .kickoff-footer {
+      padding: 0.75rem 1rem;
+      background: rgba(27, 34, 54, 0.3);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .kickoff-difficulty.hard {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--danger);
-    }
-
-    .loading {
-      text-align: center;
-      padding: 3rem;
+    .participants {
+      font-size: 0.8rem;
       color: var(--text-muted);
     }
 
-    .empty-state {
+    .kickoff-btn {
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+      background: var(--accent);
+      color: white;
+    }
+
+    .kickoff-btn:hover {
+      background: #1ea550;
+    }
+
+    .countdown {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--gold);
+    }
+
+    .countdown.urgent {
+      color: var(--danger);
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0.5; }
+    }
+
+    .loading, .empty-state {
       text-align: center;
       padding: 4rem 2rem;
-      background: var(--playbook-card);
-      border: 1px solid var(--playbook-border);
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 12px;
     }
 
-    .empty-state-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
+    .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; }
 
     .empty-state h2 {
       font-size: 1.5rem;
-      font-weight: 600;
       margin-bottom: 0.5rem;
-      color: var(--text);
     }
 
     .empty-state p {
       color: var(--text-muted);
-      font-size: 1rem;
-    }
-
-    .refresh-btn {
-      background: linear-gradient(135deg, #6f42c1, #007bff);
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .refresh-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
-    }
-
-    .refresh-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
+      margin-bottom: 1.5rem;
     }
 
     @media (max-width: 768px) {
-      .playbook-container {
-        padding: 1rem;
-      }
-
-      .slates-grid {
-        grid-template-columns: 1fr;
-      }
+      .container { padding: 1rem; }
+      .kickoffs-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .embed-frame { height: calc(100vh - 280px); min-height: 500px; }
     }
   </style>
 </head>
@@ -298,304 +514,247 @@
   <script src="/layout.js"></script>
   <script src="/js/nflad-client.js"></script>
   <main class="app-main">
-    <div class="playbook-container">
+    <div class="container" id="main-container">
       <div class="page-header">
-        <h1>Playbook</h1>
-        <div style="display: flex; gap: 1rem; align-items: center;">
-          <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
-          <a href="https://nflallday.com/kickoffs" target="_blank" style="background: var(--playbook-card); border: 1px solid var(--playbook-border); color: var(--text); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 500; text-decoration: none; font-size: 0.85rem;">
-            🏈 View on NFL All Day ↗
+        <h1>📋 Playbook</h1>
+        <div class="header-actions">
+          <div class="view-toggle">
+            <button id="view-embed" class="active" title="View NFL All Day directly">🌐 Live Site</button>
+            <button id="view-api" title="View via API (may require auth)">📊 API View</button>
+          </div>
+          <button class="btn btn-primary" id="refresh-btn">🔄 Refresh</button>
+          <a href="https://nflallday.com/games" target="_blank" class="btn btn-secondary">
+            ↗ Open in New Tab
           </a>
         </div>
       </div>
 
-      <div class="error-banner hidden" id="error-banner"></div>
-
-      <div class="status-bar">
-        <div class="status-indicator" id="status-indicator"></div>
-        <span id="status-text">Loading playbook data...</span>
-        <span style="margin-left: auto; color: var(--text-muted); font-size: 0.8rem;" id="last-updated"></span>
+      <!-- Info Banner -->
+      <div class="info-banner" id="info-banner">
+        <span class="info-banner-icon">💡</span>
+        <div class="info-banner-content">
+          <h3>Embedded NFL All Day Experience</h3>
+          <p>You're viewing the actual NFL All Day Playbook. Your Dapper login session is preserved, so you can enter kickoffs directly here!</p>
+        </div>
       </div>
 
-      <div id="content-area">
-        <div class="loading">Loading slates...</div>
+      <!-- Embed View (Default) -->
+      <div id="embed-view" class="embed-view">
+        <div class="embed-container">
+          <div class="embed-header">
+            <span>🏈 NFL All Day Playbook</span>
+            <a href="https://nflallday.com/games" target="_blank">Open in new tab ↗</a>
+          </div>
+          <div class="embed-loading" id="embed-loading">
+            <div class="spinner"></div>
+            <p>Loading NFL All Day...</p>
+          </div>
+          <iframe 
+            id="nflad-frame"
+            class="embed-frame" 
+            src="https://nflallday.com/games"
+            allow="clipboard-write"
+            loading="lazy"
+            onload="document.getElementById('embed-loading').style.display='none';"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- API View (Alternative) -->
+      <div id="api-view" class="api-view">
+        <div class="status-bar">
+          <div class="status-indicator" id="status-indicator"></div>
+          <span id="status-text">Click refresh to load via API...</span>
+          <span style="margin-left: auto; color: var(--text-muted); font-size: 0.8rem;" id="last-updated"></span>
+        </div>
+
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="current">🏈 Current</button>
+          <button class="tab" data-tab="upcoming">📅 Upcoming</button>
+          <button class="tab" data-tab="completed">✅ Completed</button>
+          <button class="tab" data-tab="all">📋 All</button>
+        </div>
+
+        <div class="difficulty-filters" id="difficulty-filters">
+          <button class="diff-filter free active" data-diff="0">🆓 Free</button>
+          <button class="diff-filter common active" data-diff="1">⚪ Common+</button>
+          <button class="diff-filter rare active" data-diff="2">💜 Rare+</button>
+          <button class="diff-filter legendary active" data-diff="3">⭐ Legendary+</button>
+        </div>
+
+        <div id="content-area">
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <h2>API View</h2>
+            <p>This view attempts to load kickoff data via the API. If it fails due to authentication, use the "Live Site" view instead.</p>
+            <button class="btn btn-primary" onclick="fetchKickoffs()">🔄 Try Loading via API</button>
+          </div>
+        </div>
       </div>
     </div>
   </main>
 
   <script>
-    let slates = [];
+    // State
+    let kickoffs = [];
     let isLoading = false;
+    let currentTab = 'current';
+    let currentView = 'embed'; // 'embed' or 'api'
+    let activeDifficulties = new Set([0, 1, 2, 3]);
 
+    // DOM Elements
+    const mainContainer = document.getElementById('main-container');
+    const embedView = document.getElementById('embed-view');
+    const apiView = document.getElementById('api-view');
+    const infoBanner = document.getElementById('info-banner');
     const contentArea = document.getElementById('content-area');
-    const errorBanner = document.getElementById('error-banner');
     const statusIndicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
     const lastUpdated = document.getElementById('last-updated');
     const refreshBtn = document.getElementById('refresh-btn');
+    const viewEmbedBtn = document.getElementById('view-embed');
+    const viewApiBtn = document.getElementById('view-api');
+    const tabs = document.getElementById('tabs');
+    const diffFilters = document.getElementById('difficulty-filters');
+    const nfladFrame = document.getElementById('nflad-frame');
+
+    // Helpers
+    const DIFFICULTY_LABELS = { 0: 'Free', 1: 'Common+', 2: 'Rare+', 3: 'Legendary+' };
+    const STATUS_LABELS = {
+      'SCHEDULED': 'Scheduled', 'OPEN': 'Open', 'STARTED': 'Live',
+      'FINISHED': 'Finished', 'PROCESSED': 'Processed',
+      'NOT_STARTED': 'Upcoming', 'RUNNING': 'Active', 'GAMES_IN_PROGRESS': 'Live'
+    };
 
     function formatDate(dateString) {
       if (!dateString) return '—';
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
+      return new Date(dateString).toLocaleDateString('en-US', { 
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
       });
     }
 
-    function formatRelativeTime(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
+    function getTimeRemaining(deadline) {
+      if (!deadline) return '';
+      const diff = new Date(deadline) - new Date();
+      if (diff <= 0) return 'Ended';
+      const hours = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+      if (hours > 0) return `${hours}h ${mins}m`;
+      return `${mins}m`;
+    }
+
+    function isUrgent(deadline) {
+      if (!deadline) return false;
+      const diff = new Date(deadline) - new Date();
+      return diff > 0 && diff < 3600000;
+    }
+
+    function getKickoffStatus(kickoff) {
       const now = new Date();
-      const diffMs = date - now;
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 0) return 'Ended';
-      if (diffMins < 60) return `in ${diffMins}m`;
-      if (diffHours < 24) return `in ${diffHours}h`;
-      return `in ${diffDays}d`;
+      const deadline = kickoff.submissionDeadline ? new Date(kickoff.submissionDeadline) : null;
+      const completed = kickoff.completedAt ? new Date(kickoff.completedAt) : null;
+      if (completed || kickoff.status === 'FINISHED' || kickoff.status === 'PROCESSED') return 'completed';
+      if (kickoff.status === 'STARTED' || kickoff.status === 'GAMES_IN_PROGRESS') return 'live';
+      if (deadline && now > deadline) return 'live';
+      return 'current';
     }
 
-    function getStatusClass(status) {
-      if (!status) return 'upcoming';
-      const s = status.toLowerCase();
-      if (s === 'active' || s === 'live') return 'active';
-      if (s === 'completed' || s === 'ended') return 'completed';
-      return 'upcoming';
+    function filterKickoffs() {
+      let filtered = kickoffs;
+      if (currentTab !== 'all') {
+        filtered = filtered.filter(k => {
+          const status = getKickoffStatus(k);
+          if (currentTab === 'current') return status === 'current' || status === 'live';
+          if (currentTab === 'upcoming') return status === 'upcoming';
+          if (currentTab === 'completed') return status === 'completed';
+          return true;
+        });
+      }
+      return filtered.filter(k => activeDifficulties.has(k.difficulty));
     }
 
-    function renderSlates() {
-      if (slates.length === 0) {
+    function renderKickoffCard(kickoff) {
+      const deadline = kickoff.submissionDeadline;
+      const timeLeft = getTimeRemaining(deadline);
+      const urgent = isUrgent(deadline);
+
+      return `
+        <div class="kickoff-card difficulty-${kickoff.difficulty}">
+          <div class="kickoff-header">
+            <div class="kickoff-title-row">
+              <h3 class="kickoff-name">${kickoff.name || 'Kickoff'}</h3>
+              <span class="kickoff-difficulty">${DIFFICULTY_LABELS[kickoff.difficulty] || '?'}</span>
+            </div>
+            <div class="kickoff-meta">
+              <span class="kickoff-status ${(kickoff.status || '').toLowerCase()}">${STATUS_LABELS[kickoff.status] || kickoff.status || '?'}</span>
+              ${deadline && timeLeft ? `<span>⏰ <span class="countdown ${urgent ? 'urgent' : ''}">${timeLeft}</span></span>` : ''}
+              ${kickoff.gamesStartAt ? `<span>🏈 ${formatDate(kickoff.gamesStartAt)}</span>` : ''}
+            </div>
+          </div>
+          <div class="kickoff-footer">
+            <span class="participants">${kickoff.numParticipants ? `👥 ${kickoff.numParticipants.toLocaleString()} entries` : ''}</span>
+            <a href="https://nflallday.com/games/${kickoff.id}" target="_blank" class="kickoff-btn">Enter ↗</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderKickoffs() {
+      const filtered = filterKickoffs();
+
+      if (filtered.length === 0) {
         contentArea.innerHTML = `
           <div class="empty-state">
             <div class="empty-state-icon">📋</div>
-            <h2>No Kickoff Slates Available</h2>
-            <p>Check back later for new slates and challenges!</p>
+            <h2>No Kickoffs Found</h2>
+            <p>Try switching to the "Live Site" view to see the actual NFL All Day page.</p>
+            <button class="btn btn-primary" onclick="switchToEmbedView()">🌐 Switch to Live Site</button>
           </div>
         `;
         return;
       }
 
       contentArea.innerHTML = `
-        <div class="slates-grid">
-          ${slates.map(slate => {
-            const kickoffs = slate.kickoffs || [];
-            const statusClass = getStatusClass(slate.status);
-            
-            return `
-              <div class="slate-card">
-                <div class="slate-header">
-                  <h3 class="slate-title">${slate.name || 'Unnamed Slate'}</h3>
-                  <span class="slate-status ${statusClass}">${slate.status || 'Unknown'}</span>
-                </div>
-                
-                <div class="slate-dates">
-                  <div>📅 Start: ${formatDate(slate.startDate)}</div>
-                  <div>📅 End: ${formatDate(slate.endDate)}</div>
-                </div>
-
-                ${kickoffs.length > 0 ? `
-                  <div class="kickoffs-list">
-                    <strong style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem; display: block;">
-                      Kickoffs (${kickoffs.length}):
-                    </strong>
-                    ${kickoffs.map(kickoff => `
-                      <div class="kickoff-item">
-                        <div>
-                          <div class="kickoff-name">${kickoff.name || 'Unnamed Kickoff'}</div>
-                          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            ${kickoff.numParticipants ? `${kickoff.numParticipants} participants` : ''}
-                            ${kickoff.submissionDeadline ? ` • Deadline: ${formatRelativeTime(kickoff.submissionDeadline)}` : ''}
-                          </div>
-                        </div>
-                        ${kickoff.difficulty ? `<span class="kickoff-difficulty ${kickoff.difficulty.toLowerCase()}">${kickoff.difficulty}</span>` : ''}
-                      </div>
-                    `).join('')}
-                  </div>
-                ` : '<div style="color: var(--text-muted); font-size: 0.85rem;">No kickoffs available</div>'}
-              </div>
-            `;
-          }).join('')}
+        <div class="kickoffs-grid">
+          ${filtered.map(k => renderKickoffCard(k)).join('')}
         </div>
       `;
     }
 
-    function showError(message, details = '') {
-      errorBanner.textContent = `⚠️ ${message}${details ? `: ${details}` : ''}`;
-      errorBanner.classList.remove('hidden');
-      statusIndicator.classList.remove('active');
-      statusText.textContent = 'Error loading data';
-      statusIndicator.style.background = 'var(--danger)';
-    }
-
-    function hideError() {
-      errorBanner.classList.add('hidden');
-    }
-
-    async function fetchViaProxy() {
-      try {
-        // Try fetching via our server proxy endpoint that mimics browser better
-        const response = await fetch('/api/kickoff/slates?first=50&useBrowserHeaders=true', {
-          credentials: 'include',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.ok) {
-          return data;
-        }
-        
-        throw new Error(data.error || 'Proxy request failed');
-      } catch (err) {
-        console.error('Proxy fetch error:', err);
-        throw err;
-      }
-    }
-    
-    async function fetchViaScraping() {
-      try {
-        // Try HTML scraping fallback
-        const response = await fetch('/api/kickoff/slates?first=50&useScraping=true', {
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.ok) {
-          return data;
-        }
-        
-        throw new Error(data.error || 'Scraping request failed');
-      } catch (err) {
-        console.error('Scraping fetch error:', err);
-        throw err;
-      }
-    }
-    
-    async function fetchSlatesDirectly() {
-      try {
-        // Try using an iframe approach - embed the playbook page and scrape it
-        // This is a workaround for CORS issues
-        return new Promise((resolve, reject) => {
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.src = 'https://nflallday.com/kickoffs';
-          iframe.onload = function() {
-            try {
-              // This won't work due to CORS, but we can try
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-              // Scrape data from iframe (limited by CORS)
-              reject(new Error('Direct browser fetch blocked by CORS'));
-            } catch (e) {
-              reject(new Error('Cannot access iframe content due to CORS'));
-            }
-          };
-          iframe.onerror = () => reject(new Error('Failed to load iframe'));
-          document.body.appendChild(iframe);
-          
-          // Timeout after 5 seconds
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-            reject(new Error('Direct fetch timeout'));
-          }, 5000);
-        });
-      } catch (err) {
-        console.error('Direct fetch error:', err);
-        throw err;
-      }
-    }
-
-    async function fetchSlates() {
+    async function fetchKickoffs() {
       if (isLoading) return;
-      
+
       isLoading = true;
       refreshBtn.disabled = true;
-      statusText.textContent = 'Loading kickoffs...';
-      statusIndicator.style.background = 'var(--warning)';
-      hideError();
+      statusText.textContent = 'Fetching kickoffs...';
+      statusIndicator.classList.remove('active', 'error');
 
       try {
-        // Try our server API first (may work for public data)
-        try {
-          console.log('[Playbook] Trying server /api/kickoffs...');
-          statusText.textContent = 'Fetching kickoffs...';
-          const kickoffsRes = await fetch('/api/kickoffs?first=20', { credentials: 'include' });
-          const kickoffsData = await kickoffsRes.json();
-          
-          if (kickoffsData.ok && kickoffsData.kickoffs && kickoffsData.kickoffs.length > 0) {
-            console.log(`[Playbook] ✅ Got ${kickoffsData.kickoffs.length} kickoffs`);
-            slates = [{
-              id: 'current',
-              name: 'Current Week Kickoffs',
-              status: 'ACTIVE',
-              kickoffs: kickoffsData.kickoffs
-            }];
-            renderSlates();
-            statusIndicator.classList.add('active');
-            statusIndicator.style.background = 'var(--success)';
-            statusText.textContent = `Loaded ${kickoffsData.kickoffs.length} kickoff${kickoffsData.kickoffs.length !== 1 ? 's' : ''}`;
-            lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
-            return;
-          }
-        } catch (serverErr) {
-          console.log('[Playbook] Server fetch failed:', serverErr.message);
+        // Try server API first
+        const response = await fetch('/api/kickoffs?first=50');
+        const data = await response.json();
+
+        if (data.ok && data.kickoffs && data.kickoffs.length > 0) {
+          kickoffs = data.kickoffs;
+          renderKickoffs();
+          statusIndicator.classList.add('active');
+          statusText.textContent = `Loaded ${kickoffs.length} kickoff${kickoffs.length !== 1 ? 's' : ''}`;
+          lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+          return;
         }
-        
-        // If API fails, show helpful redirect UI
-        console.log('[Playbook] API unavailable, showing redirect UI');
-        contentArea.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <h2>Playbook Data</h2>
-            <p style="margin-bottom: 1rem; color: var(--text-muted);">
-              NFL All Day uses secure cookies for Playbook access.<br>
-              Click below to view your Playbook directly.
-            </p>
-            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-size: 1rem;">
-              <span>🏈</span> Open Playbook on NFL All Day <span style="font-size: 0.8rem;">↗</span>
-            </a>
-            <div style="margin-top: 2rem; padding: 1rem; background: rgba(111, 66, 193, 0.1); border-radius: 8px; border: 1px solid rgba(111, 66, 193, 0.3);">
-              <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--text);">📊 Quick Stats (from Flow)</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted);">
-                Your Playbook entries and scores are stored on the Flow blockchain and can be verified on-chain.
-              </p>
-            </div>
-          </div>
-        `;
-        statusIndicator.style.background = 'var(--accent-cyan)';
-        statusText.textContent = 'Click link above to view Playbook';
-        
+        throw new Error(data.error || 'No kickoffs returned');
       } catch (err) {
-        console.error('Error fetching slates:', err);
-        showError('Error loading playbook', err.message);
+        console.error('[Playbook] API Error:', err);
+        statusIndicator.classList.add('error');
+        statusText.textContent = 'API unavailable - use Live Site view';
         
         contentArea.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">⚠️</div>
-            <h2>Unable to Load Playbook</h2>
-            <p style="margin-bottom: 1rem;">${err.message}</p>
-            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
-              🏈 View on NFL All Day
-            </a>
-            <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem;">
-              🔄 Try Again
-            </button>
+            <div class="empty-state-icon">🔒</div>
+            <h2>API Access Blocked</h2>
+            <p>NFL All Day's API requires authentication. Switch to the "Live Site" view to access your Playbook with your Dapper login.</p>
+            <button class="btn btn-accent" onclick="switchToEmbedView()">🌐 Switch to Live Site</button>
           </div>
         `;
       } finally {
@@ -604,17 +763,63 @@
       }
     }
 
-    refreshBtn.addEventListener('click', fetchSlates);
+    function switchToEmbedView() {
+      currentView = 'embed';
+      embedView.style.display = 'block';
+      apiView.classList.remove('active');
+      viewEmbedBtn.classList.add('active');
+      viewApiBtn.classList.remove('active');
+      infoBanner.style.display = 'flex';
+      mainContainer.classList.add('embed-mode');
+    }
 
-    // Initial load
-    fetchSlates();
+    function switchToApiView() {
+      currentView = 'api';
+      embedView.style.display = 'none';
+      apiView.classList.add('active');
+      viewApiBtn.classList.add('active');
+      viewEmbedBtn.classList.remove('active');
+      infoBanner.style.display = 'none';
+      mainContainer.classList.remove('embed-mode');
+    }
 
-    // Auto-refresh every 5 minutes
-    setInterval(() => {
-      if (!isLoading) {
-        fetchSlates();
+    // Event Listeners
+    viewEmbedBtn.addEventListener('click', switchToEmbedView);
+    viewApiBtn.addEventListener('click', () => {
+      switchToApiView();
+      if (kickoffs.length === 0) fetchKickoffs();
+    });
+
+    refreshBtn.addEventListener('click', () => {
+      if (currentView === 'embed') {
+        nfladFrame.src = nfladFrame.src; // Reload iframe
+        document.getElementById('embed-loading').style.display = 'block';
+      } else {
+        fetchKickoffs();
       }
-    }, 5 * 60 * 1000);
+    });
+
+    tabs.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab')) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+        currentTab = e.target.dataset.tab;
+        renderKickoffs();
+      }
+    });
+
+    diffFilters.addEventListener('click', (e) => {
+      if (e.target.classList.contains('diff-filter')) {
+        const diff = parseInt(e.target.dataset.diff, 10);
+        e.target.classList.toggle('active');
+        if (activeDifficulties.has(diff)) activeDifficulties.delete(diff);
+        else activeDifficulties.add(diff);
+        renderKickoffs();
+      }
+    });
+
+    // Initialize - Start with embed view (default)
+    switchToEmbedView();
   </script>
 </body>
 </html>

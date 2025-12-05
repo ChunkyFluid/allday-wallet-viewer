@@ -18,6 +18,8 @@
       --purple: #6f42c1;
       --gold: #fbbf24;
       --danger: #ef4444;
+      --orange: #f97316;
+      --cyan: #0dcaf0;
     }
 
     body {
@@ -58,39 +60,43 @@
       align-items: center;
     }
 
-    .refresh-btn {
-      background: linear-gradient(135deg, var(--accent), var(--purple));
-      color: white;
-      border: none;
+    .btn {
       padding: 0.6rem 1.2rem;
       border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
       font-size: 0.85rem;
-    }
-
-    .refresh-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .external-link {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.6rem 1.2rem;
-      border-radius: 8px;
-      font-weight: 500;
-      cursor: pointer;
-      font-size: 0.85rem;
-      text-decoration: none;
+      border: none;
+      transition: all 0.2s;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      text-decoration: none;
     }
 
-    .external-link:hover {
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
       border-color: var(--accent);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .status-bar {
@@ -146,7 +152,7 @@
 
     .challenges-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
       gap: 1.5rem;
     }
 
@@ -154,7 +160,7 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 1.5rem;
+      overflow: hidden;
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
@@ -170,16 +176,22 @@
     }
 
     .challenge-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .challenge-title-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
 
     .challenge-title {
       font-size: 1.1rem;
       font-weight: 600;
       margin: 0;
+      flex: 1;
     }
 
     .challenge-status {
@@ -188,6 +200,8 @@
       font-size: 0.7rem;
       font-weight: 600;
       text-transform: uppercase;
+      margin-left: 0.75rem;
+      flex-shrink: 0;
     }
 
     .challenge-status.active {
@@ -200,15 +214,26 @@
       color: var(--gold);
     }
 
-    .challenge-status.ended {
+    .challenge-status.ended, .challenge-status.completed {
       background: rgba(107, 114, 128, 0.2);
       color: var(--text-muted);
+    }
+
+    .challenge-description {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .challenge-body {
+      padding: 1.25rem;
     }
 
     .challenge-reward {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.75rem;
       margin-bottom: 1rem;
       padding: 0.75rem;
       background: rgba(251, 191, 36, 0.1);
@@ -217,12 +242,130 @@
     }
 
     .reward-icon { font-size: 1.5rem; }
-    .reward-text { color: var(--gold); font-weight: 500; }
+    
+    .reward-info {
+      flex: 1;
+    }
+
+    .reward-name {
+      color: var(--gold);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .reward-desc {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
 
     .challenge-dates {
+      display: flex;
+      gap: 1rem;
       font-size: 0.85rem;
       color: var(--text-muted);
       margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .challenge-dates span {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .time-remaining {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .time-remaining.urgent {
+      color: var(--danger);
+    }
+
+    .challenge-requirements {
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    .requirements-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .requirement-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .requirement-item.met {
+      color: var(--accent);
+    }
+
+    .requirement-item .icon {
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .requirement-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.25rem;
+    }
+
+    .requirement-tag {
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 500;
+      background: rgba(111, 66, 193, 0.2);
+      color: var(--purple);
+    }
+
+    .requirement-tag.tier { background: rgba(251, 191, 36, 0.2); color: var(--gold); }
+    .requirement-tag.set { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+    .requirement-tag.player { background: rgba(34, 197, 94, 0.2); color: var(--accent); }
+    .requirement-tag.team { background: rgba(249, 115, 22, 0.2); color: var(--orange); }
+
+    .challenge-footer {
+      padding: 0.75rem 1.25rem;
+      background: rgba(27, 34, 54, 0.3);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .submissions-count {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .challenge-btn {
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+    }
+
+    .challenge-btn:hover {
+      background: #1ea550;
     }
 
     .challenge-progress {
@@ -250,37 +393,7 @@
       transition: width 0.3s;
     }
 
-    .challenge-requirements {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-    }
-
-    .requirement-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    .requirement-item.met {
-      color: var(--accent);
-    }
-
-    .requirement-item .icon {
-      width: 18px;
-      text-align: center;
-    }
-
-    .loading, .empty {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-muted);
-    }
-
-    .empty-state {
+    .loading, .empty-state {
       text-align: center;
       padding: 4rem 2rem;
       background: var(--card);
@@ -301,23 +414,19 @@
       margin: 0 auto 1.5rem;
     }
 
-    .auth-prompt {
-      background: linear-gradient(135deg, rgba(111, 66, 193, 0.1), rgba(34, 197, 94, 0.1));
-      border: 1px solid var(--purple);
-      border-radius: 12px;
-      padding: 2rem;
-      text-align: center;
-      margin-bottom: 2rem;
+    .error-banner {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      color: var(--danger);
+      font-size: 0.9rem;
+      display: none;
     }
 
-    .auth-prompt h3 {
-      margin: 0 0 0.5rem 0;
-      color: var(--accent);
-    }
-
-    .auth-prompt p {
-      color: var(--text-muted);
-      margin-bottom: 1rem;
+    .error-banner.visible {
+      display: block;
     }
 
     @media (max-width: 768px) {
@@ -335,19 +444,20 @@
       <div class="page-header">
         <h1>🎮 Challenges</h1>
         <div class="header-actions">
-          <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
-          <a href="https://nflallday.com/challenges" target="_blank" class="external-link">
+          <button class="btn btn-primary" id="refresh-btn">🔄 Refresh</button>
+          <a href="https://nflallday.com/challenges" target="_blank" class="btn btn-secondary">
             🏈 View on NFL All Day ↗
           </a>
         </div>
       </div>
 
+      <div class="error-banner" id="error-banner"></div>
+
       <div class="status-bar">
         <div class="status-indicator" id="status-indicator"></div>
         <span id="status-text">Loading challenges...</span>
+        <span style="margin-left: auto; color: var(--text-muted); font-size: 0.8rem;" id="last-updated"></span>
       </div>
-
-      <div id="auth-area"></div>
 
       <div class="filter-tabs" id="filter-tabs">
         <button class="filter-tab active" data-filter="active">🔥 Active</button>
@@ -366,12 +476,12 @@
     let challenges = [];
     let currentFilter = 'active';
     let isLoading = false;
-    let isAuthenticated = false;
 
     const contentArea = document.getElementById('content-area');
-    const authArea = document.getElementById('auth-area');
+    const errorBanner = document.getElementById('error-banner');
     const statusIndicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
+    const lastUpdated = document.getElementById('last-updated');
     const refreshBtn = document.getElementById('refresh-btn');
     const filterTabs = document.getElementById('filter-tabs');
 
@@ -388,16 +498,34 @@
       const end = new Date(endDate);
       const diff = end - now;
       if (diff <= 0) return 'Ended';
+      
       const days = Math.floor(diff / 86400000);
       const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      
       if (days > 0) return `${days}d ${hours}h remaining`;
-      return `${hours}h remaining`;
+      if (hours > 0) return `${hours}h ${mins}m remaining`;
+      return `${mins}m remaining`;
+    }
+
+    function isUrgent(endDate) {
+      if (!endDate) return false;
+      const diff = new Date(endDate) - new Date();
+      return diff > 0 && diff < 3600000;
     }
 
     function getStatusClass(challenge) {
       const now = new Date();
       const start = challenge.startDate ? new Date(challenge.startDate) : null;
       const end = challenge.endDate ? new Date(challenge.endDate) : null;
+      
+      // Check explicit status first
+      if (challenge.status) {
+        const s = challenge.status.toUpperCase();
+        if (s === 'ACTIVE' || s === 'OPEN') return 'active';
+        if (s === 'UPCOMING' || s === 'SCHEDULED') return 'upcoming';
+        if (s === 'COMPLETED' || s === 'ENDED' || s === 'FINISHED') return 'ended';
+      }
       
       if (end && now > end) return 'ended';
       if (start && now < start) return 'upcoming';
@@ -406,7 +534,109 @@
 
     function filterChallenges() {
       if (currentFilter === 'all') return challenges;
-      return challenges.filter(c => getStatusClass(c) === currentFilter);
+      
+      return challenges.filter(c => {
+        const status = getStatusClass(c);
+        if (currentFilter === 'active') return status === 'active';
+        if (currentFilter === 'upcoming') return status === 'upcoming';
+        if (currentFilter === 'completed') return status === 'ended';
+        return true;
+      });
+    }
+
+    function renderRequirements(requirements) {
+      if (!requirements || requirements.length === 0) return '';
+
+      return requirements.map(req => {
+        const tags = [];
+        
+        if (req.tiers && req.tiers.length > 0) {
+          req.tiers.forEach(tier => tags.push(`<span class="requirement-tag tier">${tier}</span>`));
+        }
+        if (req.count) {
+          tags.push(`<span class="requirement-tag">×${req.count}</span>`);
+        }
+
+        return `
+          <div class="requirement-item ${req.met ? 'met' : ''}">
+            <span class="icon">${req.met ? '✅' : '⬜'}</span>
+            <div>
+              <div>${req.description || req.type || 'Requirement'}</div>
+              ${tags.length > 0 ? `<div class="requirement-details">${tags.join('')}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderChallengeCard(challenge) {
+      const statusClass = getStatusClass(challenge);
+      const timeLeft = getTimeRemaining(challenge.endDate);
+      const urgent = isUrgent(challenge.endDate);
+      const progress = challenge.progress || 0;
+
+      return `
+        <div class="challenge-card ${progress >= 100 ? 'completed' : ''}">
+          <div class="challenge-header">
+            <div class="challenge-title-row">
+              <h3 class="challenge-title">${challenge.name || 'Unnamed Challenge'}</h3>
+              <span class="challenge-status ${statusClass}">${statusClass}</span>
+            </div>
+            ${challenge.description ? `<p class="challenge-description">${challenge.description}</p>` : ''}
+          </div>
+
+          <div class="challenge-body">
+            ${challenge.reward ? `
+              <div class="challenge-reward">
+                <span class="reward-icon">🏆</span>
+                <div class="reward-info">
+                  <div class="reward-name">${challenge.reward.name || challenge.reward}</div>
+                  ${challenge.reward.description ? `<div class="reward-desc">${challenge.reward.description}</div>` : ''}
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="challenge-dates">
+              ${statusClass === 'active' && timeLeft ? `
+                <span>⏰ <span class="time-remaining ${urgent ? 'urgent' : ''}">${timeLeft}</span></span>
+              ` : ''}
+              ${statusClass === 'upcoming' ? `<span>📅 Starts: ${formatDate(challenge.startDate)}</span>` : ''}
+              ${statusClass === 'ended' ? `<span>✅ Ended: ${formatDate(challenge.endDate)}</span>` : ''}
+            </div>
+
+            ${challenge.requirements && challenge.requirements.length > 0 ? `
+              <div class="challenge-requirements">
+                <div class="requirements-title">
+                  <span>📝 Requirements</span>
+                  <span style="color: var(--accent);">(${challenge.requirements.length})</span>
+                </div>
+                ${renderRequirements(challenge.requirements)}
+              </div>
+            ` : ''}
+
+            ${progress > 0 ? `
+              <div class="challenge-progress">
+                <div class="progress-label">
+                  <span>Progress</span>
+                  <span>${Math.round(progress)}%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="challenge-footer">
+            <span class="submissions-count">
+              ${challenge.submissions?.totalCount ? `👥 ${challenge.submissions.totalCount.toLocaleString()} submissions` : ''}
+            </span>
+            <a href="https://nflallday.com/challenges/${challenge.id}" target="_blank" class="challenge-btn">
+              View Challenge ↗
+            </a>
+          </div>
+        </div>
+      `;
     }
 
     function renderChallenges() {
@@ -425,7 +655,7 @@
             <div class="empty-state-icon">🎮</div>
             <h2>No Challenges</h2>
             <p>${messages[currentFilter]}</p>
-            <a href="https://nflallday.com/challenges" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+            <a href="https://nflallday.com/challenges" target="_blank" class="btn btn-primary">
               View Challenges on NFL All Day ↗
             </a>
           </div>
@@ -435,74 +665,19 @@
 
       contentArea.innerHTML = `
         <div class="challenges-grid">
-          ${filtered.map(challenge => {
-            const statusClass = getStatusClass(challenge);
-            const progress = challenge.progress || 0;
-            const requirements = challenge.requirements || [];
-
-            return `
-              <div class="challenge-card ${progress >= 100 ? 'completed' : ''}">
-                <div class="challenge-header">
-                  <h3 class="challenge-title">${challenge.name || 'Unnamed Challenge'}</h3>
-                  <span class="challenge-status ${statusClass}">${statusClass}</span>
-                </div>
-
-                ${challenge.reward ? `
-                  <div class="challenge-reward">
-                    <span class="reward-icon">🏆</span>
-                    <span class="reward-text">${challenge.reward}</span>
-                  </div>
-                ` : ''}
-
-                <div class="challenge-dates">
-                  ${statusClass === 'active' ? `⏰ ${getTimeRemaining(challenge.endDate)}` : ''}
-                  ${statusClass === 'upcoming' ? `📅 Starts: ${formatDate(challenge.startDate)}` : ''}
-                  ${statusClass === 'ended' ? `✅ Ended: ${formatDate(challenge.endDate)}` : ''}
-                </div>
-
-                ${challenge.description ? `
-                  <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">${challenge.description}</p>
-                ` : ''}
-
-                ${progress !== undefined ? `
-                  <div class="challenge-progress">
-                    <div class="progress-label">
-                      <span>Progress</span>
-                      <span>${Math.round(progress)}%</span>
-                    </div>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
-                    </div>
-                  </div>
-                ` : ''}
-
-                ${requirements.length > 0 ? `
-                  <div class="challenge-requirements">
-                    ${requirements.map(req => `
-                      <div class="requirement-item ${req.met ? 'met' : ''}">
-                        <span class="icon">${req.met ? '✅' : '⬜'}</span>
-                        <span>${req.description || req.name}</span>
-                      </div>
-                    `).join('')}
-                  </div>
-                ` : ''}
-              </div>
-            `;
-          }).join('')}
+          ${filtered.map(c => renderChallengeCard(c)).join('')}
         </div>
       `;
     }
 
-    function showAuthPrompt() {
-      authArea.innerHTML = `
-        <div class="auth-prompt">
-          <h3>🔐 Sign In for Personalized Data</h3>
-          <p>To see your challenge progress and completion status, you need to be logged in to NFL All Day.</p>
-          <a href="https://nflallday.com/challenges" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
-            Open NFL All Day to Sign In ↗
-          </a>
-        </div>
-      `;
+    function showError(message) {
+      errorBanner.textContent = `⚠️ ${message}`;
+      errorBanner.classList.add('visible');
+      statusIndicator.classList.add('error');
+    }
+
+    function hideError() {
+      errorBanner.classList.remove('visible');
     }
 
     async function fetchChallenges() {
@@ -511,64 +686,49 @@
       isLoading = true;
       refreshBtn.disabled = true;
       statusText.textContent = 'Loading challenges...';
-      statusIndicator.className = 'status-indicator';
+      statusIndicator.classList.remove('active', 'error');
+      hideError();
 
       try {
-        // Try server endpoint
-        try {
-          const response = await fetch('/api/challenges', { credentials: 'include' });
-          const data = await response.json();
+        const response = await fetch('/api/challenges?first=50', { credentials: 'include' });
+        const data = await response.json();
 
-          if (data.ok && data.challenges && data.challenges.length > 0) {
-            challenges = data.challenges;
-            isAuthenticated = true;
-            authArea.innerHTML = '';
-            renderChallenges();
-            statusIndicator.classList.add('active');
-            statusText.textContent = `Loaded ${challenges.length} challenge${challenges.length !== 1 ? 's' : ''}`;
-            return;
-          }
-        } catch (serverErr) {
-          console.log('[Challenges] Server fetch failed:', serverErr.message);
+        if (data.ok && data.challenges && data.challenges.length > 0) {
+          challenges = data.challenges;
+          renderChallenges();
+          statusIndicator.classList.add('active');
+          statusText.textContent = `Loaded ${challenges.length} challenge${challenges.length !== 1 ? 's' : ''}`;
+          lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        } else if (data.requiresAuth) {
+          throw new Error('Authentication required to view challenges');
+        } else {
+          throw new Error(data.error || 'No challenges returned');
         }
-        
-        // API unavailable - show helpful redirect
-        showDemoChallenges();
-        statusIndicator.style.background = 'var(--gold)';
-        statusText.textContent = 'View challenges on NFL All Day';
-        
       } catch (err) {
-        console.error('Error fetching challenges:', err);
-        statusIndicator.classList.add('error');
-        statusText.textContent = 'Could not load challenges';
-        showDemoChallenges();
+        console.error('[Challenges] Error:', err);
+        showError(err.message);
+        statusText.textContent = 'Error loading challenges';
+        
+        contentArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🎮</div>
+            <h2>Unable to Load Challenges</h2>
+            <p>${err.message.includes('auth') ? 'Challenges may require you to be logged in to NFL All Day.' : err.message}</p>
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="fetchChallenges()">🔄 Try Again</button>
+              <a href="https://nflallday.com/challenges" target="_blank" class="btn btn-secondary">
+                🏈 View on NFL All Day
+              </a>
+            </div>
+          </div>
+        `;
       } finally {
         isLoading = false;
         refreshBtn.disabled = false;
       }
     }
 
-    function showDemoChallenges() {
-      // Show helpful message with link to official site
-      contentArea.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-state-icon">🎮</div>
-          <h2>View Challenges on NFL All Day</h2>
-          <p>
-            Challenges data requires authentication with NFL All Day. 
-            Visit the official site to view and participate in challenges.
-          </p>
-          <a href="https://nflallday.com/challenges" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block; margin-bottom: 1rem;">
-            🏈 Open Challenges on NFL All Day ↗
-          </a>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 1rem;">
-            <strong>Tip:</strong> Log in to NFL All Day in another tab, then come back and refresh to see your challenges.
-          </p>
-        </div>
-      `;
-    }
-
-    // Filter tab handling
+    // Event Listeners
     filterTabs.addEventListener('click', (e) => {
       if (e.target.classList.contains('filter-tab')) {
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
@@ -582,6 +742,13 @@
 
     // Initial load
     fetchChallenges();
+
+    // Auto-refresh every 5 minutes
+    setInterval(() => {
+      if (!isLoading) {
+        fetchChallenges();
+      }
+    }, 5 * 60 * 1000);
   </script>
 </body>
 </html>
