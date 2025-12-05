@@ -35,7 +35,6 @@
           <a href="/offers.html" class="${path === '/offers.html' ? 'active' : ''}">💬 Offers</a>
           <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
           <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
-          <a href="/nflad-auth.html" class="${path === '/nflad-auth.html' ? 'active' : ''}" title="Connect NFL All Day">🔐 NFLAD</a>
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>
         </nav>
       </header>
