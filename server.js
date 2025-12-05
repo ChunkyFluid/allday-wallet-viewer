@@ -4633,7 +4633,7 @@ const STOREFRONT_CONTRACT = "A.4eb8a10cb9f87357.NFTStorefront";
 
 const floorPriceCache = new Map(); // editionId -> { floor, updatedAt }
 const FLOOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes before refreshing
-const MAX_FLOOR_CACHE_SIZE = 1000; // Max cached editions
+const MAX_FLOOR_CACHE_SIZE = 300; // Max cached editions (reduced to save memory)
 
 // Scrape floor price from NFL All Day website
 async function scrapeFloorPrice(editionId) {
@@ -4710,9 +4710,9 @@ const sniperListings = []; // Array of ALL listings (in-memory cache)
 const seenListingNfts = new Map(); // Track seen nftIds -> timestamp to prevent duplicates
 const soldNfts = new Map(); // Track sold NFTs -> timestamp
 const unlistedNfts = new Map(); // Track delisted NFTs -> timestamp
-const MAX_SNIPER_LISTINGS = 500;
-const MAX_SEEN_NFTS = 2000; // Max tracked seen NFTs
-const MAX_SOLD_NFTS = 2000; // Max tracked sold NFTs
+const MAX_SNIPER_LISTINGS = 300; // Reduced to save memory
+const MAX_SEEN_NFTS = 500; // Max tracked seen NFTs (reduced)
+const MAX_SOLD_NFTS = 500; // Max tracked sold NFTs (reduced)
 
 // Database table for persistence (3-day retention)
 async function ensureSniperListingsTable() {
@@ -6285,9 +6285,60 @@ function cleanupSniperMemory() {
       }
     }
     
-    sniperLog(`[Sniper Cleanup] Floor cache: ${floorPriceCache.size}, Seen NFTs: ${seenListingNfts.size}, Sold NFTs: ${soldNfts.size}`);
+    // Log memory usage
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+    
+    sniperLog(`[Cleanup] Memory: ${heapUsedMB}/${heapTotalMB}MB | Floor: ${floorPriceCache.size} | Seen: ${seenListingNfts.size} | Sold: ${soldNfts.size} | Listings: ${sniperListings.length}`);
+    
+    // Force garbage collection if available (run node with --expose-gc)
+    if (global.gc) {
+      global.gc();
+      console.log("[Cleanup] Forced garbage collection");
+    }
   } catch (err) {
-    console.error("[Sniper] Error during cleanup:", err.message);
+    console.error("[Cleanup] Error during cleanup:", err.message);
+  }
+}
+
+// Global cleanup for all caches (runs less frequently)
+function globalMemoryCleanup() {
+  try {
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    
+    console.log(`[Memory] Heap used: ${heapUsedMB}MB`);
+    
+    // If memory is getting high (>200MB), be more aggressive with cleanup
+    if (heapUsedMB > 200) {
+      console.log("[Memory] High memory usage detected, running aggressive cleanup...");
+      
+      // Clear expired graphql cache entries
+      const now = Date.now();
+      for (const [key, entry] of graphqlCache.entries()) {
+        if (now >= entry.expiresAt) {
+          graphqlCache.delete(key);
+        }
+      }
+      
+      // Trim sniper listings more aggressively
+      if (sniperListings.length > 200) {
+        sniperListings.length = 200;
+      }
+      
+      // Clear old caches
+      if (typeof rarityLeaderboardCache !== 'undefined') {
+        rarityLeaderboardCache = null;
+      }
+      if (typeof setTotalsCache !== 'undefined') {
+        setTotalsCache = null;
+      }
+      
+      console.log(`[Memory] After cleanup - GraphQL cache: ${graphqlCache.size}, Listings: ${sniperListings.length}`);
+    }
+  } catch (err) {
+    console.error("[Memory] Error during global cleanup:", err.message);
   }
 }
 
@@ -6307,9 +6358,10 @@ async function cleanupOldListings() {
   }
 }
 
-// Start periodic cleanup every 10 minutes (memory) and every hour (database)
-setInterval(cleanupSniperMemory, 10 * 60 * 1000);
+// Start periodic cleanup every 5 minutes (memory) and every hour (database)
+setInterval(cleanupSniperMemory, 5 * 60 * 1000); // Every 5 minutes
 setInterval(cleanupOldListings, 60 * 60 * 1000); // Every hour
+setInterval(globalMemoryCleanup, 2 * 60 * 1000); // Every 2 minutes for memory check
 
 // Verify listing status periodically (every 5 minutes)
 setInterval(() => {
@@ -7507,6 +7559,7 @@ const NFLAD_GRAPHQL_URL = process.env.NFLAD_GRAPHQL_URL || "https://nflallday.co
 // Response cache for GraphQL requests
 const graphqlCache = new Map(); // key -> { data, timestamp, expiresAt }
 const CACHE_TTL = 2 * 60 * 1000; // Cache for 2 minutes
+const MAX_GRAPHQL_CACHE_SIZE = 50; // Limit cache size to prevent memory issues
 
 // Rate limiting for GraphQL requests
 let graphqlRequestCount = 0;
@@ -7671,12 +7724,23 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
     
     // Cache the successful response
     if (useCache && data.data) {
+      // Cleanup if cache is too large
+      if (graphqlCache.size >= MAX_GRAPHQL_CACHE_SIZE) {
+        const entries = Array.from(graphqlCache.entries())
+          .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+        // Remove oldest 20%
+        const toRemove = Math.ceil(graphqlCache.size * 0.2);
+        for (let i = 0; i < toRemove; i++) {
+          graphqlCache.delete(entries[i][0]);
+        }
+      }
+      
       graphqlCache.set(cacheKey, {
         data: data.data,
         timestamp: Date.now(),
         expiresAt: Date.now() + CACHE_TTL
       });
-      console.log(`[GraphQL] Cached response (expires in ${CACHE_TTL / 1000}s)`);
+      console.log(`[GraphQL] Cached response (cache size: ${graphqlCache.size})`);
     }
     
     return data.data;
