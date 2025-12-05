@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wallet Comparison | NFL All Day</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="header.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg: #050815; --card: #0b1020; --border: #1b2236; --text: #f8f9ff; --text-muted: #8c95b8; --accent1: #00d4ff; --accent2: #f472b6; --purple: #6f42c1; }
+    body { background: radial-gradient(circle at top, #101526 0, #050815 55%); min-height: 100vh; font-family: 'Outfit', sans-serif; color: var(--text); margin: 0; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 2rem; background: linear-gradient(135deg, var(--accent1), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.5rem; }
+    .search-row { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center; }
+    .search-row input { flex: 1; min-width: 200px; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 1rem; }
+    .search-row .vs { font-size: 1.5rem; font-weight: 700; color: var(--text-muted); }
+    .search-row button { padding: 1rem 2rem; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent1), var(--accent2)); color: white; font-weight: 600; cursor: pointer; }
+    .comparison-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 2rem; }
+    .wallet-col { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .wallet-col.left { border-color: var(--accent1); }
+    .wallet-col.right { border-color: var(--accent2); }
+    .wallet-header { text-align: center; margin-bottom: 1.5rem; }
+    .wallet-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .wallet-name.left { color: var(--accent1); }
+    .wallet-name.right { color: var(--accent2); }
+    .wallet-address { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+    .stat-row { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: var(--text-muted); }
+    .stat-value { font-weight: 600; }
+    .stat-value.winner { color: #22c55e; }
+    .vs-col { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; }
+    .vs-icon { font-size: 2rem; }
+    .vs-stat { text-align: center; }
+    .vs-stat .label { font-size: 0.75rem; color: var(--text-muted); }
+    .vs-stat .value { font-size: 1.1rem; font-weight: 600; }
+    .tier-bars { margin-top: 1rem; }
+    .tier-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .tier-bar .label { width: 80px; font-size: 0.8rem; color: var(--text-muted); }
+    .tier-bar .bar { flex: 1; height: 20px; background: var(--border); border-radius: 4px; overflow: hidden; display: flex; }
+    .tier-bar .fill-left { background: var(--accent1); }
+    .tier-bar .fill-right { background: var(--accent2); }
+    .loading, .empty { text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1 / -1; }
+    @media (max-width: 900px) {
+      .comparison-grid { grid-template-columns: 1fr; }
+      .vs-col { flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+  <script src="/layout.js"></script>
+  <main class="app-main">
+    <div class="container">
+      <h1>⚖️ Wallet Comparison</h1>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Compare two wallets side-by-side</p>
+      
+      <div class="search-row">
+        <input type="text" id="wallet1" placeholder="Search wallet 1 by name..." />
+        <span class="vs">VS</span>
+        <input type="text" id="wallet2" placeholder="Search wallet 2 by name..." />
+        <button onclick="compare()">Compare</button>
+      </div>
+      <script src="/wallet-search.js"></script>
+      
+      <div id="results" class="comparison-grid"></div>
+    </div>
+  </main>
+  <script>
+    const wallet1Input = document.getElementById('wallet1');
+    const wallet2Input = document.getElementById('wallet2');
+    const results = document.getElementById('results');
+    
+    async function compare() {
+      // Use data attribute if available (from autocomplete), otherwise use input value
+      const w1 = (wallet1Input.dataset.walletAddress || wallet1Input.value).trim().toLowerCase();
+      const w2 = (wallet2Input.dataset.walletAddress || wallet2Input.value).trim().toLowerCase();
+      if (!w1 || !w2 || !w1.startsWith('0x') || !w2.startsWith('0x')) return alert('Please select both wallets');
+      
+      results.innerHTML = '<div class="loading">Comparing wallets...</div>';
+      
+      try {
+        const res = await fetch(`/api/wallet-compare?wallet1=${w1}&wallet2=${w2}`);
+        const data = await res.json();
+        
+        if (!data.ok) throw new Error(data.error);
+        renderComparison(data);
+      } catch (err) {
+        results.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
+      }
+    }
+    
+    // Initialize wallet search with autocomplete for both inputs
+    initWalletSearch('wallet1', () => {});
+    initWalletSearch('wallet2', () => {});
+    
+    // Check URL params on page load
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('wallet1') && params.get('wallet2')) {
+      wallet1Input.value = params.get('wallet1');
+      wallet2Input.value = params.get('wallet2');
+      compare();
+    }
+    
+    function renderComparison(data) {
+      const { wallet1, wallet2, shared } = data;
+      
+      const statRow = (label, v1, v2, higherWins = true) => {
+        const w1 = higherWins ? v1 > v2 : v1 < v2;
+        const w2 = higherWins ? v2 > v1 : v2 < v1;
+        return { label, v1, v2, w1, w2 };
+      };
+      
+      const stats = [
+        statRow('Total Moments', wallet1.total, wallet2.total),
+        statRow('Locked', wallet1.locked, wallet2.locked),
+        statRow('Commons', wallet1.common, wallet2.common),
+        statRow('Uncommons', wallet1.uncommon, wallet2.uncommon),
+        statRow('Rares', wallet1.rare, wallet2.rare),
+        statRow('Legendaries', wallet1.legendary, wallet2.legendary),
+        statRow('Ultimates', wallet1.ultimate, wallet2.ultimate),
+        statRow('Floor Value', wallet1.floor_value, wallet2.floor_value),
+      ];
+      
+      const maxTotal = Math.max(wallet1.total, wallet2.total) || 1;
+      const tiers = ['common', 'uncommon', 'rare', 'legendary', 'ultimate'];
+      
+      results.innerHTML = `
+        <div class="wallet-col left">
+          <div class="wallet-header">
+            <div class="wallet-name left">${wallet1.display_name || 'Wallet 1'}</div>
+            <div class="wallet-address">${wallet1.address}</div>
+          </div>
+          ${stats.map(s => `
+            <div class="stat-row">
+              <span class="stat-label">${s.label}</span>
+              <span class="stat-value ${s.w1 ? 'winner' : ''}">${typeof s.v1 === 'number' && s.label.includes('Value') ? '$' + s.v1.toLocaleString() : s.v1.toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="vs-col">
+          <div class="vs-icon">⚔️</div>
+          <div class="vs-stat">
+            <div class="value">${shared.shared_editions}</div>
+            <div class="label">Shared Editions</div>
+          </div>
+          <div class="vs-stat">
+            <div class="value">${shared.shared_players}</div>
+            <div class="label">Shared Players</div>
+          </div>
+        </div>
+        
+        <div class="wallet-col right">
+          <div class="wallet-header">
+            <div class="wallet-name right">${wallet2.display_name || 'Wallet 2'}</div>
+            <div class="wallet-address">${wallet2.address}</div>
+          </div>
+          ${stats.map(s => `
+            <div class="stat-row">
+              <span class="stat-label">${s.label}</span>
+              <span class="stat-value ${s.w2 ? 'winner' : ''}">${typeof s.v2 === 'number' && s.label.includes('Value') ? '$' + s.v2.toLocaleString() : s.v2.toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
+

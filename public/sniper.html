@@ -1149,14 +1149,27 @@
 
         <div class="filter-group">
           <label class="filter-label">Tier</label>
-          <select class="filter-select" id="filter-tier">
-            <option value="">All Tiers</option>
-            <option value="ULTIMATE">Ultimate</option>
-            <option value="LEGENDARY">Legendary</option>
-            <option value="RARE">Rare</option>
-            <option value="UNCOMMON">Uncommon</option>
-            <option value="COMMON">Common</option>
-          </select>
+          <div id="filter-tier"></div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Series</label>
+          <div id="filter-series"></div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Set</label>
+          <div id="filter-set"></div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Position</label>
+          <div id="filter-position"></div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Min Price</label>
+          <input type="number" class="filter-input" id="filter-min-price" placeholder="Any" min="0" />
         </div>
 
         <div class="filter-group">
@@ -1255,6 +1268,7 @@
   </div>
 
   <script src="layout.js"></script>
+  <script src="/js/multi-select.js"></script>
   <script>
     // NFL Teams for filter
     const NFL_TEAMS = [
@@ -1294,7 +1308,7 @@
     const filterDealsOnly = document.getElementById('filter-deals-only');
     const filterMinDiscount = document.getElementById('filter-min-discount');
     const filterOwned = document.getElementById('filter-owned');
-    const filterTier = document.getElementById('filter-tier');
+    const filterMinPrice = document.getElementById('filter-min-price');
     const filterMaxPrice = document.getElementById('filter-max-price');
     const filterMaxSerial = document.getElementById('filter-max-serial');
     const filterPlayer = document.getElementById('filter-player');
@@ -1302,6 +1316,35 @@
     const filterMarketplace = document.getElementById('filter-marketplace');
     const filterStatus = document.getElementById('filter-status');
     const sortBy = document.getElementById('sort-by');
+
+    // Multi-select filters
+    const tierMultiSelect = new MultiSelect('filter-tier', {
+      placeholder: 'All Tiers',
+      onChange: () => { currentPage = 1; renderListings(); }
+    });
+    tierMultiSelect.setItems([
+      { value: 'ULTIMATE', label: 'Ultimate' },
+      { value: 'LEGENDARY', label: 'Legendary' },
+      { value: 'RARE', label: 'Rare' },
+      { value: 'UNCOMMON', label: 'Uncommon' },
+      { value: 'COMMON', label: 'Common' }
+    ]);
+
+    const seriesMultiSelect = new MultiSelect('filter-series', {
+      placeholder: 'All Series',
+      onChange: () => { currentPage = 1; renderListings(); }
+    });
+
+    const setMultiSelect = new MultiSelect('filter-set', {
+      placeholder: 'All Sets',
+      onChange: () => { currentPage = 1; renderListings(); }
+    });
+
+    const positionMultiSelect = new MultiSelect('filter-position', {
+      placeholder: 'All Positions',
+      onChange: () => { currentPage = 1; renderListings(); }
+    });
+    positionMultiSelect.setItems(['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'OL', 'DL', 'LB', 'DB', 'P', 'LS', 'FB', 'C', 'G', 'T', 'DE', 'DT', 'NT', 'OLB', 'ILB', 'MLB', 'CB', 'S', 'FS', 'SS']);
 
     // View toggle
     document.getElementById('view-grid').addEventListener('click', () => {
@@ -1374,11 +1417,25 @@
         
         userWallet = meData.user.default_wallet_address;
         
-        // Fetch wallet moments
-        const walletRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
-        const walletData = await walletRes.json();
-        
+        // Fetch wallet moments from blockchain (real-time data)
+        // Fallback to database if blockchain query fails
+        let walletData = null;
+        try {
+          const walletRes = await fetch(`/api/query-blockchain?wallet=${encodeURIComponent(userWallet)}`);
+          walletData = await walletRes.json();
         if (!walletData.ok || !walletData.rows) {
+            // Fallback to database
+            const fallbackRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
+            walletData = await fallbackRes.json();
+          }
+        } catch (err) {
+          // Fallback to database on error
+          console.warn('Blockchain query failed, using database:', err);
+          const fallbackRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
+          walletData = await fallbackRes.json();
+        }
+        
+        if (!walletData || !walletData.ok || !walletData.rows) {
           ownedCounts = {};
           return;
         }
@@ -1577,6 +1634,19 @@
           }
         }
         
+        // Populate series and set multi-selects from listings data
+        if (listings.length > 0) {
+          const uniqueSeries = [...new Set(listings.map(l => l.seriesName).filter(Boolean))].sort();
+          const uniqueSets = [...new Set(listings.map(l => l.setName).filter(Boolean))].sort();
+          
+          if (uniqueSeries.length > 0) {
+            seriesMultiSelect.setItems(uniqueSeries);
+          }
+          if (uniqueSets.length > 0) {
+            setMultiSelect.setItems(uniqueSets);
+          }
+        }
+        
         // Update live indicator (only if data available from real-time endpoint)
         if (data.watching !== undefined) {
           document.getElementById('live-status').textContent = data.watching 
@@ -1687,10 +1757,34 @@
         });
       }
 
-      // Tier filter
-      const tier = filterTier.value;
-      if (tier) {
-        filtered = filtered.filter(l => l.tier?.toUpperCase() === tier);
+      // Tier filter (multi-select)
+      const selectedTiers = tierMultiSelect.getValues();
+      if (selectedTiers.length > 0) {
+        filtered = filtered.filter(l => selectedTiers.includes(l.tier?.toUpperCase()));
+      }
+
+      // Series filter (multi-select)
+      const selectedSeries = seriesMultiSelect.getValues();
+      if (selectedSeries.length > 0) {
+        filtered = filtered.filter(l => selectedSeries.some(s => l.seriesName?.includes(s)));
+      }
+
+      // Set filter (multi-select)
+      const selectedSets = setMultiSelect.getValues();
+      if (selectedSets.length > 0) {
+        filtered = filtered.filter(l => selectedSets.some(s => l.setName?.includes(s)));
+      }
+
+      // Position filter (multi-select)
+      const selectedPositions = positionMultiSelect.getValues();
+      if (selectedPositions.length > 0) {
+        filtered = filtered.filter(l => selectedPositions.includes(l.position?.toUpperCase()));
+      }
+
+      // Min listing price
+      const minPrice = parseFloat(filterMinPrice.value);
+      if (minPrice) {
+        filtered = filtered.filter(l => (l.listingPrice || 0) >= minPrice);
       }
 
       // Max listing price
@@ -2102,7 +2196,7 @@
     });
 
     // Filter change listeners - reset to page 1 when filters change
-    [filterDealsOnly, filterMinDiscount, filterOwned, filterTier, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, filterStatus, sortBy].forEach(el => {
+    [filterDealsOnly, filterMinDiscount, filterOwned, filterMinPrice, filterMaxPrice, filterMaxSerial, filterPlayer, filterTeam, filterStatus, sortBy].forEach(el => {
       el.addEventListener('change', () => {
         currentPage = 1; // Reset to first page when filters change
         renderListings();

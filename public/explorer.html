@@ -379,30 +379,22 @@
 
                     <div class="filter-group">
                         <div class="filter-label">Tier</div>
-                        <select id="ex-tier" class="filter-select">
-                            <option value="">All tiers</option>
-                        </select>
+                        <div id="ex-tier"></div>
                     </div>
 
                     <div class="filter-group">
                         <div class="filter-label">Series</div>
-                        <select id="ex-series" class="filter-select">
-                            <option value="">All series</option>
-                        </select>
+                        <div id="ex-series"></div>
                     </div>
 
                     <div class="filter-group">
                         <div class="filter-label">Set</div>
-                        <select id="ex-set" class="filter-select">
-                            <option value="">All sets</option>
-                        </select>
+                        <div id="ex-set"></div>
                     </div>
 
                     <div class="filter-group">
                         <div class="filter-label">Position</div>
-                        <select id="ex-position" class="filter-select">
-                            <option value="">All positions</option>
-                        </select>
+                        <div id="ex-position"></div>
                     </div>
 
                     <div class="filters-actions">
@@ -474,7 +466,29 @@
             </div>
         </main>
 
+        <script src="/js/multi-select.js"></script>
         <script>
+            // Initialize multi-select filters
+            const tierMultiSelect = new MultiSelect('ex-tier', {
+                placeholder: 'All tiers',
+                onChange: () => {}
+            });
+            
+            const seriesMultiSelect = new MultiSelect('ex-series', {
+                placeholder: 'All series',
+                onChange: () => {}
+            });
+            
+            const setMultiSelect = new MultiSelect('ex-set', {
+                placeholder: 'All sets',
+                onChange: () => {}
+            });
+            
+            const positionMultiSelect = new MultiSelect('ex-position', {
+                placeholder: 'All positions',
+                onChange: () => {}
+            });
+
             async function loadFilterOptions() {
                 const summary = document.getElementById("ex-results-summary");
                 try {
@@ -490,10 +504,6 @@
                     // Helpers
                     const playerSelect = document.getElementById("ex-player");
                     const teamSelect = document.getElementById("ex-team");
-                    const tierSelect = document.getElementById("ex-tier");
-                    const seriesSelect = document.getElementById("ex-series");
-                    const setSelect = document.getElementById("ex-set");
-                    const posSelect = document.getElementById("ex-position");
 
                     function addOptions(selectEl, items, makeLabel) {
                         items.forEach((item) => {
@@ -506,7 +516,7 @@
                         });
                     }
 
-                    // Players
+                    // Players (still a single select)
                     playerSelect.innerHTML = '<option value="">All players</option>';
                     addOptions(
                         playerSelect,
@@ -514,42 +524,25 @@
                         (p) => [p.first_name, p.last_name].filter(Boolean).join(" ") || null
                     );
 
-                    // Teams
+                    // Teams (still a single select)
                     teamSelect.innerHTML = '<option value="">All teams</option>';
                     addOptions(teamSelect, data.teams || [], (t) => t);
 
-                    // Tiers – in nice order
+                    // Tiers – in nice order (multi-select)
                     const tierOrder = ["Common", "Uncommon", "Rare", "Legendary", "Ultimate"];
-                    const tiersSet = new Set((data.tiers || []).map((t) => t));
-                    tierSelect.innerHTML = '<option value="">All tiers</option>';
-                    tierOrder.forEach((t) => {
-                        if (tiersSet.has(t) || tiersSet.has(t.toUpperCase())) {
-                            const opt = document.createElement("option");
-                            opt.value = t;
-                            opt.textContent = t;
-                            tierSelect.appendChild(opt);
-                        }
-                    });
-                    (data.tiers || []).forEach((t) => {
-                        if (!tierOrder.includes(t)) {
-                            const opt = document.createElement("option");
-                            opt.value = t;
-                            opt.textContent = t;
-                            tierSelect.appendChild(opt);
-                        }
-                    });
+                    const tierItems = tierOrder.filter(t => 
+                        (data.tiers || []).some(dt => dt.toUpperCase() === t.toUpperCase())
+                    );
+                    tierMultiSelect.setItems(tierItems);
 
-                    // Series
-                    seriesSelect.innerHTML = '<option value="">All series</option>';
-                    addOptions(seriesSelect, data.series || [], (s) => s);
+                    // Series (multi-select)
+                    seriesMultiSelect.setItems((data.series || []).filter(Boolean));
 
-                    // Sets
-                    setSelect.innerHTML = '<option value="">All sets</option>';
-                    addOptions(setSelect, data.sets || [], (s) => s);
+                    // Sets (multi-select)
+                    setMultiSelect.setItems((data.sets || []).filter(Boolean));
 
-                    // Positions
-                    posSelect.innerHTML = '<option value="">All positions</option>';
-                    addOptions(posSelect, data.positions || [], (p) => p);
+                    // Positions (multi-select)
+                    positionMultiSelect.setItems((data.positions || []).filter(Boolean));
 
                     summary.textContent = "Ready to search";
                 } catch (err) {
@@ -839,18 +832,18 @@
             async function runSearch() {
                 const player = document.getElementById("ex-player").value.trim();
                 const team = document.getElementById("ex-team").value.trim();
-                const tier = document.getElementById("ex-tier").value.trim();
-                const series = document.getElementById("ex-series").value.trim();
-                const set = document.getElementById("ex-set").value.trim();
-                const position = document.getElementById("ex-position").value.trim();
+                const tiers = tierMultiSelect.getValues();
+                const seriesList = seriesMultiSelect.getValues();
+                const sets = setMultiSelect.getValues();
+                const positions = positionMultiSelect.getValues();
 
                 const params = new URLSearchParams();
                 if (player) params.set("player", player);
                 if (team) params.set("team", team);
-                if (tier) params.set("tier", tier);
-                if (series) params.set("series", series);
-                if (set) params.set("set", set);
-                if (position) params.set("position", position);
+                if (tiers.length > 0) params.set("tier", tiers.join(','));
+                if (seriesList.length > 0) params.set("series", seriesList.join(','));
+                if (sets.length > 0) params.set("set", sets.join(','));
+                if (positions.length > 0) params.set("position", positions.join(','));
                 params.set("limit", "200");
 
                 const summary = document.getElementById("ex-results-summary");
@@ -916,10 +909,10 @@
             function resetFilters() {
                 document.getElementById("ex-player").value = "";
                 document.getElementById("ex-team").value = "";
-                document.getElementById("ex-tier").value = "";
-                document.getElementById("ex-series").value = "";
-                document.getElementById("ex-set").value = "";
-                document.getElementById("ex-position").value = "";
+                tierMultiSelect.clear();
+                seriesMultiSelect.clear();
+                setMultiSelect.clear();
+                positionMultiSelect.clear();
                 document.getElementById("ex-sort").value = "player";
 
                 document.getElementById("ex-results-summary").textContent = "Ready to search";

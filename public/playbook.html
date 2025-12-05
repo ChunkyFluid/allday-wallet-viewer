@@ -296,11 +296,17 @@
 <body>
   <div id="app-header"></div>
   <script src="/layout.js"></script>
+  <script src="/js/nflad-client.js"></script>
   <main class="app-main">
     <div class="playbook-container">
       <div class="page-header">
         <h1>Playbook</h1>
-        <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+          <a href="https://nflallday.com/kickoffs" target="_blank" style="background: var(--playbook-card); border: 1px solid var(--playbook-border); color: var(--text); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 500; text-decoration: none; font-size: 0.85rem;">
+            🏈 View on NFL All Day ↗
+          </a>
+        </div>
       </div>
 
       <div class="error-banner hidden" id="error-banner"></div>
@@ -520,154 +526,78 @@
       
       isLoading = true;
       refreshBtn.disabled = true;
-      statusText.textContent = 'Loading slates...';
+      statusText.textContent = 'Loading kickoffs...';
       statusIndicator.style.background = 'var(--warning)';
       hideError();
 
       try {
-        let data;
-        let useDirect = false;
-        
-        // Try server endpoint first
+        // Try our server API first (may work for public data)
         try {
-          const response = await fetch('/api/kickoff/slates?first=50', {
-            credentials: 'include'
-          });
-
-          data = await response.json();
-
-          // Check if data came from HTML scraping
-          if (data.ok && data.scraped) {
-            console.log('[Playbook] ✅ Successfully loaded data via HTML scraping!');
-            statusText.textContent = 'Loaded via HTML scraping';
-          }
-
-          // If we got 403 and scraping didn't work, try other methods
-          if ((!data.ok && (data.error?.includes('403') || data.error?.includes('Forbidden'))) || response.status === 403) {
-            console.log('[Playbook] Server request blocked (403) and scraping failed, trying proxy...');
-            statusText.textContent = 'Server blocked, trying alternative methods...';
-            useDirect = true;
+          console.log('[Playbook] Trying server /api/kickoffs...');
+          statusText.textContent = 'Fetching kickoffs...';
+          const kickoffsRes = await fetch('/api/kickoffs?first=20', { credentials: 'include' });
+          const kickoffsData = await kickoffsRes.json();
+          
+          if (kickoffsData.ok && kickoffsData.kickoffs && kickoffsData.kickoffs.length > 0) {
+            console.log(`[Playbook] ✅ Got ${kickoffsData.kickoffs.length} kickoffs`);
+            slates = [{
+              id: 'current',
+              name: 'Current Week Kickoffs',
+              status: 'ACTIVE',
+              kickoffs: kickoffsData.kickoffs
+            }];
+            renderSlates();
+            statusIndicator.classList.add('active');
+            statusIndicator.style.background = 'var(--success)';
+            statusText.textContent = `Loaded ${kickoffsData.kickoffs.length} kickoff${kickoffsData.kickoffs.length !== 1 ? 's' : ''}`;
+            lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            return;
           }
         } catch (serverErr) {
-          console.log('[Playbook] Server request failed, trying direct browser fetch...');
-          statusText.textContent = 'Trying direct connection...';
-          useDirect = true;
+          console.log('[Playbook] Server fetch failed:', serverErr.message);
         }
         
-        // Try improved proxy if server failed
-        if (useDirect || !data || !data.ok) {
-          try {
-            console.log('[Playbook] Trying improved proxy with browser headers...');
-            statusText.textContent = 'Trying improved proxy...';
-            data = await fetchViaProxy();
-            if (data.ok) {
-              statusText.textContent = 'Loaded via improved proxy';
-            }
-          } catch (proxyErr) {
-            console.error('Proxy fetch failed, trying HTML scraping...');
-            
-            // Last resort: try HTML scraping
-            try {
-              statusText.textContent = 'Trying HTML scraping fallback...';
-              data = await fetchViaScraping();
-              if (data.ok) {
-                statusText.textContent = 'Loaded via HTML scraping';
-              }
-            } catch (scrapeErr) {
-              console.error('All methods failed:', scrapeErr);
-              // Show error with helpful message
-              if (useDirect && data && data.error) {
-                throw new Error(data.error);
-              }
-              // Show a helpful message with direct link
-              contentArea.innerHTML = `
-                <div class="empty-state">
-                  <div class="empty-state-icon">🔒</div>
-                  <h2>Access Restricted</h2>
-                  <p style="margin-bottom: 1.5rem;">
-                    The NFL All Day API is blocking automated requests with strict anti-bot protection.
-                    To view the Playbook, please visit the official site directly.
-                  </p>
-                  <a href="https://nflallday.com/kickoffs" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
-                    🏈 Open Playbook on NFL All Day
-                  </a>
-                  <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem; background: rgba(111, 66, 193, 0.5);">
-                    🔄 Try Again
-                  </button>
-                  <p style="margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted); max-width: 600px; margin-left: auto; margin-right: auto;">
-                    <strong>Why is this blocked?</strong><br>
-                    NFL All Day uses advanced bot detection that blocks server-side requests. 
-                    For the best experience, access the Playbook directly on nflallday.com where your browser session is recognized.
-                  </p>
-                </div>
-              `;
-              throw new Error('All access methods blocked - please use the direct link above');
-            }
-          }
-        }
-
-        if (!data || !data.ok) {
-          throw new Error(data?.error || 'Failed to fetch slates');
-        }
-
-        if (data.edges && data.edges.length > 0) {
-          slates = data.edges.map(edge => edge.node);
-          renderSlates();
-          statusIndicator.classList.add('active');
-          statusIndicator.style.background = 'var(--success)';
-          statusText.textContent = `Loaded ${slates.length} slate${slates.length !== 1 ? 's' : ''}${data.cached ? ' (cached)' : ''}`;
-          lastUpdated.textContent = `Updated: ${new Date().toLocaleTimeString()}`;
-        } else {
-          slates = [];
-          renderSlates();
-          statusIndicator.style.background = 'var(--text-muted)';
-          statusText.textContent = 'No slates available';
-        }
+        // If API fails, show helpful redirect UI
+        console.log('[Playbook] API unavailable, showing redirect UI');
+        contentArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h2>Playbook Data</h2>
+            <p style="margin-bottom: 1rem; color: var(--text-muted);">
+              NFL All Day uses secure cookies for Playbook access.<br>
+              Click below to view your Playbook directly.
+            </p>
+            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-size: 1rem;">
+              <span>🏈</span> Open Playbook on NFL All Day <span style="font-size: 0.8rem;">↗</span>
+            </a>
+            <div style="margin-top: 2rem; padding: 1rem; background: rgba(111, 66, 193, 0.1); border-radius: 8px; border: 1px solid rgba(111, 66, 193, 0.3);">
+              <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--text);">📊 Quick Stats (from Flow)</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Your Playbook entries and scores are stored on the Flow blockchain and can be verified on-chain.
+              </p>
+            </div>
+          </div>
+        `;
+        statusIndicator.style.background = 'var(--accent-cyan)';
+        statusText.textContent = 'Click link above to view Playbook';
+        
       } catch (err) {
         console.error('Error fetching slates:', err);
+        showError('Error loading playbook', err.message);
         
-        // Check if it's a 403 or authentication error
-        if (err.message.includes('403') || err.message.includes('Forbidden') || err.message.includes('Access denied')) {
-          showError(
-            'Access Denied',
-            'The NFL All Day API is blocking requests. Try this: 1) Open nflallday.com in a new tab and make sure you are logged in, 2) Come back here and refresh. Your browser cookies will help authenticate the request.'
-          );
-        } else if (err.message.includes('503') || err.message.includes('Unable to connect')) {
-          showError(
-            'Service Unavailable',
-            'Unable to connect to the NFL All Day API. The service may be temporarily unavailable. Please try again later.'
-          );
-        } else if (err.message.includes('All access methods blocked')) {
-          // Special handling - error UI already shown
-          hideError();
-        } else if (err.message.includes('Both server and browser')) {
-          showError(
-            'Connection Failed',
-            err.message + ' Try opening nflallday.com in another tab first to establish a session.'
-          );
-        } else {
-          showError('Error loading playbook', err.message);
-        }
-        
-        // Still show cached data if we have it
-        if (slates.length > 0) {
-          renderSlates();
-        } else if (!err.message.includes('All access methods blocked')) {
-          // Only show default error UI if we haven't already shown a custom one
-          contentArea.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">⚠️</div>
-              <h2>Unable to Load Playbook</h2>
-              <p style="margin-bottom: 1rem;">${err.message}</p>
-              <a href="https://nflallday.com/kickoffs" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
-                🏈 View on NFL All Day
-              </a>
-              <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem;">
-                🔄 Try Again
-              </button>
-            </div>
-          `;
-        }
+        contentArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <h2>Unable to Load Playbook</h2>
+            <p style="margin-bottom: 1rem;">${err.message}</p>
+            <a href="https://nflallday.com/games" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+              🏈 View on NFL All Day
+            </a>
+            <button class="refresh-btn" onclick="fetchSlates()" style="margin-top: 1rem;">
+              🔄 Try Again
+            </button>
+          </div>
+        `;
       } finally {
         isLoading = false;
         refreshBtn.disabled = false;

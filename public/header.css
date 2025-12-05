@@ -117,6 +117,67 @@
   color: #fef3c7;
 }
 
+/* Dropdown menu */
+.nav-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-dropdown-btn {
+  color: var(--text-muted, #9ca3af);
+  background: none;
+  border: 1px solid transparent;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.nav-dropdown-btn:hover {
+  color: var(--text-main, #f9fafb);
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.nav-dropdown-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  background: rgba(11, 16, 32, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  backdrop-filter: blur(10px);
+}
+
+.nav-dropdown:hover .nav-dropdown-content {
+  display: block;
+}
+
+.nav-dropdown-content a {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  color: var(--text-muted, #9ca3af);
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-dropdown-content a:hover {
+  background: rgba(37, 99, 235, 0.2);
+  color: #fff;
+}
+
 .btn-primary {
   border-radius: 999px;
   border: none;
@@ -201,6 +262,35 @@
   .main-nav a:hover,
   .main-nav a.active {
     background: rgba(37, 99, 235, 0.2);
+  }
+  
+  /* Mobile dropdown */
+  .nav-dropdown {
+    width: 100%;
+  }
+  
+  .nav-dropdown-btn {
+    width: 100%;
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.5);
+    text-align: left;
+  }
+  
+  .nav-dropdown-content {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: rgba(15, 23, 42, 0.8);
+  }
+  
+  .nav-dropdown-content a {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
   }
 }
 

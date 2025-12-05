@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Set Completion | NFL All Day</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="header.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { --bg: #050815; --card: #0b1020; --border: #1b2236; --text: #f8f9ff; --text-muted: #8c95b8; --accent: #22c55e; --purple: #6f42c1; }
+    body { background: radial-gradient(circle at top, #101526 0, #050815 55%); min-height: 100vh; font-family: 'Outfit', sans-serif; color: var(--text); margin: 0; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 2rem; background: linear-gradient(135deg, #22c55e, #6f42c1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.5rem; }
+    .search-box { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .search-box input { flex: 1; min-width: 250px; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 1rem; }
+    .search-box button { padding: 1rem 2rem; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent), var(--purple)); color: white; font-weight: 600; cursor: pointer; }
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .summary-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; }
+    .summary-card .value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+    .summary-card .label { font-size: 0.85rem; color: var(--text-muted); }
+    .sets-grid { display: grid; gap: 1rem; }
+    .set-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .set-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .set-name { font-size: 1.2rem; font-weight: 600; }
+    .set-progress { font-size: 0.9rem; color: var(--accent); }
+    .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 4px; transition: width 0.3s; }
+    .set-tiers { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .tier-badge { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .tier-common { background: rgba(156,163,175,0.2); color: #9ca3af; }
+    .tier-uncommon { background: rgba(34,197,94,0.2); color: #22c55e; }
+    .tier-rare { background: rgba(59,130,246,0.2); color: #3b82f6; }
+    .tier-legendary { background: rgba(168,85,247,0.2); color: #a855f7; }
+    .tier-ultimate { background: rgba(251,191,36,0.2); color: #fbbf24; }
+    .complete { border-color: var(--accent); box-shadow: 0 0 20px rgba(34,197,94,0.2); }
+    .loading, .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .filter-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filter-btn { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
+    .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+  <script src="/layout.js"></script>
+  <main class="app-main">
+    <div class="container">
+      <h1>📊 Set Completion Tracker</h1>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Track your progress towards completing NFL All Day sets</p>
+      
+      <div class="search-box">
+        <input type="text" id="wallet-input" placeholder="Search by name or wallet address..." />
+        <button onclick="loadCompletion()">Check Progress</button>
+      </div>
+      <script src="/wallet-search.js"></script>
+      
+      <div id="results"></div>
+    </div>
+  </main>
+  <script>
+    const input = document.getElementById('wallet-input');
+    const results = document.getElementById('results');
+    let allSets = [];
+    let currentFilter = 'all';
+    
+    async function loadCompletion() {
+      // Use data attribute if available (from autocomplete), otherwise use input value
+      const wallet = (input.dataset.walletAddress || input.value).trim().toLowerCase();
+      if (!wallet || !wallet.startsWith('0x')) return;
+      
+      results.innerHTML = '<div class="loading">Analyzing set completion...</div>';
+      
+      try {
+        const res = await fetch(`/api/set-completion?wallet=${wallet}`);
+        const data = await res.json();
+        
+        if (!data.ok) throw new Error(data.error);
+        
+        allSets = data.sets;
+        renderResults(data);
+      } catch (err) {
+        results.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
+      }
+    }
+    
+    // Initialize wallet search with autocomplete
+    initWalletSearch('wallet-input', (wallet) => {
+      loadCompletion();
+    });
+    
+    // Check URL params on page load
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('wallet')) {
+      input.value = params.get('wallet');
+      loadCompletion();
+    }
+    
+    function filterSets(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      });
+      renderSets();
+    }
+    
+    function renderResults(data) {
+      const { summary, sets } = data;
+      
+      let html = `
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="value">${summary.total_sets}</div>
+            <div class="label">Total Sets</div>
+          </div>
+          <div class="summary-card">
+            <div class="value">${summary.completed_sets}</div>
+            <div class="label">Completed</div>
+          </div>
+          <div class="summary-card">
+            <div class="value">${summary.in_progress}</div>
+            <div class="label">In Progress</div>
+          </div>
+          <div class="summary-card">
+            <div class="value">${Math.round(summary.avg_completion)}%</div>
+            <div class="label">Avg Completion</div>
+          </div>
+        </div>
+        
+        <div class="filter-row">
+          <button class="filter-btn active" data-filter="all" onclick="filterSets('all')">All Sets</button>
+          <button class="filter-btn" data-filter="complete" onclick="filterSets('complete')">✅ Complete</button>
+          <button class="filter-btn" data-filter="inprogress" onclick="filterSets('inprogress')">🔄 In Progress</button>
+          <button class="filter-btn" data-filter="notstarted" onclick="filterSets('notstarted')">⬜ Not Started</button>
+        </div>
+        
+        <div id="sets-container" class="sets-grid"></div>
+      `;
+      
+      results.innerHTML = html;
+      renderSets();
+    }
+    
+    function renderSets() {
+      const container = document.getElementById('sets-container');
+      let filtered = allSets;
+      
+      if (currentFilter === 'complete') filtered = allSets.filter(s => s.completion === 100);
+      else if (currentFilter === 'inprogress') filtered = allSets.filter(s => s.completion > 0 && s.completion < 100);
+      else if (currentFilter === 'notstarted') filtered = allSets.filter(s => s.completion === 0);
+      
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty">No sets match this filter</div>';
+        return;
+      }
+      
+      container.innerHTML = filtered.map(set => `
+        <div class="set-card ${set.completion === 100 ? 'complete' : ''}">
+          <div class="set-header">
+            <div class="set-name">${set.set_name} ${set.completion === 100 ? '✅' : ''}</div>
+            <div class="set-progress">${set.owned}/${set.total} (${Math.round(set.completion)}%)</div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${set.completion}%"></div>
+          </div>
+          <div class="set-tiers">
+            ${set.by_tier ? Object.entries(set.by_tier).map(([tier, count]) => 
+              count > 0 ? `<span class="tier-badge tier-${tier.toLowerCase()}">${tier}: ${count}</span>` : ''
+            ).join('') : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
+

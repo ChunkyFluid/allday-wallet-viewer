@@ -20,6 +20,15 @@ function formatTimestampForSnowflake(ts) {
     if (!ts) return null;
     const date = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(date.getTime())) return null;
+    
+    // Validate timestamp is within reasonable range (1970 to 2100)
+    const minDate = new Date('1970-01-01');
+    const maxDate = new Date('2100-01-01');
+    if (date < minDate || date > maxDate) {
+        console.warn(`⚠️  Timestamp out of range: ${ts}, skipping`);
+        return null;
+    }
+    
     return date.toISOString().replace('T', ' ').replace('Z', '');
 }
 
@@ -55,11 +64,29 @@ async function syncWalletHoldings() {
 
     if (isIncremental && existingCount > 0) {
         // Get the max timestamp from existing data
+        // Make sure to handle invalid timestamps gracefully
         const maxTsRes = await pgQuery(`
             SELECT COALESCE(MAX(last_event_ts), '2021-01-01'::timestamptz) AS max_ts
-            FROM wallet_holdings;
+            FROM wallet_holdings
+            WHERE last_event_ts IS NOT NULL 
+            AND last_event_ts >= '2021-01-01'::timestamptz
+            AND last_event_ts <= NOW();
         `);
         minTimestamp = maxTsRes.rows[0]?.max_ts;
+        
+        // Validate timestamp is reasonable (not in the future and not too old)
+        if (minTimestamp) {
+            const ts = new Date(minTimestamp);
+            const now = new Date();
+            const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+            
+            // If timestamp is invalid, too old, or in the future, use a default
+            if (isNaN(ts.getTime()) || ts > now || ts < oneYearAgo) {
+                console.log(`⚠️  Invalid timestamp found (${minTimestamp}), using default: 2021-01-01`);
+                minTimestamp = new Date('2021-01-01');
+            }
+        }
+        
         console.log("Incremental sync: fetching records since", minTimestamp);
     } else {
         // Full refresh - truncate and reload
@@ -74,12 +101,24 @@ async function syncWalletHoldings() {
     while (true) {
         let whereConditions = [];
         
+        // Filter out invalid timestamps at the SQL level to prevent Snowflake proto errors
+        // Only include rows with valid timestamps or NULL
+        whereConditions.push(`(
+            last_event_ts IS NULL 
+            OR (last_event_ts >= '1970-01-01'::timestamp_ntz AND last_event_ts <= '2100-01-01'::timestamp_ntz)
+        )`);
+        
         // For incremental, filter by timestamp
         // Include records where last_event_ts > minTimestamp OR last_event_ts IS NULL
         // (NULL timestamps need to be synced too)
         if (minTimestamp) {
             const tsFormatted = formatTimestampForSnowflake(minTimestamp);
-            whereConditions.push(`(last_event_ts > '${escapeLiteral(tsFormatted)}'::timestamp_ntz OR last_event_ts IS NULL)`);
+            if (tsFormatted) {
+                whereConditions.push(`(
+                    last_event_ts IS NULL 
+                    OR last_event_ts > '${escapeLiteral(tsFormatted)}'::timestamp_ntz
+                )`);
+            }
         }
         
         // Keyset pagination
@@ -93,12 +132,20 @@ async function syncWalletHoldings() {
             ? `WHERE ${whereConditions.join(' AND ')}` 
             : '';
 
+        // Use TRY_TO_TIMESTAMP_NTZ to handle invalid timestamps gracefully
+        // This prevents Snowflake proto errors when encountering bad timestamp data
         const sql = `
       SELECT
         wallet_address,
         nft_id,
         is_locked,
-        last_event_ts
+        CASE 
+          WHEN last_event_ts IS NULL THEN NULL
+          WHEN TRY_TO_TIMESTAMP_NTZ(last_event_ts::STRING) IS NULL THEN NULL
+          WHEN TRY_TO_TIMESTAMP_NTZ(last_event_ts::STRING) < '1970-01-01'::timestamp_ntz THEN NULL
+          WHEN TRY_TO_TIMESTAMP_NTZ(last_event_ts::STRING) > '2100-01-01'::timestamp_ntz THEN NULL
+          ELSE TRY_TO_TIMESTAMP_NTZ(last_event_ts::STRING)
+        END AS last_event_ts
       FROM ${db}.${schema}.ALLDAY_WALLET_HOLDINGS_CURRENT
       ${whereClause}
       ORDER BY wallet_address, nft_id
@@ -108,7 +155,56 @@ async function syncWalletHoldings() {
         console.log(
             `Fetching holdings batch: after=(${lastWallet || "START"}, ${lastNftId || "START"}), limit=${BATCH_SIZE}...`
         );
-        const rows = await executeSnowflakeWithRetry(connection, sql);
+        console.log(`⏳ Querying Snowflake... (this may take 30-60 seconds for large queries)`);
+        const queryStartTime = Date.now();
+        
+        let rows;
+        try {
+            rows = await executeSnowflakeWithRetry(connection, sql);
+        } catch (err) {
+            // If query fails due to timestamp/proto errors, try without timestamp column
+            const errorMsg = (err.message || err.code || '').toLowerCase();
+            if (errorMsg.includes('timestamp') || errorMsg.includes('proto') || errorMsg.includes('out of range')) {
+                console.warn(`⚠️  Timestamp serialization error detected, retrying without timestamp column...`);
+                console.warn(`   Error: ${err.message || err.code}`);
+                
+                // Build fallback query without timestamp filters
+                const fallbackWhereConditions = [];
+                if (lastWallet && lastNftId) {
+                    const lastWalletLit = `'${escapeLiteral(lastWallet)}'`;
+                    const lastNftLit = `'${escapeLiteral(lastNftId)}'`;
+                    fallbackWhereConditions.push(`(wallet_address, nft_id) > (${lastWalletLit}, ${lastNftLit})`);
+                }
+                const fallbackWhereClause = fallbackWhereConditions.length > 0 
+                    ? `WHERE ${fallbackWhereConditions.join(' AND ')}` 
+                    : '';
+                
+                // Try query without timestamp to avoid proto serialization issues
+                const fallbackSql = `
+                  SELECT
+                    wallet_address,
+                    nft_id,
+                    is_locked,
+                    NULL AS last_event_ts
+                  FROM ${db}.${schema}.ALLDAY_WALLET_HOLDINGS_CURRENT
+                  ${fallbackWhereClause}
+                  ORDER BY wallet_address, nft_id
+                  LIMIT ${BATCH_SIZE};
+                `;
+                try {
+                    rows = await executeSnowflakeWithRetry(connection, fallbackSql);
+                    console.warn(`⚠️  Using fallback query (no timestamps) due to Snowflake timestamp errors`);
+                } catch (retryErr) {
+                    console.error(`❌ Fallback query also failed:`, retryErr.message);
+                    throw err; // Throw original error
+                }
+            } else {
+                throw err; // Re-throw non-timestamp errors
+            }
+        }
+        
+        const queryDuration = ((Date.now() - queryStartTime) / 1000).toFixed(1);
+        console.log(`✅ Snowflake query completed in ${queryDuration} seconds`);
 
         console.log(`Snowflake returned ${rows.length} rows for this batch.`);
         if (!rows.length) {
@@ -138,8 +234,30 @@ async function syncWalletHoldings() {
 
             let tsLit = "NULL";
             if (ts) {
-                const tsStr = ts instanceof Date ? ts.toISOString() : escapeLiteral(ts);
-                tsLit = `'${tsStr}'::timestamptz`;
+                // Validate timestamp before using it
+                let date = null;
+                if (ts instanceof Date) {
+                    date = ts;
+                } else if (typeof ts === 'string' || typeof ts === 'number') {
+                    date = new Date(ts);
+                }
+                
+                if (date && !isNaN(date.getTime())) {
+                    // Check if timestamp is in reasonable range (1970 to 2100)
+                    const minDate = new Date('1970-01-01');
+                    const maxDate = new Date('2100-01-01');
+                    if (date >= minDate && date <= maxDate) {
+                        const tsStr = date.toISOString();
+                        tsLit = `'${escapeLiteral(tsStr)}'::timestamptz`;
+                    } else {
+                        // Invalid timestamp - use NULL
+                        console.warn(`⚠️  Skipping invalid timestamp from Snowflake: ${ts}`);
+                        tsLit = "NULL";
+                    }
+                } else {
+                    // Invalid date - use NULL
+                    tsLit = "NULL";
+                }
             }
 
             valueLiterals.push(`(${waLit}, ${nftLit}, ${lockedLit}, ${tsLit})`);

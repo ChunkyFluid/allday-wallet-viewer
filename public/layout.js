@@ -21,17 +21,22 @@
         <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button>
 
         <nav class="main-nav" id="main-nav">
-          ${navLink("/", "Wallet")}
-          ${navLink("/top-holders.html", "Leaderboard")}
-          ${navLink("/explorer.html", "Browse")}
+          <a href="/" class="${path === '/' || path === '/index.html' ? 'active' : ''}">👛 Wallet</a>
+          <a href="/top-holders.html" class="${path === '/top-holders.html' ? 'active' : ''}">🏅 Leaderboard</a>
+          <a href="/explorer.html" class="${path === '/explorer.html' ? 'active' : ''}">🔎 Browse</a>
           <a href="/sniper.html" class="${path === '/sniper.html' ? 'active nav-hot' : 'nav-hot'}">🎯 Sniper</a>
-          ${navLink("/playbook.html", "Playbook")}
-          ${navLink("/challenges.html", "Challenges")}
-          ${navLink("/offers.html", "Offers")}
-          ${navLink("/insights.html", "Insights")}
-          ${navLink("/faq.html", "FAQ")}
-          ${navLink("/contact.html", "Contact")}
-          ${navLink("/login.html", "Login", { id: "nav-account-link" })}
+          <a href="/set-completion.html" class="${path === '/set-completion.html' ? 'active' : ''}">📊 Sets</a>
+          <a href="/serial-finder.html" class="${path === '/serial-finder.html' ? 'active' : ''}">🏆 Serials</a>
+          <a href="/wallet-compare.html" class="${path === '/wallet-compare.html' ? 'active' : ''}">⚖️ Compare</a>
+          <a href="/rarity-score.html" class="${path === '/rarity-score.html' ? 'active' : ''}">📈 Rarity</a>
+          <a href="/trade-analyzer.html" class="${path === '/trade-analyzer.html' ? 'active' : ''}">🔄 Trades</a>
+          <a href="/playbook.html" class="${path === '/playbook.html' ? 'active' : ''}">📖 Playbook</a>
+          <a href="/challenges.html" class="${path === '/challenges.html' ? 'active' : ''}">🎮 Challenges</a>
+          <a href="/offers.html" class="${path === '/offers.html' ? 'active' : ''}">💬 Offers</a>
+          <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
+          <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
+          <a href="/nflad-auth.html" class="${path === '/nflad-auth.html' ? 'active' : ''}" title="Connect NFL All Day">🔐 NFLAD</a>
+          <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>
         </nav>
       </header>
     `;

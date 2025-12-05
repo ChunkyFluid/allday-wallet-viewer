@@ -409,18 +409,27 @@
         cursor: pointer;
       }
 
+      th.sortable {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+
       th.sortable:hover {
         color: var(--accent-cyan);
+        background: rgba(15, 23, 42, 0.3);
       }
 
       th.sort-asc::after {
         content: " ▲";
         font-size: 0.65em;
+        color: var(--accent-cyan);
       }
 
       th.sort-desc::after {
         content: " ▼";
         font-size: 0.65em;
+        color: var(--accent-cyan);
       }
 
       tbody tr:nth-child(2n) {

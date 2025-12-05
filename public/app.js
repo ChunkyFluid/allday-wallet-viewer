@@ -577,7 +577,8 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
     `;
 
     try {
-        const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`);
+        // Use blockchain source for wallet summary (real-time data)
+        const res = await fetch(`/api/wallet-summary?wallet=${encodeURIComponent(wallet)}&source=blockchain`);
         const data = await res.json();
         if (!data.ok) return;
 
@@ -651,7 +652,16 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
           <span class="chip">Holdings last sync: ${holdingsSyncText}</span>
           <span class="chip">Prices last scrape: ${pricesSyncText}</span>
         </div>
-        <div class="mobile-hidden">${setDefaultButtonHtml}</div>
+        <div class="mobile-hidden" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          ${setDefaultButtonHtml}
+          <button id="btn-refresh-wallet" 
+                  type="button"
+                  class="btn-secondary" 
+                  style="font-size: 0.8rem; padding: 0.4rem 0.8rem; cursor: pointer;"
+                  title="Refresh wallet holdings from blockchain (updates immediately)">
+            🔄 Refresh Holdings
+          </button>
+        </div>
       </div>
       <div class="wallet-summary-chips" style="flex-wrap: wrap;">
         <span class="chip-pill-tier chip-common" style="cursor: pointer;" onclick="filterByTier('Common')" title="Click to filter by Common tier">Common: ${byTier.Common ?? 0}</span>
@@ -698,6 +708,51 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
                     alert("Failed to set default wallet: " + (err.message || "Unknown error"));
                     setDefaultBtn.disabled = false;
                     setDefaultBtn.textContent = "Set as default wallet";
+                }
+            });
+        }
+        
+        // Wire up the "Refresh Holdings" button
+        const refreshBtn = document.getElementById("btn-refresh-wallet");
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                try {
+                    refreshBtn.disabled = true;
+                    refreshBtn.textContent = "🔄 Refreshing...";
+                    
+                    // Refresh wallet holdings
+                    allMoments = await fetchWalletMoments(wallet, true); // Force refresh
+                    
+                    await attachPricesToMoments(allMoments);
+                    
+                    // Update summary with fresh data
+                    await fetchWalletSummary(wallet);
+                    
+                    // Rebuild filters and re-render
+                    const editionCounts = countDuplicatesByEdition(allMoments);
+                    for (const moment of allMoments) {
+                        moment.owned_count = moment.edition_id ? (editionCounts[moment.edition_id] || 1) : 1;
+                    }
+                    
+                    updateSummaryWithStats(wallet);
+                    buildFilterOptions();
+                    applyFilters();
+                    applySort();
+                    renderPage(1);
+                    
+                    refreshBtn.textContent = "✓ Refreshed";
+                    setTimeout(() => {
+                        refreshBtn.textContent = "🔄 Refresh Holdings";
+                        refreshBtn.disabled = false;
+                    }, 2000);
+                } catch (err) {
+                    console.error("Failed to refresh wallet:", err);
+                    alert("Failed to refresh wallet: " + (err.message || "Unknown error"));
+                    refreshBtn.textContent = "🔄 Refresh Holdings";
+                    refreshBtn.disabled = false;
                 }
             });
         }
@@ -754,8 +809,26 @@ function updateSummaryWithStats(wallet) {
     }
 }
 
-async function fetchWalletMoments(wallet) {
-    const res = await fetch(`/api/query?wallet=${encodeURIComponent(wallet)}`);
+async function fetchWalletMoments(wallet, forceRefresh = false) {
+    // Use database endpoint - it has all holdings including locked moments
+    // The sync script keeps it up-to-date with blockchain + locked status from Snowflake
+    let url = `/api/query?wallet=${encodeURIComponent(wallet)}${forceRefresh ? '&refresh=1' : ''}`;
+    
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.ok) {
+            return data.rows || [];
+        }
+        // If blockchain query fails, fallback to database
+        console.warn('Blockchain query failed, falling back to database:', data.error);
+    } catch (err) {
+        console.warn('Blockchain query error, falling back to database:', err);
+    }
+    
+    // Fallback to database query
+    url = `/api/query?wallet=${encodeURIComponent(wallet)}${forceRefresh ? '&refresh=1' : ''}`;
+    const res = await fetch(url);
     const data = await res.json();
     if (!data.ok) {
         throw new Error(data.error || "Failed to load wallet");
@@ -1006,7 +1079,8 @@ window.runQuery = async function runQuery(walletRaw) {
 
     try {
         await fetchWalletSummary(wallet);
-        allMoments = await fetchWalletMoments(wallet);
+        // Always force refresh on initial load to ensure we have latest data
+        allMoments = await fetchWalletMoments(wallet, true);
 
         await attachPricesToMoments(allMoments);
 

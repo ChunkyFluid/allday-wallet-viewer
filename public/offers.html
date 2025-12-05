@@ -6,16 +6,19 @@
   <title>Offers | NFL All Day</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --offers-bg: #050815;
-      --offers-card: #0b1020;
-      --offers-border: #1b2236;
+      --bg: #050815;
+      --card: #0b1020;
+      --border: #1b2236;
       --text: #f8f9ff;
       --text-muted: #8c95b8;
-      --accent-purple: #6f42c1;
-      --accent-cyan: #0dcaf0;
+      --accent: #22c55e;
+      --purple: #6f42c1;
+      --gold: #fbbf24;
+      --danger: #ef4444;
+      --blue: #3b82f6;
     }
 
     body {
@@ -26,8 +29,8 @@
       margin: 0;
     }
 
-    .offers-container {
-      max-width: 1400px;
+    .container {
+      max-width: 1200px;
       margin: 0 auto;
       padding: 2rem;
     }
@@ -44,50 +47,276 @@
     .page-header h1 {
       font-size: 2rem;
       font-weight: 700;
-      background: linear-gradient(135deg, #ff5b81, #ffb64d, #6f42c1, #00d4ff);
+      background: linear-gradient(135deg, var(--blue), var(--purple));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
       margin: 0;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .external-link {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-decoration: none;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 0.5rem;
     }
 
-    .page-header h1::before {
-      content: "💼";
-      -webkit-text-fill-color: initial;
+    .external-link:hover { border-color: var(--blue); }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
     }
 
-    .coming-soon {
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    .status-indicator.active { background: var(--accent); }
+    .status-indicator.error { background: var(--danger); }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 1rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .tab:hover { color: var(--text); background: rgba(59, 130, 246, 0.1); }
+
+    .tab.active {
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      color: white;
+    }
+
+    .tab .badge {
+      background: rgba(255,255,255,0.2);
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .offers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .offer-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .offer-card:hover { border-color: var(--blue); }
+
+    .offer-card.pending { border-left: 3px solid var(--gold); }
+    .offer-card.accepted { border-left: 3px solid var(--accent); }
+    .offer-card.rejected { border-left: 3px solid var(--danger); }
+    .offer-card.expired { border-left: 3px solid var(--text-muted); }
+
+    .offer-main { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .offer-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .offer-price {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .offer-status {
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .offer-status.pending { background: rgba(251, 191, 36, 0.2); color: var(--gold); }
+    .offer-status.accepted { background: rgba(34, 197, 94, 0.2); color: var(--accent); }
+    .offer-status.rejected { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .offer-status.expired { background: rgba(107, 114, 128, 0.2); color: var(--text-muted); }
+    .offer-status.cancelled { background: rgba(107, 114, 128, 0.2); color: var(--text-muted); }
+
+    .offer-counterparty {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .offer-counterparty strong { color: var(--text); }
+
+    .offer-moments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .moment-chip {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .moment-chip .serial {
+      background: var(--border);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .tier-badge {
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+    }
+
+    .tier-common { background: rgba(156,163,175,0.2); color: #9ca3af; }
+    .tier-rare { background: rgba(59,130,246,0.2); color: #3b82f6; }
+    .tier-legendary { background: rgba(168,85,247,0.2); color: #a855f7; }
+    .tier-ultimate { background: rgba(251,191,36,0.2); color: #fbbf24; }
+
+    .offer-dates {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .offer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+
+    .action-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .action-btn.accept { background: var(--accent); color: white; }
+    .action-btn.reject { background: var(--danger); color: white; }
+    .action-btn.cancel { background: var(--border); color: var(--text); }
+
+    .loading, .empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state {
       text-align: center;
       padding: 4rem 2rem;
-      background: var(--offers-card);
-      border: 1px solid var(--offers-border);
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 12px;
     }
 
-    .coming-soon-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
+    .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .empty-state h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .empty-state p { color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem; }
+
+    .auth-prompt {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(111, 66, 193, 0.1));
+      border: 1px solid var(--blue);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 2rem;
     }
 
-    .coming-soon h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: var(--text);
-    }
-
-    .coming-soon p {
-      color: var(--text-muted);
-      font-size: 1rem;
-    }
+    .auth-prompt h3 { margin: 0 0 0.5rem 0; color: var(--blue); }
+    .auth-prompt p { color: var(--text-muted); margin-bottom: 1rem; }
 
     @media (max-width: 768px) {
-      .offers-container {
-        padding: 1rem;
-      }
+      .container { padding: 1rem; }
+      .offer-card { grid-template-columns: 1fr; }
+      .offer-actions { flex-direction: row; }
     }
   </style>
 </head>
@@ -95,17 +324,282 @@
   <div id="app-header"></div>
   <script src="/layout.js"></script>
   <main class="app-main">
-    <div class="offers-container">
+    <div class="container">
       <div class="page-header">
-        <h1>Offers</h1>
+        <h1>💬 Offers</h1>
+        <div class="header-actions">
+          <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+          <a href="https://nflallday.com/my-collection/offers" target="_blank" class="external-link">
+            🏈 View on NFL All Day ↗
+          </a>
+        </div>
       </div>
 
-      <div class="coming-soon">
-        <div class="coming-soon-icon">💼</div>
-        <h2>Coming Soon</h2>
-        <p>The Offers feature is under development. Check back soon!</p>
+      <div class="status-bar">
+        <div class="status-indicator" id="status-indicator"></div>
+        <span id="status-text">Loading offers...</span>
+      </div>
+
+      <div id="auth-area"></div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="received">
+          📥 Received <span class="badge" id="received-count">0</span>
+        </button>
+        <button class="tab" data-tab="sent">
+          📤 Sent <span class="badge" id="sent-count">0</span>
+        </button>
+      </div>
+
+      <div id="content-area">
+        <div class="loading">Loading offers...</div>
       </div>
     </div>
   </main>
+
+  <script>
+    let receivedOffers = [];
+    let sentOffers = [];
+    let currentTab = 'received';
+    let isLoading = false;
+
+    const contentArea = document.getElementById('content-area');
+    const authArea = document.getElementById('auth-area');
+    const statusIndicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const receivedCount = document.getElementById('received-count');
+    const sentCount = document.getElementById('sent-count');
+
+    function formatDate(dateString) {
+      if (!dateString) return '—';
+      return new Date(dateString).toLocaleDateString('en-US', { 
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    }
+
+    function formatPrice(price) {
+      if (!price) return '$0';
+      return '$' + parseFloat(price).toFixed(2);
+    }
+
+    function getExpiryText(expiresAt) {
+      if (!expiresAt) return '';
+      const now = new Date();
+      const expires = new Date(expiresAt);
+      const diff = expires - now;
+      if (diff <= 0) return 'Expired';
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      if (days > 0) return `Expires in ${days}d`;
+      return `Expires in ${hours}h`;
+    }
+
+    function renderOffers() {
+      const offers = currentTab === 'received' ? receivedOffers : sentOffers;
+      const isReceived = currentTab === 'received';
+
+      if (offers.length === 0) {
+        contentArea.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">${isReceived ? '📥' : '📤'}</div>
+            <h2>No ${isReceived ? 'Received' : 'Sent'} Offers</h2>
+            <p>
+              ${isReceived 
+                ? "You haven't received any offers yet. When someone makes an offer on your moments, it will appear here." 
+                : "You haven't sent any offers yet. Browse the marketplace to find moments you want and make an offer!"}
+            </p>
+            <a href="https://nflallday.com/marketplace" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+              Browse Marketplace ↗
+            </a>
+          </div>
+        `;
+        return;
+      }
+
+      contentArea.innerHTML = `
+        <div class="offers-list">
+          ${offers.map(offer => {
+            const moments = offer.moments || [];
+            const isPending = offer.status === 'pending';
+
+            return `
+              <div class="offer-card ${offer.status}">
+                <div class="offer-main">
+                  <div class="offer-header">
+                    <span class="offer-price">${formatPrice(offer.price)}</span>
+                    <span class="offer-status ${offer.status}">${offer.status}</span>
+                  </div>
+
+                  <div class="offer-counterparty">
+                    ${isReceived ? 'From' : 'To'}: <strong>${offer.counterparty || 'Unknown'}</strong>
+                  </div>
+
+                  ${moments.length > 0 ? `
+                    <div class="offer-moments">
+                      ${moments.map(m => `
+                        <div class="moment-chip">
+                          <span>${m.playerName || 'Unknown'}</span>
+                          <span class="serial">#${m.serialNumber || '?'}</span>
+                          ${m.tier ? `<span class="tier-badge tier-${m.tier.toLowerCase()}">${m.tier}</span>` : ''}
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+
+                  <div class="offer-dates">
+                    <span>📅 ${formatDate(offer.createdAt)}</span>
+                    ${offer.expiresAt && offer.status === 'pending' ? `<span>⏰ ${getExpiryText(offer.expiresAt)}</span>` : ''}
+                  </div>
+                </div>
+
+                ${isPending ? `
+                  <div class="offer-actions">
+                    ${isReceived ? `
+                      <button class="action-btn accept" onclick="handleOffer('${offer.id}', 'accept')">✓ Accept</button>
+                      <button class="action-btn reject" onclick="handleOffer('${offer.id}', 'reject')">✕ Reject</button>
+                    ` : `
+                      <button class="action-btn cancel" onclick="handleOffer('${offer.id}', 'cancel')">Cancel</button>
+                    `}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function handleOffer(offerId, action) {
+      if (!confirm(`Are you sure you want to ${action} this offer?`)) return;
+
+      try {
+        const response = await fetch(`/api/offers/${offerId}/${action}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) {
+          throw new Error(data.error || `Failed to ${action} offer`);
+        }
+
+        alert(`Offer ${action}ed successfully!`);
+        fetchOffers();
+      } catch (err) {
+        console.error(`Error ${action}ing offer:`, err);
+        alert(`Failed to ${action} offer: ${err.message}`);
+      }
+    }
+
+    function showAuthPrompt() {
+      authArea.innerHTML = `
+        <div class="auth-prompt">
+          <h3>🔐 Sign In Required</h3>
+          <p>To view and manage your offers, you need to be logged in to NFL All Day.</p>
+          <a href="https://nflallday.com/my-collection/offers" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block;">
+            Open NFL All Day to Sign In ↗
+          </a>
+        </div>
+      `;
+    }
+
+    async function fetchOffers() {
+      if (isLoading) return;
+
+      isLoading = true;
+      refreshBtn.disabled = true;
+      statusText.textContent = 'Loading offers...';
+      statusIndicator.className = 'status-indicator';
+
+      try {
+        // Fetch both received and sent offers
+        const [receivedRes, sentRes] = await Promise.all([
+          fetch('/api/offers/received', { credentials: 'include' }),
+          fetch('/api/offers/sent', { credentials: 'include' })
+        ]);
+
+        const receivedData = await receivedRes.json();
+        const sentData = await sentRes.json();
+
+        // Check for auth errors
+        if (receivedData.requiresAuth || sentData.requiresAuth) {
+          showAuthPrompt();
+          showFallbackUI();
+          throw new Error('Authentication required');
+        }
+
+        receivedOffers = receivedData.ok ? (receivedData.offers || []) : [];
+        sentOffers = sentData.ok ? (sentData.offers || []) : [];
+
+        // Update counts
+        receivedCount.textContent = receivedOffers.length;
+        sentCount.textContent = sentOffers.length;
+
+        authArea.innerHTML = '';
+        
+        if (receivedOffers.length > 0 || sentOffers.length > 0) {
+          renderOffers();
+          statusIndicator.classList.add('active');
+          statusText.textContent = `Loaded ${receivedOffers.length} received, ${sentOffers.length} sent`;
+        } else {
+          // Check if API just returned empty (might not be auth issue)
+          if (receivedData.ok && sentData.ok) {
+            renderOffers();
+            statusIndicator.classList.add('active');
+            statusText.textContent = 'No offers found';
+          } else {
+            showFallbackUI();
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching offers:', err);
+        statusIndicator.classList.add('error');
+        statusText.textContent = 'Could not load offers';
+        
+        if (!err.message.includes('Authentication')) {
+          showFallbackUI();
+        }
+      } finally {
+        isLoading = false;
+        refreshBtn.disabled = false;
+      }
+    }
+
+    function showFallbackUI() {
+      contentArea.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">💬</div>
+          <h2>View Offers on NFL All Day</h2>
+          <p>
+            Offers require authentication with NFL All Day. 
+            Visit the official site to view and manage your offers.
+          </p>
+          <a href="https://nflallday.com/my-collection/offers" target="_blank" class="refresh-btn" style="text-decoration: none; display: inline-block; margin-bottom: 1rem;">
+            🏈 Open Offers on NFL All Day ↗
+          </a>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 1rem;">
+            <strong>Tip:</strong> Log in to NFL All Day in another tab, then come back and refresh.
+          </p>
+        </div>
+      `;
+    }
+
+    // Tab handling
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        renderOffers();
+      });
+    });
+
+    refreshBtn.addEventListener('click', fetchOffers);
+
+    // Initial load
+    fetchOffers();
+  </script>
 </body>
 </html>

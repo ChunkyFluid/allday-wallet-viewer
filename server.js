@@ -99,6 +99,7 @@ async function findlabRequest(endpoint, options = {}) {
       signal: controller.signal,
       headers: {
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
         ...options.headers
       }
     });
@@ -106,7 +107,19 @@ async function findlabRequest(endpoint, options = {}) {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error(`FindLab API error: ${response.status} ${response.statusText}`);
+      // Try to get error details from response body
+      let errorBody = '';
+      try {
+        errorBody = await response.text();
+      } catch (e) {
+        // Ignore
+      }
+      
+      const errorMsg = `FindLab API error: ${response.status} ${response.statusText}`;
+      const error = new Error(errorMsg);
+      error.response = response;
+      error.body = errorBody;
+      throw error;
     }
     
     const data = await response.json();
@@ -141,25 +154,59 @@ async function getLatestBlockHeightFindLab() {
 // Get NFT holdings for an address using FindLab API
 async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDay') {
   try {
-    // FindLab API format: /flow/v1/account/{address}/nft/{nft_type}
+    // Try multiple endpoint formats - FindLab API might use different paths
     const encodedAddress = encodeURIComponent(address);
     const encodedNftType = encodeURIComponent(nftType);
-    const data = await findlabRequest(`/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`);
     
-    if (data.data && Array.isArray(data.data)) {
-      // Extract NFT IDs from the response
-      // Response format may vary, so we handle multiple possible structures
-      const nftIds = data.data.map(item => {
-        if (typeof item === 'string' || typeof item === 'number') return String(item);
-        return item.id || item.nft_id || item.identifier || String(item);
-      }).filter(Boolean);
-      
-      return nftIds;
+    // Try different endpoint formats
+    const endpoints = [
+      `/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`,
+      `/flow/v1/accounts/${encodedAddress}/nfts?contract=${encodedNftType}&limit=1000`,
+      `/flow/v1/nft/${encodedNftType}/owner/${encodedAddress}?limit=1000`,
+      `/api/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        const data = await findlabRequest(endpoint);
+        
+        // Handle different response structures
+        let nftArray = null;
+        if (data.data && Array.isArray(data.data)) {
+          nftArray = data.data;
+        } else if (Array.isArray(data)) {
+          nftArray = data;
+        } else if (data.nfts && Array.isArray(data.nfts)) {
+          nftArray = data.nfts;
+        } else if (data.items && Array.isArray(data.items)) {
+          nftArray = data.items;
+        }
+        
+        if (nftArray) {
+          // Extract NFT IDs from the response
+          const nftIds = nftArray.map(item => {
+            if (typeof item === 'string' || typeof item === 'number') return String(item);
+            return item.id || item.nft_id || item.identifier || item.tokenId || String(item);
+          }).filter(Boolean);
+          
+          if (nftIds.length > 0 || nftArray.length === 0) {
+            // Success - return the IDs (empty array is valid - wallet has no NFTs)
+            return nftIds;
+          }
+        }
+      } catch (endpointErr) {
+        // Try next endpoint format
+        continue;
+      }
     }
     
-    return [];
+    // All endpoints failed
+    console.warn(`[FindLab] All endpoint formats failed for ${address.substring(0, 10)}...`);
+    return null;
   } catch (err) {
-    console.warn(`[FindLab] Failed to get NFTs for ${address}:`, err.message);
+    // Log full error details for debugging
+    const errorDetails = err.response ? await err.response.text().catch(() => '') : '';
+    console.warn(`[FindLab] Failed to get NFTs for ${address.substring(0, 10)}...:`, err.message, errorDetails ? `\nResponse: ${errorDetails.substring(0, 200)}` : '');
     return null;
   }
 }
@@ -402,6 +449,13 @@ async function processFlowEvent(event) {
     
     console.log(`Live event: ${eventType} NFT=${nftId} from=${fromAddr} to=${toAddr}`);
     
+    // Update wallet holdings in real-time
+    if (nftId && eventType === 'Deposit' && toAddr) {
+      await updateWalletHoldingOnDeposit(toAddr, nftId, timestamp, blockHeight);
+    } else if (nftId && eventType === 'Withdraw' && fromAddr) {
+      await updateWalletHoldingOnWithdraw(fromAddr, nftId);
+    }
+    
     // Try to enrich with wallet names and moment details
     if (liveEvent.from) {
       try {
@@ -450,6 +504,204 @@ async function processFlowEvent(event) {
     console.error("Error processing Flow event:", err.message);
   }
 }
+
+// Update wallet holdings in real-time when we see Deposit events
+async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blockHeight) {
+  try {
+    if (!walletAddress || !nftId) return;
+    
+    const walletAddr = walletAddress.toLowerCase();
+    const ts = timestamp ? new Date(timestamp) : new Date();
+    
+    // Upsert: add NFT to wallet holdings (or update timestamp if already exists)
+    // Only update if the new timestamp is newer (avoid overwriting with old data)
+    await pgQuery(
+      `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (wallet_address, nft_id) 
+       DO UPDATE SET 
+         is_locked = FALSE,
+         last_event_ts = CASE 
+           WHEN wallet_holdings.last_event_ts IS NULL OR wallet_holdings.last_event_ts < EXCLUDED.last_event_ts 
+           THEN EXCLUDED.last_event_ts 
+           ELSE wallet_holdings.last_event_ts 
+         END,
+         last_synced_at = NOW()`,
+      [walletAddr, nftId.toString(), false, ts]
+    );
+    
+    console.log(`[Wallet Sync] ✅ Added NFT ${nftId} to wallet ${walletAddr.substring(0, 8)}...`);
+  } catch (err) {
+    // Don't spam logs for expected errors (e.g., duplicate key during race conditions)
+    if (!err.message.includes('duplicate') && !err.message.includes('already exists')) {
+      console.error(`[Wallet Sync] Error updating wallet holding for Deposit:`, err.message);
+    }
+  }
+}
+
+// Remove wallet holding when we see Withdraw events
+async function updateWalletHoldingOnWithdraw(walletAddress, nftId) {
+  try {
+    if (!walletAddress || !nftId) return;
+    
+    const walletAddr = walletAddress.toLowerCase();
+    
+    // Delete the NFT from wallet holdings
+    const result = await pgQuery(
+      `DELETE FROM wallet_holdings 
+       WHERE wallet_address = $1 AND nft_id = $2`,
+      [walletAddr, nftId.toString()]
+    );
+    
+    if (result.rowCount > 0) {
+      console.log(`[Wallet Sync] ✅ Removed NFT ${nftId} from wallet ${walletAddr.substring(0, 8)}...`);
+    }
+  } catch (err) {
+    console.error(`[Wallet Sync] Error updating wallet holding for Withdraw:`, err.message);
+  }
+}
+
+// Manually refresh a wallet's holdings using FindLab API (catch-up mechanism)
+app.post("/api/wallet/refresh", async (req, res) => {
+  try {
+    const { wallet } = req.body;
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "Missing wallet address" });
+    }
+    
+    const walletAddr = wallet.toString().trim().toLowerCase();
+    if (!/^0x[0-9a-f]{4,64}$/.test(walletAddr)) {
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+    }
+    
+    console.log(`[Wallet Refresh] Fetching current holdings for ${walletAddr.substring(0, 8)}...`);
+    
+    // Try new Flow blockchain service first (most reliable)
+    let nftIds = null;
+    
+    try {
+      const flowService = await import("./services/flow-blockchain.js");
+      const nftIdNumbers = await flowService.getWalletNFTIds(walletAddr);
+      if (nftIdNumbers && nftIdNumbers.length >= 0) {
+        nftIds = nftIdNumbers.map(id => id.toString());
+        console.log(`[Wallet Refresh] Flow blockchain service returned ${nftIds.length} NFTs`);
+      }
+    } catch (err) {
+      console.warn(`[Wallet Refresh] Flow blockchain service failed, trying FindLab API...`, err.message);
+    }
+    
+    // Fallback to FindLab API
+    if (!nftIds || nftIds.length === 0) {
+      try {
+        nftIds = await getWalletNFTsFindLab(walletAddr, 'A.e4cf4bdc1751c65d.AllDay');
+        if (nftIds && nftIds.length >= 0) {
+          console.log(`[Wallet Refresh] FindLab API returned ${nftIds.length} NFTs`);
+        }
+      } catch (err) {
+        console.warn(`[Wallet Refresh] FindLab API failed, trying Flow REST API...`);
+      }
+    }
+    
+    // Final fallback to Flow REST API
+    if (!nftIds || nftIds.length === 0) {
+      try {
+        nftIds = await fetchWalletNFTsViaFlowAPI(walletAddr);
+        if (nftIds && nftIds.length >= 0) {
+          console.log(`[Wallet Refresh] Flow REST API returned ${nftIds.length} NFTs`);
+        }
+      } catch (err) {
+        console.warn(`[Wallet Refresh] Flow REST API failed:`, err.message);
+      }
+    }
+    
+    // If still no NFTs, treat as empty wallet
+    if (!nftIds || nftIds.length === 0) {
+      // Wallet has no NFTs - remove all holdings
+      const deleteResult = await pgQuery(
+        `DELETE FROM wallet_holdings WHERE wallet_address = $1`,
+        [walletAddr]
+      );
+      
+      return res.json({
+        ok: true,
+        wallet: walletAddr,
+        message: "Wallet refreshed - no NFTs found",
+        added: 0,
+        removed: deleteResult.rowCount,
+        current: 0
+      });
+    }
+    
+    // Get current holdings from database
+    const currentResult = await pgQuery(
+      `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1`,
+      [walletAddr]
+    );
+    const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
+    const newNftIds = new Set(nftIds.map(id => id.toString()));
+    
+    // Find NFTs to add (in new list but not in current)
+    const toAdd = nftIds.filter(id => !currentNftIds.has(id.toString()));
+    
+    // Find NFTs to remove (in current but not in new)
+    const toRemove = Array.from(currentNftIds).filter(id => !newNftIds.has(id));
+    
+    // Add new NFTs
+    let added = 0;
+    if (toAdd.length > 0) {
+      const now = new Date();
+      const values = toAdd.map((nftId, idx) => 
+        `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`
+      ).join(', ');
+      
+      const params = toAdd.flatMap(nftId => [walletAddr, nftId.toString(), false, now]);
+      
+      await pgQuery(
+        `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+         VALUES ${values}
+         ON CONFLICT (wallet_address, nft_id) 
+         DO UPDATE SET 
+           is_locked = FALSE,
+           last_event_ts = EXCLUDED.last_event_ts,
+           last_synced_at = NOW()`,
+        params
+      );
+      added = toAdd.length;
+    }
+    
+    // Remove NFTs that are no longer in the wallet
+    let removed = 0;
+    if (toRemove.length > 0) {
+      const result = await pgQuery(
+        `DELETE FROM wallet_holdings 
+         WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+        [walletAddr, toRemove]
+      );
+      removed = result.rowCount;
+    }
+    
+    console.log(`[Wallet Refresh] ✅ Updated wallet ${walletAddr.substring(0, 8)}... - Added: ${added}, Removed: ${removed}, Total: ${newNftIds.size}`);
+    
+    return res.json({
+      ok: true,
+      wallet: walletAddr,
+      message: "Wallet refreshed successfully",
+      added,
+      removed,
+      current: newNftIds.size,
+      details: {
+        addedNftIds: toAdd,
+        removedNftIds: toRemove
+      }
+    });
+  } catch (err) {
+    console.error("[Wallet Refresh] Error:", err.message);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to refresh wallet: " + (err.message || String(err))
+    });
+  }
+});
 
 // Start the WebSocket connection when server starts
 setTimeout(() => {
@@ -840,6 +1092,7 @@ app.get("/api/search-profiles", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing ?q= search term" });
     }
 
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const pattern = `%${qRaw}%`;
     const result = await pgQuery(
       `
@@ -847,9 +1100,9 @@ app.get("/api/search-profiles", async (req, res) => {
       FROM wallet_profiles
       WHERE display_name ILIKE $1
       ORDER BY display_name ASC, wallet_address ASC
-      LIMIT 50;
+      LIMIT $2;
       `,
-      [pattern]
+      [pattern, limit]
     );
 
     return res.json({
@@ -927,6 +1180,12 @@ app.get("/api/search-editions", async (req, res) => {
     const rawLimit = parseInt(limit, 10);
     const safeLimit = Math.min(Math.max(rawLimit || 200, 1), 1000);
 
+    // Parse comma-separated values for multi-select filters
+    const tiers = tier ? tier.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const seriesList = series ? series.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const sets = set ? set.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const positions = position ? position.split(',').map(p => p.trim()).filter(Boolean) : [];
+
     const conditionsSnapshot = [];
     const conditionsLive = [];
     const params = [];
@@ -946,32 +1205,40 @@ app.get("/api/search-editions", async (req, res) => {
       idx++;
     }
 
-    if (tier) {
-      conditionsSnapshot.push(`tier = $${idx}`);
-      conditionsLive.push(`e.tier = $${idx}`);
-      params.push(tier);
-      idx++;
+    // Tier filter (multi-select)
+    if (tiers.length > 0) {
+      const placeholders = tiers.map((_, i) => `$${idx + i}`).join(', ');
+      conditionsSnapshot.push(`tier IN (${placeholders})`);
+      conditionsLive.push(`e.tier IN (${placeholders})`);
+      params.push(...tiers);
+      idx += tiers.length;
     }
 
-    if (series) {
-      conditionsSnapshot.push(`series_name = $${idx}`);
-      conditionsLive.push(`e.series_name = $${idx}`);
-      params.push(series);
-      idx++;
+    // Series filter (multi-select)
+    if (seriesList.length > 0) {
+      const placeholders = seriesList.map((_, i) => `$${idx + i}`).join(', ');
+      conditionsSnapshot.push(`series_name IN (${placeholders})`);
+      conditionsLive.push(`e.series_name IN (${placeholders})`);
+      params.push(...seriesList);
+      idx += seriesList.length;
     }
 
-    if (set) {
-      conditionsSnapshot.push(`set_name = $${idx}`);
-      conditionsLive.push(`e.set_name = $${idx}`);
-      params.push(set);
-      idx++;
+    // Set filter (multi-select)
+    if (sets.length > 0) {
+      const placeholders = sets.map((_, i) => `$${idx + i}`).join(', ');
+      conditionsSnapshot.push(`set_name IN (${placeholders})`);
+      conditionsLive.push(`e.set_name IN (${placeholders})`);
+      params.push(...sets);
+      idx += sets.length;
     }
 
-    if (position) {
-      conditionsSnapshot.push(`position = $${idx}`);
-      conditionsLive.push(`e.position = $${idx}`);
-      params.push(position);
-      idx++;
+    // Position filter (multi-select)
+    if (positions.length > 0) {
+      const placeholders = positions.map((_, i) => `$${idx + i}`).join(', ');
+      conditionsSnapshot.push(`position IN (${placeholders})`);
+      conditionsLive.push(`e.position IN (${placeholders})`);
+      params.push(...positions);
+      idx += positions.length;
     }
 
     const whereClauseSnapshot = conditionsSnapshot.length ? `WHERE ${conditionsSnapshot.join(" AND ")}` : "";
@@ -1349,23 +1616,169 @@ access(all) fun main(address: Address): [UInt64] {
 }
 `;
 
-// Fetch wallet's AllDay NFTs - use database snapshot (fast) 
-// Live blockchain queries are too slow for real-time use
-// Now with FindLab API as a faster alternative
+// Fetch wallet's AllDay NFTs using Flow REST API with Cadence script
+async function fetchWalletNFTsViaFlowAPI(walletAddress) {
+  try {
+    // Convert wallet address to Flow format
+    // Flow addresses need to be in hex format with 0x prefix, padded to 16 characters (8 bytes)
+    let flowAddress = walletAddress.toLowerCase().trim();
+    if (flowAddress.startsWith('0x')) {
+      flowAddress = flowAddress.substring(2);
+    }
+    
+    // Ensure address is properly formatted (remove any extra characters, pad if needed)
+    flowAddress = flowAddress.replace(/[^0-9a-f]/g, '');
+    
+    // Flow REST API expects arguments in a specific format
+    // The address needs to be in the correct format
+    const flowAddressWithPrefix = `0x${flowAddress}`;
+    
+    // Flow REST API v1 scripts endpoint expects arguments as an array
+    // Each argument is a JSON-CDC encoded value
+    // For Address, we pass it as: { "type": "Address", "value": "0x..." }
+    const addressArg = {
+      type: "Address",
+      value: flowAddressWithPrefix
+    };
+    
+    const scriptResponse = await fetch(`${FLOW_REST_API}/v1/scripts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        script: GET_ALLDAY_NFTS_SCRIPT,
+        arguments: [addressArg] // Array of argument objects
+      }),
+      signal: AbortSignal.timeout(20000) // 20 second timeout (scripts can be slow)
+    });
+    
+    if (!scriptResponse.ok) {
+      const errorText = await scriptResponse.text().catch(() => '');
+      throw new Error(`Flow API error: ${scriptResponse.status} ${scriptResponse.statusText} - ${errorText.substring(0, 200)}`);
+    }
+    
+    const scriptData = await scriptResponse.json();
+    
+    // The response should contain the NFT IDs array (as UInt64 values)
+    if (scriptData && Array.isArray(scriptData)) {
+      const nftIds = scriptData.map(id => String(id)).filter(Boolean);
+      return nftIds;
+    } else if (scriptData?.value) {
+      // Sometimes the response is wrapped in a value field
+      const value = scriptData.value;
+      if (Array.isArray(value)) {
+        const nftIds = value.map(id => String(id)).filter(Boolean);
+        return nftIds;
+      }
+    }
+    
+    return [];
+  } catch (err) {
+    console.warn(`[LiveWallet] Flow REST API script execution failed for ${walletAddress.substring(0, 10)}...:`, err.message);
+    return null;
+  }
+}
+
+// Fetch wallet's AllDay NFTs - try multiple methods
 async function fetchLiveWalletNFTs(walletAddress) {
-  // Try FindLab API first (faster than direct Flow REST API)
+  // Try FindLab API first (fastest if it works)
   try {
     const nftIds = await getWalletNFTsFindLab(walletAddress, 'A.e4cf4bdc1751c65d.AllDay');
     if (nftIds && nftIds.length >= 0) {
-      console.log(`[LiveWallet] FindLab API returned ${nftIds.length} NFTs for ${walletAddress}`);
+      console.log(`[LiveWallet] FindLab API returned ${nftIds.length} NFTs for ${walletAddress.substring(0, 10)}...`);
       return nftIds;
     }
   } catch (err) {
-    console.warn(`[LiveWallet] FindLab API failed, falling back to database:`, err.message);
+    // Continue to next method
   }
   
-  // Fallback to database - live queries via Flow REST API are too slow
+  // Fallback to Flow REST API with Cadence script
+  try {
+    const nftIds = await fetchWalletNFTsViaFlowAPI(walletAddress);
+    if (nftIds && nftIds.length >= 0) {
+      console.log(`[LiveWallet] Flow REST API returned ${nftIds.length} NFTs for ${walletAddress.substring(0, 10)}...`);
+      return nftIds;
+    }
+  } catch (err) {
+    console.warn(`[LiveWallet] Flow REST API failed:`, err.message);
+  }
+  
+  // Final fallback: query recent Deposit events for this wallet (last 7 days)
+  // This is a compromise - we can't get ALL NFTs this way, but we can get recently received ones
+  try {
+    const recentNfts = await fetchRecentWalletNFTsViaEvents(walletAddress);
+    if (recentNfts && recentNfts.length > 0) {
+      console.log(`[LiveWallet] Found ${recentNfts.length} recent NFTs via events for ${walletAddress.substring(0, 10)}...`);
+      // Combine with database holdings for complete picture
+      return recentNfts;
+    }
+  } catch (err) {
+    console.warn(`[LiveWallet] Event-based fetch failed:`, err.message);
+  }
+  
+  // All methods failed - return null to use database
   return null;
+}
+
+// Fetch recent NFTs by querying Deposit events for the wallet
+async function fetchRecentWalletNFTsViaEvents(walletAddress) {
+  try {
+    // Get latest block height
+    const latestHeight = await getLatestBlockHeightFindLab() || await getLatestBlockHeight();
+    if (!latestHeight) return null;
+    
+    // Query last 7 days of blocks (~1.2M blocks = 7 days * 24 hours * 60 min * 60 sec * 2 blocks/sec)
+    const blocksPerDay = 24 * 60 * 60 * 2; // ~172,800 blocks per day
+    const startHeight = Math.max(0, latestHeight - (7 * blocksPerDay));
+    
+    const walletAddr = walletAddress.toLowerCase();
+    
+    // Query Deposit events where this wallet is the recipient
+    const depositRes = await fetch(
+      `${FLOW_REST_API}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${latestHeight}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    
+    if (!depositRes.ok) return null;
+    
+    const depositData = await depositRes.json();
+    const nftIds = new Set();
+    
+    for (const block of depositData) {
+      if (!block.events) continue;
+      for (const event of block.events) {
+        try {
+          let payload = event.payload;
+          if (typeof payload === 'string') {
+            payload = JSON.parse(Buffer.from(payload, 'base64').toString());
+          }
+          
+          if (payload?.value?.fields) {
+            const fields = payload.value.fields;
+            const toField = fields.find(f => f.name === 'to');
+            const idField = fields.find(f => f.name === 'id');
+            
+            if (toField && idField) {
+              const toAddr = (toField.value?.value || toField.value || '').toString().toLowerCase();
+              const nftId = (idField.value?.value || idField.value || '').toString();
+              
+              if (toAddr === walletAddr && nftId) {
+                nftIds.add(nftId);
+              }
+            }
+          }
+        } catch (e) {
+          // Skip malformed events
+        }
+      }
+    }
+    
+    return Array.from(nftIds);
+  } catch (err) {
+    console.warn(`[LiveWallet] Event-based fetch error:`, err.message);
+    return null;
+  }
 }
 
 // Wallet summary - NOW WITH LIVE DATA!
@@ -1383,18 +1796,38 @@ app.get("/api/wallet-summary", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
-    // Try to fetch live data from blockchain
+    // Try to fetch live data from blockchain using new Flow blockchain service
     let liveNftIds = null;
     let dataSource = 'database';
+    const useBlockchain = req.query.source === 'blockchain' || useLive;
     
-    if (useLive) {
-      console.log(`[LiveWallet] Fetching live data for ${wallet}...`);
-      liveNftIds = await fetchLiveWalletNFTs(wallet);
-      if (liveNftIds !== null) {
-        dataSource = 'blockchain';
-        console.log(`[LiveWallet] Got ${liveNftIds.length} NFTs from blockchain`);
-      } else {
-        console.log(`[LiveWallet] Falling back to database`);
+    if (useBlockchain) {
+      try {
+        console.log(`[Wallet Summary] Fetching live data from Flow blockchain for ${wallet}...`);
+        const flowService = await import("./services/flow-blockchain.js");
+        const nftIds = await flowService.getWalletNFTIds(wallet);
+        
+        if (nftIds && nftIds.length >= 0) {
+          liveNftIds = nftIds.map(id => id.toString());
+          dataSource = 'blockchain';
+          console.log(`[Wallet Summary] Got ${liveNftIds.length} NFTs from Flow blockchain`);
+        } else {
+          console.log(`[Wallet Summary] Wallet has no NFTs or collection not set up`);
+          liveNftIds = []; // Empty wallet
+          dataSource = 'blockchain';
+        }
+      } catch (blockchainErr) {
+        console.warn(`[Wallet Summary] Flow blockchain query failed, falling back to database:`, blockchainErr.message);
+        // Try fallback to FindLab API
+        try {
+          liveNftIds = await fetchLiveWalletNFTs(wallet);
+          if (liveNftIds !== null) {
+            dataSource = 'blockchain';
+            console.log(`[Wallet Summary] Got ${liveNftIds.length} NFTs from FindLab API (fallback)`);
+          }
+        } catch (fallbackErr) {
+          console.warn(`[Wallet Summary] All blockchain queries failed, using database`);
+        }
       }
     }
 
@@ -1414,33 +1847,81 @@ app.get("/api/wallet-summary", async (req, res) => {
     let statsResult;
     
     if (liveNftIds !== null && liveNftIds.length > 0) {
-      // Use LIVE blockchain data - query metadata for the NFT IDs we got from chain
-      statsResult = await pgQuery(
-        `
-        SELECT
-          $1 AS wallet_address,
-
-          COUNT(*)::int AS moments_total,
-          0::int AS locked_count,
-          COUNT(*)::int AS unlocked_count,
-
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
-          COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
-
-          COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
-          COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
-          COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
-
-        FROM nft_core_metadata m
-        LEFT JOIN public.edition_price_scrape eps
-          ON eps.edition_id = m.edition_id
-        WHERE m.nft_id = ANY($2::text[]);
-        `,
-        [wallet, liveNftIds]
+      // Use LIVE blockchain data - but prioritize wallet_holdings for locked status
+      // First check if wallet_holdings has locked status data
+      const holdingsCheck = await pgQuery(
+        `SELECT COUNT(*)::int as total, COUNT(CASE WHEN is_locked = true THEN 1 END)::int as locked
+         FROM wallet_holdings WHERE wallet_address = $1`,
+        [wallet]
       );
+      
+      const hasLockedData = holdingsCheck.rows[0]?.locked > 0 || holdingsCheck.rows[0]?.total === liveNftIds.length;
+      
+      if (hasLockedData) {
+        // Use wallet_holdings as source of truth for locked status (it has the data)
+        // Don't filter by blockchain NFT IDs - use ALL wallet_holdings data
+        statsResult = await pgQuery(
+          `
+          SELECT
+            h.wallet_address,
+
+            COUNT(*)::int AS moments_total,
+            COUNT(*) FILTER (WHERE h.is_locked = true)::int AS locked_count,
+            COUNT(*) FILTER (WHERE h.is_locked = false)::int AS unlocked_count,
+
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
+
+            COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
+            COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
+            COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
+
+          FROM wallet_holdings h
+          LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+          LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = m.edition_id
+          WHERE h.wallet_address = $1
+          GROUP BY h.wallet_address;
+          `,
+          [wallet]
+        );
+        
+        console.log(`[Wallet Summary] Using wallet_holdings: ${statsResult.rows[0]?.locked_count || 0} locked out of ${statsResult.rows[0]?.moments_total || 0} total`);
+      } else {
+        // Fall back to blockchain NFT IDs with wallet_holdings join (for when wallet_holdings doesn't have locked data yet)
+        const nftIdPlaceholders = liveNftIds.map((_, idx) => `$${idx + 2}`).join(', ');
+        statsResult = await pgQuery(
+          `
+          SELECT
+            $1 AS wallet_address,
+
+            COUNT(*)::int AS moments_total,
+            COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+            COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
+
+            COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
+            COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
+            COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
+
+          FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+          LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+          LEFT JOIN wallet_holdings h 
+            ON h.nft_id = nft_ids.nft_id 
+            AND h.wallet_address = $1
+          LEFT JOIN public.edition_price_scrape eps
+            ON eps.edition_id = m.edition_id;
+          `,
+          [wallet, ...liveNftIds]
+        );
+      }
     } else if (liveNftIds !== null && liveNftIds.length === 0) {
       // Live data returned empty wallet
       statsResult = { rows: [{ 
@@ -1626,10 +2107,14 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
-// Full wallet query
+// Full wallet query - NOW WITH AUTO-REFRESH!
+// Supports both database (default) and blockchain (use ?source=blockchain) queries
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
+    const useBlockchain = req.query.source === 'blockchain' || req.query.blockchain === 'true';
+    
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
@@ -1638,13 +2123,172 @@ app.get("/api/query", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
 
+    // NEW: Use blockchain query if requested
+    if (useBlockchain) {
+      try {
+        const flowService = await import("./services/flow-blockchain.js");
+        const startTime = Date.now();
+        
+        console.log(`[Wallet Query] Using blockchain source for ${wallet.substring(0, 8)}...`);
+        
+        // Get NFT IDs from blockchain
+        const nftIds = await flowService.getWalletNFTIds(wallet);
+        
+        if (nftIds.length === 0) {
+          return res.json({
+            ok: true,
+            wallet,
+            count: 0,
+            rows: [],
+            source: 'blockchain',
+            queryTime: Date.now() - startTime
+          });
+        }
+        
+        // Get metadata from database - start from blockchain NFT IDs, then join to metadata
+        // This ensures we get ALL NFTs from blockchain, even if metadata doesn't exist yet
+        // Also join with wallet_holdings to preserve locked status
+        const nftIdPlaceholders = nftIds.map((_, idx) => `$${idx + 1}`).join(', ');
+        const result = await pgQuery(
+          `
+          SELECT
+            $${nftIds.length + 1}::text AS wallet_address,
+            COALESCE(h.is_locked, false) AS is_locked,
+            COALESCE(h.last_event_ts, NOW()) AS last_event_ts,
+            nft_ids.nft_id,
+            m.edition_id,
+            m.play_id,
+            m.series_id,
+            m.set_id,
+            m.tier,
+            m.serial_number,
+            m.max_mint_size,
+            m.first_name,
+            m.last_name,
+            m.team_name,
+            m.position,
+            m.jersey_number,
+            m.series_name,
+            m.set_name
+          FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+          LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+          LEFT JOIN wallet_holdings h 
+            ON h.nft_id = nft_ids.nft_id 
+            AND h.wallet_address = $${nftIds.length + 1}::text
+          ORDER BY COALESCE(m.last_name, '') NULLS LAST, COALESCE(m.first_name, '') NULLS LAST, nft_ids.nft_id;
+          `,
+          [...nftIds.map(id => id.toString()), wallet]
+        );
+        
+        const queryTime = Date.now() - startTime;
+        console.log(`[Wallet Query] ✅ Blockchain query completed in ${queryTime}ms - Found ${result.rowCount} moments`);
+        
+        return res.json({
+          ok: true,
+          wallet,
+          count: result.rowCount,
+          rows: result.rows,
+          source: 'blockchain',
+          queryTime: queryTime
+        });
+      } catch (blockchainErr) {
+        console.error(`[Wallet Query] Blockchain query failed, falling back to database:`, blockchainErr.message);
+        // Fall through to database query
+      }
+    }
+
+    // Check if we should auto-refresh (if data is stale or forced)
+    // NOTE: Live API calls are currently unreliable, so we primarily rely on real-time WebSocket updates
+    // Only refresh if explicitly forced or if no data exists (new wallet)
+    let shouldRefresh = forceRefresh;
+    if (!shouldRefresh) {
+      // Check if wallet has any holdings in database
+      const countResult = await pgQuery(
+        `SELECT COUNT(*) as count 
+         FROM wallet_holdings 
+         WHERE wallet_address = $1`,
+        [wallet]
+      );
+      const count = parseInt(countResult.rows[0]?.count || 0);
+      
+      // Only refresh if wallet has no holdings (might be a new wallet that needs initial sync)
+      // Otherwise, trust the database which is kept up-to-date via WebSocket real-time events
+      if (count === 0) {
+        shouldRefresh = true;
+        console.log(`[Wallet Query] Wallet ${wallet.substring(0, 8)}... has no holdings in database, will attempt refresh`);
+      }
+    }
+
+    // Auto-refresh from FindLab API if needed
+    if (shouldRefresh) {
+      try {
+        console.log(`[Wallet Query] Auto-refreshing wallet ${wallet.substring(0, 8)}... (stale data or forced)`);
+        const nftIds = await getWalletNFTsFindLab(wallet, 'A.e4cf4bdc1751c65d.AllDay');
+        
+        if (nftIds && nftIds.length >= 0) {
+          // Get current holdings from database
+          const currentResult = await pgQuery(
+            `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1`,
+            [wallet]
+          );
+          const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
+          const newNftIds = new Set(nftIds.map(id => id.toString()));
+          
+          // Find NFTs to add
+          const toAdd = nftIds.filter(id => !currentNftIds.has(id.toString()));
+          
+          // Find NFTs to remove
+          const toRemove = Array.from(currentNftIds).filter(id => !newNftIds.has(id));
+          
+          // Add new NFTs
+          if (toAdd.length > 0) {
+            const now = new Date();
+            const values = toAdd.map((nftId, idx) => 
+              `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`
+            ).join(', ');
+            
+            const params = toAdd.flatMap(nftId => [wallet, nftId.toString(), false, now]);
+            
+            await pgQuery(
+              `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+               VALUES ${values}
+               ON CONFLICT (wallet_address, nft_id) 
+               DO UPDATE SET 
+                 is_locked = FALSE,
+                 last_event_ts = EXCLUDED.last_event_ts,
+                 last_synced_at = NOW()`,
+              params
+            );
+          }
+          
+          // Remove NFTs that are no longer in the wallet
+          if (toRemove.length > 0) {
+            await pgQuery(
+              `DELETE FROM wallet_holdings 
+               WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+              [wallet, toRemove]
+            );
+          }
+          
+          if (toAdd.length > 0 || toRemove.length > 0) {
+            console.log(`[Wallet Query] ✅ Refreshed wallet ${wallet.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length}`);
+          }
+        }
+      } catch (refreshErr) {
+        // Don't fail the request if refresh fails - just log and continue with database data
+        console.warn(`[Wallet Query] Auto-refresh failed for ${wallet}:`, refreshErr.message);
+      }
+    }
+
+    // Query the database (now with fresh data if refresh happened)
+    // Use LEFT JOIN so we show all holdings even if metadata is missing
     const result = await pgQuery(
       `
       SELECT
         h.wallet_address,
         h.is_locked,
         h.last_event_ts,
-        m.nft_id,
+        h.nft_id,
         m.edition_id,
         m.play_id,
         m.series_id,
@@ -1660,9 +2304,9 @@ app.get("/api/query", async (req, res) => {
         m.series_name,
         m.set_name
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1
-      ORDER BY h.last_event_ts DESC;
+      ORDER BY h.is_locked DESC, h.last_event_ts DESC;
       `,
       [wallet]
     );
@@ -1671,10 +2315,134 @@ app.get("/api/query", async (req, res) => {
       ok: true,
       wallet,
       count: result.rowCount,
-      rows: result.rows
+      rows: result.rows,
+      refreshed: shouldRefresh,
+      source: 'database'
     });
   } catch (err) {
     console.error("Error in /api/query (Neon):", err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
+  }
+});
+
+// NEW: Blockchain-based wallet query (direct Cadence/Flow integration)
+// This endpoint uses direct blockchain queries and automatically syncs to database
+app.get("/api/query-blockchain", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
+    }
+
+    if (!/^0x[0-9a-f]{4,64}$/.test(wallet)) {
+      return res.status(400).json({ ok: false, error: "Invalid wallet format" });
+    }
+
+    const startTime = Date.now();
+    console.log(`[Blockchain Query] Fetching wallet ${wallet.substring(0, 8)}... from Flow blockchain`);
+
+    try {
+      const flowService = await import("./services/flow-blockchain.js");
+      
+      // Get NFT IDs directly from blockchain
+      const nftIds = await flowService.getWalletNFTIds(wallet);
+      
+      // Auto-sync to database for future fast queries (non-blocking)
+      if (nftIds.length > 0) {
+        try {
+          const syncService = await import("./scripts/sync_wallets_from_blockchain.js");
+          syncService.syncWallet(wallet).catch(err => {
+            console.warn(`[Blockchain Query] Background sync failed:`, err.message);
+          });
+        } catch (syncErr) {
+          // Continue even if sync fails
+        }
+      } else {
+        // Empty wallet - remove old holdings
+        try {
+          await pgQuery(`DELETE FROM wallet_holdings WHERE wallet_address = $1`, [wallet]);
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
+      if (nftIds.length === 0) {
+        return res.json({
+          ok: true,
+          wallet,
+          count: 0,
+          rows: [],
+          source: 'blockchain',
+          queryTime: Date.now() - startTime,
+          message: 'Wallet has no NFTs or collection not set up'
+        });
+      }
+
+      console.log(`[Blockchain Query] Found ${nftIds.length} NFT IDs, fetching metadata from database...`);
+
+      // Get metadata from database - start from blockchain NFT IDs, then join to metadata
+      // This ensures we get ALL NFTs from blockchain, even if metadata doesn't exist yet
+      // Also join with wallet_holdings to preserve locked status
+      const nftIdPlaceholders = nftIds.map((_, idx) => `$${idx + 1}`).join(', ');
+      const result = await pgQuery(
+        `
+        SELECT
+          $${nftIds.length + 1}::text AS wallet_address,
+          COALESCE(h.is_locked, false) AS is_locked,
+          COALESCE(h.last_event_ts, NOW()) AS last_event_ts,
+          nft_ids.nft_id,
+          m.edition_id,
+          m.play_id,
+          m.series_id,
+          m.set_id,
+          m.tier,
+          m.serial_number,
+          m.max_mint_size,
+          m.first_name,
+          m.last_name,
+          m.team_name,
+          m.position,
+          m.jersey_number,
+          m.series_name,
+          m.set_name
+        FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+        LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+        LEFT JOIN wallet_holdings h 
+          ON h.nft_id = nft_ids.nft_id 
+          AND h.wallet_address = $${nftIds.length + 1}::text
+        ORDER BY COALESCE(m.last_name, '') NULLS LAST, COALESCE(m.first_name, '') NULLS LAST, nft_ids.nft_id;
+        `,
+        [...nftIds.map(id => id.toString()), wallet]
+      );
+
+      const queryTime = Date.now() - startTime;
+      console.log(`[Blockchain Query] ✅ Completed in ${queryTime}ms - Found ${result.rowCount} moments with metadata`);
+
+      return res.json({
+        ok: true,
+        wallet,
+        count: result.rowCount,
+        rows: result.rows,
+        source: 'blockchain',
+        queryTime: queryTime,
+        blockchainNftCount: nftIds.length,
+        metadataMatched: result.rowCount
+      });
+    } catch (blockchainErr) {
+      console.error(`[Blockchain Query] Error:`, blockchainErr);
+      return res.status(500).json({
+        ok: false,
+        error: blockchainErr.message || String(blockchainErr),
+        source: 'blockchain',
+        queryTime: Date.now() - startTime
+      });
+    }
+  } catch (err) {
+    console.error("Error in /api/query-blockchain:", err);
     return res.status(500).json({
       ok: false,
       error: err.message || String(err)
@@ -2575,7 +3343,9 @@ app.get("/api/me", async (req, res) => {
 
     return res.json({
       ok: true,
-      user: req.session.user
+      user: req.session.user,
+      hasNfladToken: !!req.session.nflad_token,
+      tokenLength: req.session.nflad_token ? req.session.nflad_token.length : 0
     });
   } catch (err) {
     console.error("GET /api/me error:", err);
@@ -3854,8 +4624,8 @@ function sniperError(...args) {
   if (SNIPER_LOGGING_ENABLED) console.error(...args);
 }
 
-// NFTStorefrontV2 contract for marketplace events
-const STOREFRONT_CONTRACT = "A.4eb8a10cb9f87357.NFTStorefrontV2";
+// NFTStorefront contract for marketplace events (V1 - used by NFL All Day)
+const STOREFRONT_CONTRACT = "A.4eb8a10cb9f87357.NFTStorefront";
 
 // ============================================================
 // FLOOR PRICE CACHE - Stores known floor prices for editions
@@ -4067,13 +4837,8 @@ async function addSniperListing(listing) {
     }
   }
   
-  // Mark as sold/unlisted if already in tracking maps
-  if (soldNfts.has(listing.nftId)) {
-    listing.isSold = true;
-  }
-  if (unlistedNfts.has(listing.nftId)) {
-    listing.isUnlisted = true;
-  }
+  // NOTE: Don't override isSold/isUnlisted here - trust what's passed in the listing object
+  // The calling code (processListingEvent) handles clearing sold/unlisted status for relistings
   
   // Add to front of array
   sniperListings.unshift(listing);
@@ -4188,7 +4953,7 @@ async function resetAllListingsToUnsold() {
   }
 }
 
-async function markListingAsUnlisted(nftId) {
+async function markListingAsUnlisted(nftId, listingId = null) {
   unlistedNfts.set(nftId, Date.now());
   
   // Cleanup unlistedNfts if it gets too large
@@ -4202,12 +4967,15 @@ async function markListingAsUnlisted(nftId) {
   }
   
   // Mark existing listings as unlisted in memory
+  // If listingId provided, only mark that specific listing; otherwise mark all for this nftId
   for (const listing of sniperListings) {
     if (listing.nftId === nftId) {
-      listing.isUnlisted = true;
-      listing.isSold = false; // Can't be both sold and unlisted
-      // Update in database
-      persistSniperListing(listing).catch(() => {});
+      if (!listingId || listing.listingId === listingId) {
+        listing.isUnlisted = true;
+        listing.isSold = false; // Can't be both sold and unlisted
+        // Update in database
+        persistSniperListing(listing).catch(() => {});
+      }
     }
   }
   
@@ -4316,16 +5084,15 @@ async function processListingEvent(event) {
       } catch (e) { /* ignore */ }
     }
     
-    // Check if this listing is sold and get buyer info
-    let buyerAddr = null;
-    let buyerName = null;
+    // IMPORTANT: A new ListingAvailable event means this NFT is being (re)listed
+    // Clear any old sold/unlisted status - this is a FRESH listing
     if (soldNfts.has(nftId)) {
-      // Find the sold listing to get buyer info
-      const soldListing = sniperListings.find(l => l.nftId === nftId && l.isSold);
-      if (soldListing) {
-        buyerAddr = soldListing.buyerAddr;
-        buyerName = soldListing.buyerName;
-      }
+      console.log(`[Sniper] 🔄 NFT ${nftId} was previously sold, now relisted - clearing sold status`);
+      soldNfts.delete(nftId);
+    }
+    if (unlistedNfts.has(nftId)) {
+      console.log(`[Sniper] 🔄 NFT ${nftId} was previously unlisted, now relisted - clearing unlisted status`);
+      unlistedNfts.delete(nftId);
     }
     
     const listing = {
@@ -4347,13 +5114,14 @@ async function processListingEvent(event) {
       jerseyNumber: momentData?.jersey_number ? Number(momentData.jersey_number) : null,
       sellerName,
       sellerAddr,
-      buyerAddr,
-      buyerName,
+      buyerAddr: null,  // New listing has no buyer
+      buyerName: null,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
-      isSold: soldNfts.has(nftId),
-      isUnlisted: unlistedNfts.has(nftId),
+      isSold: false,     // New listing is NOT sold
+      isUnlisted: false, // New listing is NOT unlisted
       listedAt: timestamp || new Date().toISOString(),
-      listingUrl: `https://nflallday.com/listing/moment/${editionId}`
+      // Direct moment link for faster buying (one click to buy page)
+      listingUrl: `https://nflallday.com/moments/${nftId}`
     };
     
     addSniperListing(listing);
@@ -4438,22 +5206,24 @@ async function watchForListings() {
       
       let listingRes, completedRes, removedRes;
       
+      // Query NFTStorefront events (V1 - NFL All Day marketplace)
+      console.log(`[Sniper] 🔍 Querying ${STOREFRONT_CONTRACT} events for blocks ${startHeight}-${endHeight}`);
       try {
-        listingRes = await fetch(`${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
+        listingRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
         console.error(`[Sniper] Error fetching ListingAvailable events:`, e.message);
         listingRes = { ok: false };
       }
       
       try {
-        completedRes = await fetch(`${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
+        completedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
         console.error(`[Sniper] Error fetching ListingCompleted events:`, e.message);
         completedRes = { ok: false };
       }
       
       try {
-        removedRes = await fetch(`${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingRemoved&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
+        removedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingRemoved&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
         console.error(`[Sniper] Error fetching ListingRemoved events:`, e.message);
         removedRes = { ok: false };
@@ -4467,9 +5237,11 @@ async function watchForListings() {
       // Process new listings
       if (listingRes.ok) {
         const eventData = await listingRes.json();
+        console.log(`[Sniper] 📦 ListingAvailable response: ${eventData?.length || 0} blocks with events`);
         
         for (const block of eventData) {
           if (!block.events) continue;
+          console.log(`[Sniper] 📦 Block ${block.block_height}: ${block.events.length} ListingAvailable events`);
           
           for (const event of block.events) {
             try {
@@ -4505,6 +5277,7 @@ async function watchForListings() {
               if (!nftId || !listingPrice) continue;
               
               alldayCount++;
+              console.log(`[Sniper] ✨ Found AllDay listing: NFT ${nftId}, price $${listingPrice}, seller ${sellerAddr}`);
               
               // Get listingId if available
               const listingId = getField('listingResourceID')?.toString() || null;
@@ -4562,6 +5335,33 @@ async function watchForListings() {
               
               const nftId = getField('nftID')?.toString();
               const listingResourceId = getField('listingResourceID')?.toString();
+              
+              // CRITICAL: Check the 'purchased' field to distinguish SOLD vs DELISTED
+              // purchased = true  → SOLD (someone bought it)
+              // purchased = false → DELISTED (seller cancelled the listing)
+              // If 'purchased' field is missing or undefined, treat as DELISTED (safer)
+              const purchasedField = getField('purchased');
+              
+              // Be very strict - only treat as sold if purchased is explicitly true
+              let wasPurchased = false;
+              if (purchasedField === true) {
+                wasPurchased = true;
+              } else if (typeof purchasedField === 'string' && purchasedField.toLowerCase() === 'true') {
+                wasPurchased = true;
+              } else if (typeof purchasedField === 'object' && purchasedField !== null) {
+                // Cadence Bool might come as { value: true } or similar
+                const boolValue = purchasedField.value ?? purchasedField;
+                wasPurchased = boolValue === true || boolValue === 'true';
+              }
+              
+              console.log(`[Sniper] 📋 ListingCompleted for NFT ${nftId} (listingId: ${listingResourceId}): purchased = ${JSON.stringify(purchasedField)} → wasPurchased = ${wasPurchased}`);
+              
+              // STRICT: Require listingResourceId to be present - this is the unique identifier for matching
+              // Without it, we can't reliably match to our listings and risk false positives
+              if (!listingResourceId) {
+                console.log(`[Sniper] ⚠️  ListingCompleted without listingResourceId - skipping (nftId: ${nftId || 'none'})`);
+                continue;
+              }
               
               if (!nftId && !listingResourceId) continue;
               
@@ -4661,69 +5461,193 @@ async function watchForListings() {
                 }
               }
               
-              // Extract buyer address from the event
-              let buyerAddr = getField('purchaser')?.toString()?.toLowerCase() || 
-                             getField('buyer')?.toString()?.toLowerCase() ||
-                             getField('recipient')?.toString()?.toLowerCase() ||
-                             null;
+              // Extract buyer address - best method is from AllDay.Deposit event in same tx
+              // The Deposit event has 'to' field = buyer address, 'id' field = NFT ID
+              let buyerAddr = null;
               
-              // If not in event fields, try to get from transaction authorizer
-              // The buyer is typically the transaction authorizer (the account that signed)
+              // First try to get buyer from ListingCompleted event fields
+              buyerAddr = getField('purchaser')?.toString()?.toLowerCase() || 
+                         getField('buyer')?.toString()?.toLowerCase() ||
+                         getField('recipient')?.toString()?.toLowerCase() ||
+                         null;
+              
+              // If not found, query AllDay.Deposit event for this block to find buyer
+              // The Deposit event fires when an NFT is transferred TO the buyer
+              if (!buyerAddr && block.block_height && targetNftId) {
+                try {
+                  const depositRes = await fetch(
+                    `${FLOW_REST_API}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${block.block_height}&end_height=${block.block_height}`,
+                    { signal: AbortSignal.timeout(5000) }
+                  );
+                  
+                  if (depositRes.ok) {
+                    const depositData = await depositRes.json();
+                    console.log(`[Sniper] 🔍 Checking ${depositData?.length || 0} blocks for Deposit events for NFT ${targetNftId}`);
+                    
+                    // Find the Deposit event for our NFT ID
+                    for (const depositBlock of depositData) {
+                      if (!depositBlock.events) continue;
+                      
+                      for (const depositEvent of depositBlock.events) {
+                        try {
+                          let depositPayload = depositEvent.payload;
+                          if (typeof depositPayload === 'string') {
+                            depositPayload = JSON.parse(Buffer.from(depositPayload, 'base64').toString());
+                          }
+                          
+                          if (!depositPayload?.value?.fields) continue;
+                          
+                          const depositFields = depositPayload.value.fields;
+                          
+                          // Extract NFT ID - can be nested in different ways
+                          const idField = depositFields.find(f => f.name === 'id');
+                          let depositNftId = null;
+                          if (idField) {
+                            // Try to extract the numeric ID from nested structures
+                            const extractId = (obj) => {
+                              if (!obj) return null;
+                              if (typeof obj === 'string' || typeof obj === 'number') return String(obj);
+                              if (typeof obj === 'object') {
+                                if (obj.value !== undefined) return extractId(obj.value);
+                              }
+                              return null;
+                            };
+                            depositNftId = extractId(idField);
+                          }
+                          
+                          // Extract 'to' address - Address type can be deeply nested in Cadence
+                          const toField = depositFields.find(f => f.name === 'to');
+                          let depositTo = null;
+                          if (toField) {
+                            // Debug: log the structure to understand it
+                            // console.log(`[Sniper] DEBUG toField:`, JSON.stringify(toField, null, 2));
+                            
+                            // Try to extract address from various nested structures
+                            // Cadence Address can be: { value: "0x..." } or { value: { value: "0x..." } }
+                            const extractAddress = (obj) => {
+                              if (!obj) return null;
+                              if (typeof obj === 'string' && obj.startsWith('0x')) return obj;
+                              if (typeof obj === 'object') {
+                                // Try common patterns
+                                if (typeof obj.value === 'string' && obj.value.startsWith('0x')) return obj.value;
+                                if (obj.value && typeof obj.value.value === 'string') return obj.value.value;
+                                if (obj.value && obj.value.value && typeof obj.value.value.value === 'string') return obj.value.value.value;
+                                // Recurse into value if it's an object
+                                if (obj.value && typeof obj.value === 'object') return extractAddress(obj.value);
+                              }
+                              return null;
+                            };
+                            
+                            depositTo = extractAddress(toField);
+                            
+                            // Log what we found for debugging
+                            if (depositTo) {
+                              console.log(`[Sniper] 📍 Extracted 'to' address: ${depositTo}`);
+                            } else {
+                              console.log(`[Sniper] ⚠️ Could not extract 'to' address from:`, JSON.stringify(toField).substring(0, 200));
+                            }
+                          }
+                          
+                          // Normalize both IDs to strings for comparison
+                          const targetIdStr = targetNftId?.toString();
+                          const depositIdStr = depositNftId?.toString();
+                          
+                          // Match by NFT ID - this is the buyer receiving the NFT
+                          if (depositIdStr && targetIdStr && depositIdStr === targetIdStr && depositTo) {
+                            // Ensure depositTo is a valid address string
+                            if (typeof depositTo === 'string' && depositTo.startsWith('0x')) {
+                              buyerAddr = depositTo.toLowerCase();
+                              console.log(`[Sniper] 🎯 Found buyer ${buyerAddr} from AllDay.Deposit event for NFT ${targetNftId}`);
+                              break;
+                            } else {
+                              console.log(`[Sniper] ⚠️ depositTo is not a valid address: ${typeof depositTo} - ${JSON.stringify(depositTo).substring(0, 100)}`);
+                            }
+                          }
+                        } catch (e) {
+                          console.warn(`[Sniper] Error parsing Deposit event:`, e.message);
+                        }
+                      }
+                      if (buyerAddr) break;
+                    }
+                    
+                    if (!buyerAddr) {
+                      console.log(`[Sniper] ⚠️ No matching Deposit event found for NFT ${targetNftId} in block ${block.block_height}`);
+                    }
+                  } else {
+                    console.warn(`[Sniper] Deposit events fetch failed: ${depositRes.status}`);
+                  }
+                } catch (e) {
+                  console.warn(`[Sniper] Could not fetch Deposit events for buyer lookup:`, e.message);
+                }
+              }
+              
+              // Fallback: try to get from transaction - query tx result for all events
               if (!buyerAddr) {
-                // Try to get transaction ID from various locations
                 let txId = event.transaction_id || event.transactionId || 
                           block.transaction_id || block.transactions?.[0]?.id;
                 
-                // Also check if transaction info is in the block structure
-                if (!txId && block.transactions && block.transactions.length > 0) {
-                  txId = block.transactions[0].id;
-                }
-                
-                // Try to get from block by querying the block directly
-                if (!txId && block.block_height) {
+                if (txId) {
                   try {
-                    const blockRes = await fetch(`${FLOW_REST_API}/v1/blocks?height=${block.block_height}`);
-                    if (blockRes.ok) {
-                      const blockData = await blockRes.json();
-                      if (blockData?.[0]?.collection_guarantees && blockData[0].collection_guarantees.length > 0) {
-                        const collectionId = blockData[0].collection_guarantees[0].collection_id;
-                        if (collectionId) {
-                          const collectionRes = await fetch(`${FLOW_REST_API}/v1/collections/${collectionId}`);
-                          if (collectionRes.ok) {
-                            const collectionData = await collectionRes.json();
-                            if (collectionData?.transactions && collectionData.transactions.length > 0) {
-                              // Find the transaction that contains this ListingCompleted event
-                              // We'll try the first transaction (usually correct for single-event transactions)
-                              txId = collectionData.transactions[0];
+                    // Query transaction result which includes ALL events from that transaction
+                    // This is more reliable than querying by block since we get the exact tx
+                    const txResultRes = await fetch(`${FLOW_REST_API}/v1/transaction_results/${txId}`, 
+                      { signal: AbortSignal.timeout(5000) });
+                    
+                    if (txResultRes.ok) {
+                      const txResult = await txResultRes.json();
+                      
+                      // Look for AllDay.Deposit event in this transaction's events
+                      if (txResult.events && txResult.events.length > 0) {
+                        for (const txEvent of txResult.events) {
+                          if (txEvent.type && txEvent.type.includes('AllDay') && txEvent.type.includes('Deposit')) {
+                            try {
+                              let eventPayload = txEvent.payload;
+                              if (typeof eventPayload === 'string') {
+                                eventPayload = JSON.parse(Buffer.from(eventPayload, 'base64').toString());
+                              }
+                              
+                              if (eventPayload?.value?.fields) {
+                                const fields = eventPayload.value.fields;
+                                const idField = fields.find(f => f.name === 'id');
+                                const toField = fields.find(f => f.name === 'to');
+                                
+                                const eventNftId = idField?.value?.value?.toString() || idField?.value?.toString();
+                                const eventTo = toField?.value?.value?.toString() || toField?.value?.toString();
+                                
+                                if (eventNftId?.toString() === targetNftId?.toString() && eventTo) {
+                                  buyerAddr = eventTo.toLowerCase();
+                                  console.log(`[Sniper] 🎯 Found buyer ${buyerAddr} from tx_result Deposit event for NFT ${targetNftId}`);
+                                  break;
+                                }
+                              }
+                            } catch (e) {
+                              // Skip malformed events
                             }
+                          }
+                        }
+                      }
+                      
+                      // If still no buyer, try authorizer as last resort
+                      if (!buyerAddr) {
+                        const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`, 
+                          { signal: AbortSignal.timeout(5000) });
+                        if (txRes.ok) {
+                          const txData = await txRes.json();
+                          if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
+                            buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
+                            console.log(`[Sniper] 📝 Using tx authorizer as buyer: ${buyerAddr}`);
+                          } else if (txData?.payload?.payer) {
+                            buyerAddr = txData.payload.payer?.toLowerCase();
+                            console.log(`[Sniper] 📝 Using tx payer as buyer: ${buyerAddr}`);
                           }
                         }
                       }
                     }
                   } catch (e) {
-                    // Ignore block fetch errors
+                    console.warn(`[Sniper] Error fetching transaction ${txId}:`, e.message);
                   }
-                }
-                
-                if (txId) {
-                  try {
-                    // Fetch transaction to get authorizer
-                    const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`);
-                    if (txRes.ok) {
-                      const txData = await txRes.json();
-                      // The authorizer is typically the first account in the authorization list
-                      // For purchases, the payer/authorizer is the buyer
-                      if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
-                        buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
-                      } else if (txData?.payload?.payer) {
-                        buyerAddr = txData.payload.payer?.toLowerCase();
-                      } else if (txData?.payload?.proposalKey?.address) {
-                        buyerAddr = txData.payload.proposalKey.address?.toLowerCase();
-                      }
-                    }
-                  } catch (e) {
-                    console.error(`[Sniper] Error fetching transaction ${txId} for buyer:`, e.message);
-                  }
+                } else {
+                  console.log(`[Sniper] ⚠️ No transaction ID available for buyer lookup`);
                 }
               }
               
@@ -4731,21 +5655,29 @@ async function watchForListings() {
               // Buyer address is preferred but not required for exact listingResourceId matches
               // (listingResourceId is unique per listing, so if it matches, it's definitely sold)
               
-              if (buyerAddr && buyerAddr.trim() !== '' && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
-                // We have a valid buyer address
-                await markListingAsSold(targetNftId, buyerAddr);
-                console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as sold to ${buyerAddr}`);
-              } else if (listingResourceId && existingListing && existingListing.listingId === listingResourceId) {
-                // Exact listingResourceId match but no buyer - still mark as sold (listingResourceId is unique)
-                await markListingAsSold(targetNftId, null);
-                console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as sold (buyer unknown, but exact listingId match)`);
+              // Use the 'purchased' field to determine if this was a sale or delisting
+              if (wasPurchased) {
+                // This was a SALE - someone bought the listing
+                if (buyerAddr && buyerAddr.trim() !== '' && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
+                  // We have a valid buyer address
+                  await markListingAsSold(targetNftId, buyerAddr);
+                  console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD to ${buyerAddr}`);
+                } else if (listingResourceId && existingListing && existingListing.listingId === listingResourceId) {
+                  // Exact listingResourceId match but no buyer - still mark as sold (listingResourceId is unique)
+                  await markListingAsSold(targetNftId, null);
+                  console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD (buyer unknown, but exact listingId match)`);
+                } else {
+                  // No buyer and no exact listingResourceId match - skip to avoid false positive
+                  console.log(`[Sniper] ⚠️  ListingCompleted (purchased=true) for ${targetNftId} but no buyer and no exact listingId match - skipping`);
+                  continue;
+                }
+                soldCount++;
               } else {
-                // No buyer and no exact listingResourceId match - skip to avoid false positive
-                console.log(`[Sniper] ⚠️  ListingCompleted for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no buyer and no exact listingId match - skipping`);
-                continue;
+                // This was a DELISTING - seller cancelled the listing (purchased = false)
+                await markListingAsUnlisted(targetNftId, listingResourceId);
+                console.log(`[Sniper] ❌ Marked ${targetNftId} (listing ${listingResourceId}) as DELISTED (purchased=false)`);
+                unlistedCount++;
               }
-              
-              soldCount++;
               
             } catch (e) {
               // Skip malformed events
@@ -4828,6 +5760,7 @@ async function watchForListings() {
       }
       
       if (!listingRes.ok && !completedRes.ok && !removedRes.ok) {
+        console.log(`[Sniper] ⚠️ All event fetches failed - listingRes: ${listingRes.status || 'error'}, completedRes: ${completedRes.status || 'error'}, removedRes: ${removedRes.status || 'error'}`);
         lastCheckedBlock = endHeight;
         return;
       }
@@ -4926,9 +5859,9 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       return f.value;
     };
     
-    // Query for ListingCompleted events only after the listing was created
+    // Query for ListingCompleted events only after the listing was created (use V2 contract)
     const completedRes = await fetch(
-      `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingCompleted&start_height=${startHeight}&end_height=${latestHeight}`,
+      `${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
     );
     
@@ -5019,7 +5952,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
     
     // Query for ListingRemoved events only after the listing was created
     const removedRes = await fetch(
-      `${FLOW_REST_API}/v1/events?type=A.4eb8a10cb9f87357.NFTStorefront.ListingRemoved&start_height=${startHeight}&end_height=${latestHeight}`,
+      `${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingRemoved&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
     );
     
@@ -6281,8 +7214,8 @@ app.get("/api/sniper-listings", async (req, res) => {
         isLowSerial,
         listedAt: timestamp,
         
-        // Direct link to buy
-        listingUrl: `https://nflallday.com/listing/moment/${editionId}`
+        // Direct moment link for faster buying (one click to buy page)
+        listingUrl: `https://nflallday.com/moments/${nftId}`
       });
     }
     
@@ -6460,8 +7393,8 @@ app.get("/api/sniper-active-listings", async (req, res) => {
         setName: moment.set_name,
         floorPrice,
         dealPercent: dealPercent ? Math.round(dealPercent * 10) / 10 : null,
-        listingUrl: moment.edition_id 
-          ? `https://nflallday.com/listing/moment/${moment.edition_id}` : null
+        // Direct moment link for faster buying (one click to buy page)
+        listingUrl: listing.nftId ? `https://nflallday.com/moments/${listing.nftId}` : null
       };
     });
     
@@ -6586,7 +7519,7 @@ function createCacheKey(query, variables) {
   return JSON.stringify({ query, variables });
 }
 
-// Extract query name from GraphQL query string (e.g., "SearchKickoffSlates" from "query SearchKickoffSlates")
+// Extract query name from GraphQL query string (e.g., "SearchKickoffSlates" from "query searchKickoffSlates")
 // Also handles mutations (e.g., "AcceptOffer" from "mutation AcceptOffer")
 function extractQueryName(query) {
   const queryMatch = query.match(/query\s+(\w+)/);
@@ -6951,7 +7884,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
         useClientProxy: true,
         graphqlUrl: NFLAD_GRAPHQL_URL,
         query: `
-          query SearchKickoffSlates($input: SearchKickoffSlatesInput!) {
+          query searchKickoffSlates($input: SearchKickoffSlatesInput!) {
             searchKickoffSlates(input: $input) {
               edges {
                 node {
@@ -6993,7 +7926,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
     }
     
     const query = `
-      query SearchKickoffSlates($input: SearchKickoffSlatesInput!) {
+      query searchKickoffSlates($input: SearchKickoffSlatesInput!) {
         searchKickoffSlates(input: $input) {
           edges {
             node {
@@ -7034,7 +7967,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
     };
     
     try {
-      // Try GraphQL first
+      // Try GraphQL SearchKickoffSlates first
       const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
       if (data && data.searchKickoffSlates) {
         return res.json({ ok: true, ...data.searchKickoffSlates, cached: isResponseCached(query, variables) });
@@ -7043,6 +7976,75 @@ app.get("/api/kickoff/slates", async (req, res) => {
       }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error for kickoff slates:", graphqlErr.message);
+      
+      // FALLBACK: Try SearchKickoffs directly (newer endpoint that NFLAD is pushing)
+      try {
+        console.log("[API] Trying SearchKickoffs fallback...");
+        const kickoffsQuery = `
+          query searchKickoffs($input: SearchKickoffsInput!) {
+            searchKickoffs(input: $input) {
+              edges {
+                node {
+                  id
+                  name
+                  slateID
+                  difficulty
+                  status
+                  submissionDeadline
+                  gamesStartAt
+                  completedAt
+                  numParticipants
+                }
+                cursor
+              }
+              pageInfo {
+                endCursor
+                hasNextPage
+              }
+              totalCount
+            }
+          }
+        `;
+        
+        const kickoffsVars = {
+          input: {
+            first: parseInt(first, 10),
+            filters: {
+              byStatuses: ["STARTED", "NOT_STARTED", "GAMES_IN_PROGRESS"]
+            }
+          }
+        };
+        
+        const kickoffsData = await nfladGraphQLQuery(kickoffsQuery, kickoffsVars, getUserToken(req), 2, true, req);
+        
+        if (kickoffsData && kickoffsData.searchKickoffs && kickoffsData.searchKickoffs.edges) {
+          console.log(`[API] SearchKickoffs fallback success! Got ${kickoffsData.searchKickoffs.edges.length} kickoffs`);
+          
+          // Transform to match expected format (wrap in a fake slate)
+          const transformedData = {
+            edges: [{
+              node: {
+                id: "current-week",
+                name: "Current Week Kickoffs",
+                startDate: new Date().toISOString(),
+                endDate: null,
+                status: "ACTIVE",
+                kickoffs: kickoffsData.searchKickoffs.edges.map(e => e.node)
+              }
+            }],
+            totalCount: kickoffsData.searchKickoffs.totalCount
+          };
+          
+          return res.json({ 
+            ok: true, 
+            ...transformedData, 
+            source: "SearchKickoffs",
+            cached: false 
+          });
+        }
+      } catch (fallbackErr) {
+        console.error("[API] SearchKickoffs fallback also failed:", fallbackErr.message);
+      }
       
       // Check if we have cached data we can return even on error
       const cacheKey = createCacheKey(query, variables);
@@ -7114,13 +8116,79 @@ app.get("/api/kickoff/slates", async (req, res) => {
   }
 });
 
+// Get all active kickoffs directly (newer NFLAD endpoint)
+app.get("/api/kickoffs", async (req, res) => {
+  try {
+    const { first = 20, statuses } = req.query;
+    
+    // Default to active statuses
+    const statusFilter = statuses 
+      ? statuses.split(",") 
+      : ["STARTED", "NOT_STARTED", "GAMES_IN_PROGRESS"];
+    
+    const query = `
+      query searchKickoffs($input: SearchKickoffsInput!) {
+        searchKickoffs(input: $input) {
+          edges {
+            node {
+              id
+              name
+              slateID
+              difficulty
+              status
+              submissionDeadline
+              gamesStartAt
+              completedAt
+              numParticipants
+            }
+            cursor
+          }
+          pageInfo {
+            endCursor
+            hasNextPage
+          }
+          totalCount
+        }
+      }
+    `;
+    
+    const variables = {
+      input: {
+        first: parseInt(first, 10),
+        filters: {
+          byStatuses: statusFilter
+        }
+      }
+    };
+    
+    const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
+    
+    if (data && data.searchKickoffs) {
+      const kickoffs = data.searchKickoffs.edges.map(e => e.node);
+      console.log(`[API] SearchKickoffs returned ${kickoffs.length} kickoffs`);
+      
+      return res.json({ 
+        ok: true, 
+        kickoffs,
+        totalCount: data.searchKickoffs.totalCount,
+        cached: isResponseCached(query, variables)
+      });
+    }
+    
+    throw new Error('No data returned from SearchKickoffs');
+  } catch (err) {
+    console.error("[API] Error fetching kickoffs:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Get specific kickoff details
 app.get("/api/kickoff/:kickoffId", async (req, res) => {
   try {
     const { kickoffId } = req.params;
     
     const query = `
-      query SearchKickoffs($input: SearchKickoffsInput!) {
+      query searchKickoffs($input: SearchKickoffsInput!) {
         searchKickoffs(input: $input) {
           edges {
             node {
@@ -7228,7 +8296,7 @@ app.get("/api/kickoff/:kickoffId/submissions", async (req, res) => {
     }
     
     const query = `
-      query SearchKickoffSubmissions($input: SearchKickoffSubmissionsInput!) {
+      query searchKickoffSubmissions($input: SearchKickoffSubmissionsInput!) {
         searchKickoffSubmissions(input: $input) {
           edges {
             node {
@@ -7290,7 +8358,7 @@ app.get("/api/kickoff/:kickoffId/games", async (req, res) => {
     const { after = "", first = 50 } = req.query;
     
     const query = `
-      query SearchKickoffGames($input: SearchKickoffGamesInput!) {
+      query searchKickoffGames($input: SearchKickoffGamesInput!) {
         searchKickoffGames(input: $input) {
           edges {
             node {
@@ -7369,8 +8437,249 @@ app.get("/api/kickoff/:kickoffId/player-prices", async (req, res) => {
 // ============================================================
 
 app.get("/api/challenges", async (req, res) => {
-  // Placeholder - needs GraphQL query implementation
-  res.json({ ok: true, challenges: [] });
+  try {
+    const { first = 20, statuses } = req.query;
+    
+    // Use searchChallenges query (per dev recommendation)
+    const query = `
+      query searchChallenges($input: SearchChallengesInput!) {
+        searchChallenges(input: $input) {
+          edges {
+            node {
+              id
+              name
+              description
+              status
+              startDate
+              endDate
+              reward {
+                id
+                name
+                description
+                type
+              }
+              requirements {
+                id
+                description
+                type
+                count
+                tiers
+                setIDs
+                playerIDs
+                teamIDs
+              }
+              submissions {
+                totalCount
+              }
+            }
+            cursor
+          }
+          pageInfo {
+            endCursor
+            hasNextPage
+          }
+          totalCount
+        }
+      }
+    `;
+    
+    const statusFilter = statuses 
+      ? statuses.split(",") 
+      : ["ACTIVE", "UPCOMING", "COMPLETED"];
+    
+    const variables = {
+      input: {
+        first: parseInt(first, 10),
+        filters: {
+          byStatuses: statusFilter
+        }
+      }
+    };
+    
+    const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
+    
+    if (data && data.searchChallenges) {
+      const challenges = data.searchChallenges.edges.map(e => ({
+        ...e.node,
+        progress: 0, // User-specific progress would need auth
+        requirements: (e.node.requirements || []).map(r => ({
+          ...r,
+          met: false // User-specific would need auth
+        }))
+      }));
+      
+      console.log(`[API] searchChallenges returned ${challenges.length} challenges`);
+      
+      return res.json({ 
+        ok: true, 
+        challenges,
+        totalCount: data.searchChallenges.totalCount,
+        cached: isResponseCached(query, variables)
+      });
+    }
+    
+    throw new Error('No data returned from searchChallenges');
+  } catch (err) {
+    console.error("[API] Error fetching challenges:", err.message);
+    
+    // Check for auth errors
+    if (err.message.includes('403') || err.message.includes('401') || err.message.includes('Unauthorized')) {
+      return res.status(401).json({ 
+        ok: false, 
+        error: "Authentication may be required",
+        requiresAuth: true,
+        details: err.message
+      });
+    }
+    
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================================
+// TRADE-IN LEADERBOARDS API
+// ============================================================
+
+// Get all published trade-in leaderboards
+app.get("/api/tradeins", async (req, res) => {
+  try {
+    const query = `
+      query GetPublishedLeaderboards {
+        getPublishedLeaderboards {
+          id
+          slug
+          name
+          description
+          startDate
+          endDate
+          status
+          totalEntries
+          reward {
+            id
+            name
+            description
+          }
+        }
+      }
+    `;
+    
+    const data = await nfladGraphQLQuery(query, {}, getUserToken(req), 3, true, req);
+    
+    if (data && data.getPublishedLeaderboards) {
+      const leaderboards = data.getPublishedLeaderboards;
+      console.log(`[API] getPublishedLeaderboards returned ${leaderboards.length} trade-in leaderboards`);
+      
+      return res.json({ 
+        ok: true, 
+        leaderboards,
+        cached: isResponseCached(query, {})
+      });
+    }
+    
+    throw new Error('No data returned from getPublishedLeaderboards');
+  } catch (err) {
+    console.error("[API] Error fetching trade-in leaderboards:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Get specific trade-in leaderboard entries
+app.get("/api/tradeins/:idOrSlug", async (req, res) => {
+  try {
+    const { idOrSlug } = req.params;
+    const { first = 50, after } = req.query;
+    
+    const query = `
+      query GetLeaderboard($input: GetLeaderboardInput!) {
+        getLeaderboard(input: $input) {
+          id
+          slug
+          name
+          description
+          startDate
+          endDate
+          status
+          totalEntries
+          reward {
+            id
+            name
+            description
+          }
+          entries(first: $first, after: $after) {
+            edges {
+              node {
+                id
+                rank
+                score
+                user {
+                  id
+                  displayName
+                  username
+                }
+                submittedAt
+                moments {
+                  id
+                  flowID
+                  serialNumber
+                  player {
+                    id
+                    fullName
+                  }
+                  tier
+                  set {
+                    id
+                    name
+                  }
+                }
+              }
+              cursor
+            }
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
+            totalCount
+          }
+        }
+      }
+    `;
+    
+    // Try by slug first, then by ID
+    const variables = {
+      input: {
+        slug: idOrSlug
+      },
+      first: parseInt(first, 10),
+      after: after || null
+    };
+    
+    let data;
+    try {
+      data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
+    } catch (slugErr) {
+      // Try by ID if slug fails
+      variables.input = { id: idOrSlug };
+      data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
+    }
+    
+    if (data && data.getLeaderboard) {
+      const leaderboard = data.getLeaderboard;
+      console.log(`[API] getLeaderboard returned leaderboard: ${leaderboard.name}`);
+      
+      return res.json({ 
+        ok: true, 
+        leaderboard,
+        entries: leaderboard.entries?.edges?.map(e => e.node) || [],
+        totalEntries: leaderboard.entries?.totalCount || 0,
+        cached: isResponseCached(query, variables)
+      });
+    }
+    
+    throw new Error('No data returned from getLeaderboard');
+  } catch (err) {
+    console.error("[API] Error fetching trade-in leaderboard:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ============================================================
@@ -7779,6 +9088,694 @@ app.post("/api/offers/:offerId/cancel", async (req, res) => {
   } catch (err) {
     console.error("[API] Error canceling offer:", err.message);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ============================================================
+// NEW ANALYTICS ENDPOINTS
+// ============================================================
+
+// Get filter options for dropdowns (teams, sets, series)
+app.get("/api/filter-options", async (req, res) => {
+  try {
+    const type = (req.query.type || "").toString().toLowerCase();
+    
+    let query = "";
+    if (type === "teams") {
+      query = `SELECT DISTINCT team_name as option FROM nft_core_metadata WHERE team_name IS NOT NULL AND team_name != '' ORDER BY team_name`;
+    } else if (type === "sets") {
+      query = `SELECT DISTINCT set_name as option FROM nft_core_metadata WHERE set_name IS NOT NULL AND set_name != '' ORDER BY set_name`;
+    } else if (type === "series") {
+      query = `SELECT DISTINCT series_name as option FROM nft_core_metadata WHERE series_name IS NOT NULL AND series_name != '' ORDER BY series_name`;
+    } else {
+      return res.status(400).json({ ok: false, error: "Invalid type. Use: teams, sets, or series" });
+    }
+    
+    const result = await pgQuery(query);
+    return res.json({
+      ok: true,
+      options: result.rows.map(r => r.option)
+    });
+  } catch (err) {
+    console.error("Error in /api/filter-options:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Advanced NFT search with multiple filters
+app.get("/api/search-nfts-advanced", async (req, res) => {
+  try {
+    const player = (req.query.player || "").toString().trim();
+    const team = (req.query.team || "").toString().trim();
+    const tier = (req.query.tier || "").toString().trim().toUpperCase();
+    const set = (req.query.set || "").toString().trim();
+    const series = (req.query.series || "").toString().trim();
+    const serial = parseInt(req.query.serial) || null;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    
+    const conditions = [];
+    const params = [];
+    let paramIndex = 1;
+    
+    if (player) {
+      conditions.push(`CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')) ILIKE $${paramIndex}`);
+      params.push(`%${player}%`);
+      paramIndex++;
+    }
+    
+    if (team) {
+      conditions.push(`m.team_name = $${paramIndex}`);
+      params.push(team);
+      paramIndex++;
+    }
+    
+    if (tier) {
+      conditions.push(`UPPER(m.tier) = $${paramIndex}`);
+      params.push(tier);
+      paramIndex++;
+    }
+    
+    if (set) {
+      conditions.push(`m.set_name = $${paramIndex}`);
+      params.push(set);
+      paramIndex++;
+    }
+    
+    if (series) {
+      conditions.push(`m.series_name = $${paramIndex}`);
+      params.push(series);
+      paramIndex++;
+    }
+    
+    if (serial) {
+      conditions.push(`m.serial_number = $${paramIndex}`);
+      params.push(serial);
+      paramIndex++;
+    }
+    
+    if (conditions.length === 0) {
+      return res.status(400).json({ ok: false, error: "At least one filter is required" });
+    }
+    
+    const whereClause = conditions.join(' AND ');
+    params.push(limit);
+    
+    const result = await pgQuery(
+      `SELECT 
+        m.nft_id, m.edition_id, m.first_name, m.last_name, m.team_name,
+        m.set_name, m.series_name, m.tier, m.serial_number, m.max_mint_size,
+        m.jersey_number,
+        h.wallet_address, p.display_name as owner_name
+      FROM nft_core_metadata m
+      LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      WHERE ${whereClause}
+      ORDER BY 
+        CASE m.tier 
+          WHEN 'ULTIMATE' THEN 1 
+          WHEN 'LEGENDARY' THEN 2 
+          WHEN 'RARE' THEN 3 
+          WHEN 'UNCOMMON' THEN 4 
+          ELSE 5 
+        END,
+        m.serial_number ASC
+      LIMIT $${paramIndex}`,
+      params
+    );
+    
+    return res.json({
+      ok: true,
+      count: result.rowCount,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/search-nfts-advanced:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Search NFTs by player name, team, set, series, etc.
+app.get("/api/search-nfts", async (req, res) => {
+  try {
+    const q = (req.query.q || "").toString().trim();
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    
+    if (!q || q.length < 2) {
+      return res.status(400).json({ ok: false, error: "Search query too short (min 2 chars)" });
+    }
+    
+    const pattern = `%${q}%`;
+    
+    // Search by player name, team, set name, or series
+    const result = await pgQuery(
+      `SELECT 
+        m.nft_id, m.edition_id, m.first_name, m.last_name, m.team_name,
+        m.set_name, m.series_name, m.tier, m.serial_number, m.max_mint_size,
+        m.jersey_number,
+        h.wallet_address, p.display_name as owner_name
+      FROM nft_core_metadata m
+      LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      WHERE 
+        CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')) ILIKE $1
+        OR m.team_name ILIKE $1
+        OR m.set_name ILIKE $1
+        OR m.series_name ILIKE $1
+        OR m.nft_id::text = $2
+        OR m.edition_id::text = $2
+      ORDER BY 
+        CASE m.tier 
+          WHEN 'ULTIMATE' THEN 1 
+          WHEN 'LEGENDARY' THEN 2 
+          WHEN 'RARE' THEN 3 
+          WHEN 'UNCOMMON' THEN 4 
+          ELSE 5 
+        END,
+        m.serial_number ASC
+      LIMIT $3`,
+      [pattern, q, limit]
+    );
+    
+    return res.json({
+      ok: true,
+      count: result.rowCount,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/search-nfts:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Set Completion - track set completion progress
+// Cache for set totals (refreshed every 10 minutes)
+let setTotalsCache = null;
+let setTotalsCacheTime = 0;
+const SET_TOTALS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+async function getSetTotals() {
+  const now = Date.now();
+  if (setTotalsCache && (now - setTotalsCacheTime) < SET_TOTALS_CACHE_TTL) {
+    return setTotalsCache;
+  }
+  
+  console.log("[Set Completion] Refreshing set totals cache...");
+  const result = await pgQuery(`
+    SELECT set_name, COUNT(DISTINCT edition_id) as total_editions
+    FROM nft_core_metadata
+    WHERE set_name IS NOT NULL
+    GROUP BY set_name
+  `);
+  
+  setTotalsCache = new Map(result.rows.map(r => [r.set_name, parseInt(r.total_editions)]));
+  setTotalsCacheTime = now;
+  console.log(`[Set Completion] Cached ${setTotalsCache.size} set totals`);
+  return setTotalsCache;
+}
+
+app.get("/api/set-completion", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    if (!wallet) return res.status(400).json({ ok: false, error: "Missing ?wallet=" });
+    
+    const startTime = Date.now();
+    
+    // Get cached set totals (fast - from memory)
+    const setTotals = await getSetTotals();
+    
+    // Query only what the user owns (much faster - single pass)
+    const result = await pgQuery(`
+      SELECT 
+        m.set_name,
+        COUNT(DISTINCT m.edition_id) as owned_editions,
+        COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'COMMON' THEN m.edition_id END) as common,
+        COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'UNCOMMON' THEN m.edition_id END) as uncommon,
+        COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'RARE' THEN m.edition_id END) as rare,
+        COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'LEGENDARY' THEN m.edition_id END) as legendary,
+        COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'ULTIMATE' THEN m.edition_id END) as ultimate
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1 AND m.set_name IS NOT NULL
+      GROUP BY m.set_name
+      ORDER BY m.set_name`,
+      [wallet]
+    );
+    
+    // Merge with cached totals
+    const sets = result.rows.map(r => {
+      const total = setTotals.get(r.set_name) || 0;
+      const owned = parseInt(r.owned_editions);
+      return {
+        set_name: r.set_name,
+        total,
+        owned,
+        completion: total > 0 ? Math.round(owned * 1000 / total) / 10 : 0,
+        by_tier: {
+          Common: parseInt(r.common) || 0,
+          Uncommon: parseInt(r.uncommon) || 0,
+          Rare: parseInt(r.rare) || 0,
+          Legendary: parseInt(r.legendary) || 0,
+          Ultimate: parseInt(r.ultimate) || 0
+        }
+      };
+    }).sort((a, b) => b.completion - a.completion || a.set_name.localeCompare(b.set_name));
+    
+    const summary = {
+      total_sets: sets.length,
+      completed_sets: sets.filter(s => s.completion === 100).length,
+      in_progress: sets.filter(s => s.completion > 0 && s.completion < 100).length,
+      avg_completion: sets.length > 0 ? sets.reduce((a, b) => a + b.completion, 0) / sets.length : 0
+    };
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`[Set Completion] Query for ${wallet.substring(0, 10)}... completed in ${elapsed}ms (${sets.length} sets)`);
+    
+    return res.json({ ok: true, summary, sets });
+  } catch (err) {
+    console.error("Error in /api/set-completion:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Serial Finder - find NFTs with specific serial numbers
+app.get("/api/serial-finder", async (req, res) => {
+  try {
+    const serial = parseInt(req.query.serial);
+    const tierParam = (req.query.tier || "").trim();
+    const player = (req.query.player || "").trim();
+    const team = (req.query.team || "").trim();
+    const seriesParam = (req.query.series || "").trim();
+    const setParam = (req.query.set || "").trim();
+    const positionParam = (req.query.position || "").trim();
+    
+    // Parse comma-separated values for multi-select filters
+    const tiers = tierParam ? tierParam.split(',').map(t => t.trim().toUpperCase()).filter(Boolean) : [];
+    const seriesList = seriesParam ? seriesParam.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const sets = setParam ? setParam.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const positions = positionParam ? positionParam.split(',').map(p => p.trim().toUpperCase()).filter(Boolean) : [];
+    
+    if (!serial || serial < 1) return res.status(400).json({ ok: false, error: "Missing ?serial=" });
+    
+    let query = `
+      SELECT 
+        h.wallet_address, h.is_locked,
+        m.nft_id, m.first_name, m.last_name, m.team_name, m.tier, m.set_name,
+        m.serial_number, m.jersey_number, m.series_name, m.position,
+        p.display_name
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      WHERE m.serial_number = $1
+    `;
+    const params = [serial];
+    let paramIndex = 2;
+    
+    // Tier filter (multi-select with IN clause)
+    if (tiers.length > 0) {
+      const placeholders = tiers.map((_, i) => `$${paramIndex + i}`).join(', ');
+      query += ` AND UPPER(m.tier) IN (${placeholders})`;
+      params.push(...tiers);
+      paramIndex += tiers.length;
+    }
+    
+    if (player) {
+      query += ` AND TRIM(COALESCE(m.first_name, '') || ' ' || COALESCE(m.last_name, '')) ILIKE $${paramIndex}`;
+      params.push(player);
+      paramIndex++;
+    }
+    
+    if (team) {
+      query += ` AND m.team_name ILIKE $${paramIndex}`;
+      params.push(`%${team}%`);
+      paramIndex++;
+    }
+    
+    // Series filter (multi-select)
+    if (seriesList.length > 0) {
+      const conditions = seriesList.map((_, i) => `m.series_name ILIKE $${paramIndex + i}`).join(' OR ');
+      query += ` AND (${conditions})`;
+      seriesList.forEach(s => params.push(`%${s}%`));
+      paramIndex += seriesList.length;
+    }
+    
+    // Set filter (multi-select)
+    if (sets.length > 0) {
+      const conditions = sets.map((_, i) => `m.set_name ILIKE $${paramIndex + i}`).join(' OR ');
+      query += ` AND (${conditions})`;
+      sets.forEach(s => params.push(`%${s}%`));
+      paramIndex += sets.length;
+    }
+    
+    // Position filter (multi-select with IN clause)
+    if (positions.length > 0) {
+      const placeholders = positions.map((_, i) => `$${paramIndex + i}`).join(', ');
+      query += ` AND UPPER(m.position) IN (${placeholders})`;
+      params.push(...positions);
+      paramIndex += positions.length;
+    }
+    
+    query += ` ORDER BY m.tier DESC, m.last_name LIMIT 500`;
+    
+    const result = await pgQuery(query, params);
+    
+    const uniqueOwners = new Set(result.rows.map(r => r.wallet_address)).size;
+    const jerseyMatches = result.rows.filter(r => r.serial_number == r.jersey_number).length;
+    
+    return res.json({
+      ok: true,
+      serial,
+      count: result.rowCount,
+      unique_owners: uniqueOwners,
+      jersey_matches: jerseyMatches,
+      rows: result.rows
+    });
+  } catch (err) {
+    console.error("Error in /api/serial-finder:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Wallet Comparison - compare two wallets
+app.get("/api/wallet-compare", async (req, res) => {
+  try {
+    const w1 = (req.query.wallet1 || "").toString().trim().toLowerCase();
+    const w2 = (req.query.wallet2 || "").toString().trim().toLowerCase();
+    
+    if (!w1 || !w2) return res.status(400).json({ ok: false, error: "Missing wallet1 or wallet2" });
+    
+    const statsQuery = `
+      SELECT 
+        h.wallet_address,
+        p.display_name,
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE h.is_locked)::int as locked,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int as common,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int as uncommon,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int as rare,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int as legendary,
+        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int as ultimate,
+        COALESCE(SUM(eps.lowest_ask_usd), 0)::numeric as floor_value
+      FROM wallet_holdings h
+      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id
+      WHERE h.wallet_address = $1
+      GROUP BY h.wallet_address, p.display_name
+    `;
+    
+    const [r1, r2] = await Promise.all([
+      pgQuery(statsQuery, [w1]),
+      pgQuery(statsQuery, [w2])
+    ]);
+    
+    const s1 = r1.rows[0] || { total: 0, locked: 0, common: 0, uncommon: 0, rare: 0, legendary: 0, ultimate: 0, floor_value: 0 };
+    const s2 = r2.rows[0] || { total: 0, locked: 0, common: 0, uncommon: 0, rare: 0, legendary: 0, ultimate: 0, floor_value: 0 };
+    
+    // Shared editions
+    const sharedResult = await pgQuery(
+      `SELECT COUNT(DISTINCT m1.edition_id)::int as shared_editions,
+              COUNT(DISTINCT CONCAT(m1.first_name, m1.last_name))::int as shared_players
+       FROM wallet_holdings h1
+       JOIN nft_core_metadata m1 ON m1.nft_id = h1.nft_id
+       WHERE h1.wallet_address = $1
+         AND m1.edition_id IN (
+           SELECT m2.edition_id FROM wallet_holdings h2
+           JOIN nft_core_metadata m2 ON m2.nft_id = h2.nft_id
+           WHERE h2.wallet_address = $2
+         )`,
+      [w1, w2]
+    );
+    
+    return res.json({
+      ok: true,
+      wallet1: { address: w1, display_name: s1.display_name, ...s1 },
+      wallet2: { address: w2, display_name: s2.display_name, ...s2 },
+      shared: sharedResult.rows[0] || { shared_editions: 0, shared_players: 0 }
+    });
+  } catch (err) {
+    console.error("Error in /api/wallet-compare:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Rarity Score Leaderboard - cached for performance
+let rarityLeaderboardCache = null;
+let rarityLeaderboardCacheTime = 0;
+const RARITY_LEADERBOARD_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function computeRarityScore(walletAddress) {
+  const result = await pgQuery(
+    `SELECT 
+      h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
+      m.first_name, m.last_name, m.edition_id
+    FROM wallet_holdings h
+    JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+    WHERE h.wallet_address = $1`,
+    [walletAddress]
+  );
+  
+  const rows = result.rows;
+  let score = 0;
+  let serial1Count = 0, serial10Count = 0, jerseyMatchCount = 0;
+  let ultimateCount = 0, legendaryCount = 0, rareCount = 0;
+  
+  for (const r of rows) {
+    let pts = 0;
+    const serial = parseInt(r.serial_number) || 9999;
+    const tier = (r.tier || '').toUpperCase();
+    
+    // Serial scoring
+    if (serial === 1) { serial1Count++; pts += 1000; }
+    else if (serial <= 10) { serial10Count++; pts += 200; }
+    else if (serial <= 100) pts += 20;
+    
+    // Jersey match
+    if (r.jersey_number && serial == r.jersey_number) {
+      jerseyMatchCount++; pts += 300;
+    }
+    
+    // Tier scoring
+    if (tier === 'ULTIMATE') { ultimateCount++; pts += 500; }
+    else if (tier === 'LEGENDARY') { legendaryCount++; pts += 200; }
+    else if (tier === 'RARE') { rareCount++; pts += 50; }
+    
+    score += pts;
+  }
+  
+  const uniqueEditions = new Set(rows.map(r => r.edition_id)).size;
+  score += uniqueEditions * 2 + rows.length;
+  
+  return {
+    wallet: walletAddress,
+    score: Math.round(score),
+    moments: rows.length,
+    serial1Count,
+    ultimateCount,
+    legendaryCount
+  };
+}
+
+// Known contract/holding addresses to exclude from leaderboard
+const EXCLUDED_LEADERBOARD_WALLETS = [
+  '0xe4cf4bdc1751c65d', // NFL All Day contract
+  '0xb6f2481eba4df97b', // Huge custodial/system wallet  
+  '0x4eb8a10cb9f87357', // NFT Storefront contract
+  '0xf919ee77447b7497', // Dapper wallet / marketplace
+  '0x4eded0de73c5b00c', // Another system wallet
+  '0x0b2a3299cc857e29', // Pack distribution
+];
+
+app.get("/api/rarity-leaderboard", async (req, res) => {
+  try {
+    const now = Date.now();
+    const forceRefresh = req.query.refresh === 'true';
+    
+    // Return cached if available and not expired
+    if (!forceRefresh && rarityLeaderboardCache && (now - rarityLeaderboardCacheTime) < RARITY_LEADERBOARD_CACHE_TTL) {
+      return res.json({ 
+        ok: true, 
+        leaderboard: rarityLeaderboardCache,
+        cached: true,
+        cache_age_minutes: Math.round((now - rarityLeaderboardCacheTime) / 60000)
+      });
+    }
+    
+    console.log("[Rarity Leaderboard] Computing leaderboard (this may take a moment)...");
+    const startTime = Date.now();
+    
+    // Get all wallets with significant holdings (at least 10 moments for leaderboard)
+    // Exclude known contract/holding addresses
+    const walletsResult = await pgQuery(`
+      SELECT wallet_address, COUNT(*) as moment_count
+      FROM wallet_holdings
+      WHERE wallet_address NOT IN (${EXCLUDED_LEADERBOARD_WALLETS.map((_, i) => `$${i + 1}`).join(', ')})
+      GROUP BY wallet_address
+      HAVING COUNT(*) >= 10
+      ORDER BY COUNT(*) DESC
+      LIMIT 500
+    `, EXCLUDED_LEADERBOARD_WALLETS);
+    
+    // Compute scores for top wallets (batch for efficiency)
+    const leaderboard = [];
+    
+    // Process in parallel batches of 20
+    const batchSize = 20;
+    for (let i = 0; i < walletsResult.rows.length; i += batchSize) {
+      const batch = walletsResult.rows.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(w => computeRarityScore(w.wallet_address).catch(() => null))
+      );
+      leaderboard.push(...batchResults.filter(r => r !== null));
+    }
+    
+    // Sort by score and take top 100
+    leaderboard.sort((a, b) => b.score - a.score);
+    const top100 = leaderboard.slice(0, 100);
+    
+    // Add rank and get display names from wallet_profiles
+    const walletAddresses = top100.map(e => e.wallet);
+    let displayNames = {};
+    
+    try {
+      // Try wallet_profiles first (primary source for display names)
+      const namesResult = await pgQuery(`
+        SELECT wallet_address, display_name 
+        FROM wallet_profiles 
+        WHERE wallet_address = ANY($1) AND display_name IS NOT NULL AND display_name != ''
+      `, [walletAddresses]);
+      displayNames = Object.fromEntries(namesResult.rows.map(r => [r.wallet_address, r.display_name]));
+      
+      // Fall back to wallet_holdings for any missing names
+      const missingWallets = walletAddresses.filter(w => !displayNames[w]);
+      if (missingWallets.length > 0) {
+        const holdingsNames = await pgQuery(`
+          SELECT DISTINCT ON (wallet_address) wallet_address, display_name 
+          FROM wallet_holdings 
+          WHERE wallet_address = ANY($1) AND display_name IS NOT NULL AND display_name != ''
+        `, [missingWallets]);
+        for (const r of holdingsNames.rows) {
+          if (!displayNames[r.wallet_address]) {
+            displayNames[r.wallet_address] = r.display_name;
+          }
+        }
+      }
+    } catch (e) { 
+      console.log("[Rarity Leaderboard] Could not fetch display names:", e.message);
+    }
+    
+    const rankedLeaderboard = top100.map((entry, idx) => ({
+      rank: idx + 1,
+      ...entry,
+      displayName: displayNames[entry.wallet] || null
+    }));
+    
+    // Cache the result
+    rarityLeaderboardCache = rankedLeaderboard;
+    rarityLeaderboardCacheTime = now;
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`[Rarity Leaderboard] Computed ${rankedLeaderboard.length} entries in ${elapsed}ms`);
+    
+    return res.json({ 
+      ok: true, 
+      leaderboard: rankedLeaderboard,
+      cached: false,
+      computed_in_ms: elapsed
+    });
+  } catch (err) {
+    console.error("Error in /api/rarity-leaderboard:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Rarity Score Calculator
+app.get("/api/rarity-score", async (req, res) => {
+  try {
+    const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
+    if (!wallet) return res.status(400).json({ ok: false, error: "Missing ?wallet=" });
+    
+    const result = await pgQuery(
+      `SELECT 
+        h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
+        m.first_name, m.last_name
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1`,
+      [wallet]
+    );
+    
+    const rows = result.rows;
+    let score = 0;
+    const breakdown = {
+      serial_1_count: 0, serial_1_points: 0,
+      serial_10_count: 0, serial_10_points: 0,
+      jersey_match_count: 0, jersey_match_points: 0,
+      ultimate_count: 0, ultimate_points: 0,
+      legendary_count: 0, legendary_points: 0,
+      rare_count: 0, rare_points: 0,
+      total_moments: rows.length,
+      collection_points: rows.length,
+      unique_editions: new Set(rows.map(r => r.edition_id)).size,
+      edition_points: 0,
+      low_serial_pct: 0
+    };
+    
+    const topMoments = [];
+    
+    for (const r of rows) {
+      let pts = 0;
+      const serial = parseInt(r.serial_number) || 9999;
+      const tier = (r.tier || '').toUpperCase();
+      
+      // Serial scoring
+      if (serial === 1) { breakdown.serial_1_count++; pts += 1000; breakdown.serial_1_points += 1000; }
+      else if (serial <= 10) { breakdown.serial_10_count++; pts += 200; breakdown.serial_10_points += 200; }
+      else if (serial <= 100) pts += 20;
+      
+      // Jersey match
+      if (r.jersey_number && serial == r.jersey_number) {
+        breakdown.jersey_match_count++; pts += 300; breakdown.jersey_match_points += 300;
+      }
+      
+      // Tier scoring
+      if (tier === 'ULTIMATE') { breakdown.ultimate_count++; pts += 500; breakdown.ultimate_points += 500; }
+      else if (tier === 'LEGENDARY') { breakdown.legendary_count++; pts += 200; breakdown.legendary_points += 200; }
+      else if (tier === 'RARE') { breakdown.rare_count++; pts += 50; breakdown.rare_points += 50; }
+      
+      score += pts;
+      if (pts >= 100) topMoments.push({ ...r, points: pts });
+    }
+    
+    breakdown.edition_points = breakdown.unique_editions * 2;
+    score += breakdown.edition_points + breakdown.collection_points;
+    
+    const lowSerialCount = rows.filter(r => (parseInt(r.serial_number) || 9999) <= 100).length;
+    breakdown.low_serial_pct = rows.length > 0 ? Math.round(lowSerialCount / rows.length * 100) : 0;
+    
+    topMoments.sort((a, b) => b.points - a.points);
+    
+    // Find rank from cached leaderboard
+    let rank = null;
+    let totalWallets = null;
+    if (rarityLeaderboardCache) {
+      const entry = rarityLeaderboardCache.find(e => e.wallet === wallet);
+      if (entry) {
+        rank = entry.rank;
+      }
+      totalWallets = rarityLeaderboardCache.length;
+    }
+    
+    return res.json({
+      ok: true,
+      score: Math.round(score),
+      rank,
+      total_wallets: totalWallets,
+      breakdown,
+      top_moments: topMoments.slice(0, 10)
+    });
+  } catch (err) {
+    console.error("Error in /api/rarity-score:", err);
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
