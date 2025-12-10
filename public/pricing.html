@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing - NFL All Day Wallet Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="header.css" />
+  <style>
+    .pricing-container {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .pricing-header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .pricing-header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #facc15, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pricing-header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .pricing-card {
+      background: rgba(15, 15, 30, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 2rem;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(111, 66, 193, 0.5);
+    }
+
+    .pricing-card.popular {
+      border-color: var(--accent-purple);
+      background: linear-gradient(135deg, rgba(111, 66, 193, 0.1), rgba(59, 130, 246, 0.1));
+    }
+
+    .popular-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      color: white;
+      padding: 0.3rem 1rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .plan-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .plan-price {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .plan-price span {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    .plan-savings {
+      color: #22c55e;
+      font-size: 0.85rem;
+      margin-bottom: 1.5rem;
+      min-height: 1.2rem;
+    }
+
+    .plan-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem 0;
+    }
+
+    .plan-features li {
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .plan-features li::before {
+      content: '✓';
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .plan-btn {
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      border-radius: 8px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .plan-btn.primary {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      color: white;
+    }
+
+    .plan-btn.primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .plan-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .free-features {
+      background: rgba(15, 15, 30, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .free-features h3 {
+      margin-bottom: 1rem;
+      color: var(--text-muted);
+    }
+
+    .free-features ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.5rem;
+    }
+
+    .free-features li {
+      padding: 0.35rem 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .free-features li::before {
+      content: '•';
+      margin-right: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    .already-subscribed {
+      text-align: center;
+      padding: 3rem;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 16px;
+      margin-bottom: 2rem;
+    }
+
+    .already-subscribed h2 {
+      color: #22c55e;
+      margin-bottom: 0.5rem;
+    }
+
+    .manage-btn {
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: transparent;
+      border: 1px solid #22c55e;
+      color: #22c55e;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .manage-btn:hover {
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .login-prompt {
+      text-align: center;
+      padding: 1.5rem;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .login-prompt a {
+      color: #fbbf24;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-header"></div>
+  
+  <main class="pricing-container">
+    <div class="pricing-header">
+      <h1>🏈 Unlock Full Access</h1>
+      <p>Get unlimited access to all tools and features</p>
+    </div>
+
+    <div id="login-prompt" class="login-prompt" style="display: none;">
+      <p>📝 <a href="/login.html">Log in</a> or <a href="/login.html">create an account</a> to subscribe</p>
+    </div>
+
+    <div id="already-subscribed" class="already-subscribed" style="display: none;">
+      <h2>✅ You're Subscribed!</h2>
+      <p>Thank you for supporting NFL All Day Wallet Viewer</p>
+      <button class="manage-btn" onclick="openBillingPortal()">Manage Subscription</button>
+    </div>
+
+    <div id="pricing-plans" class="pricing-grid">
+      <div class="pricing-card">
+        <div class="plan-name">Monthly</div>
+        <div class="plan-price">$5.99<span>/month</span></div>
+        <div class="plan-savings">&nbsp;</div>
+        <ul class="plan-features">
+          <li>Full wallet analysis</li>
+          <li>Unlimited sorting & filtering</li>
+          <li>Complete sniper access</li>
+          <li>Trade analyzer</li>
+          <li>Historical value charts</li>
+          <li>All premium tools</li>
+        </ul>
+        <button class="plan-btn primary" onclick="subscribe('monthly')">Subscribe Monthly</button>
+      </div>
+
+      <div class="pricing-card popular">
+        <div class="popular-badge">Best Value</div>
+        <div class="plan-name">Annual</div>
+        <div class="plan-price">$60<span>/year</span></div>
+        <div class="plan-savings">Save $11.88/year!</div>
+        <ul class="plan-features">
+          <li>Everything in Monthly</li>
+          <li>2 months FREE</li>
+          <li>Priority support</li>
+          <li>Early access to new features</li>
+          <li>Lock in current pricing</li>
+          <li>Best value for collectors</li>
+        </ul>
+        <button class="plan-btn primary" onclick="subscribe('annual')">Subscribe Annually</button>
+      </div>
+    </div>
+
+    <div class="free-features">
+      <h3>🆓 Free Features (No Account Required)</h3>
+      <ul>
+        <li>View top 10 wallet holdings</li>
+        <li>Basic wallet overview</li>
+        <li>1 sniper listing preview</li>
+        <li>Public leaderboards</li>
+      </ul>
+    </div>
+  </main>
+
+  <script src="/layout.js"></script>
+  <script>
+    let isLoggedIn = false;
+    let isSubscribed = false;
+
+    async function checkStatus() {
+      try {
+        // Check login status
+        const meRes = await fetch('/api/me', { credentials: 'include' });
+        const meData = await meRes.json();
+        isLoggedIn = meData.ok && meData.user;
+
+        // Check subscription status
+        const subRes = await fetch('/api/subscription', { credentials: 'include' });
+        const subData = await subRes.json();
+        isSubscribed = subData.subscribed;
+
+        // Update UI
+        if (!isLoggedIn) {
+          document.getElementById('login-prompt').style.display = 'block';
+          document.querySelectorAll('.plan-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.textContent = 'Login Required';
+          });
+        } else if (isSubscribed) {
+          document.getElementById('already-subscribed').style.display = 'block';
+          document.getElementById('pricing-plans').style.opacity = '0.5';
+          document.querySelectorAll('.plan-btn').forEach(btn => {
+            btn.disabled = true;
+            btn.textContent = 'Already Subscribed';
+          });
+        }
+      } catch (err) {
+        console.error('Error checking status:', err);
+      }
+    }
+
+    async function subscribe(plan) {
+      if (!isLoggedIn) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/subscription/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ plan })
+        });
+
+        const data = await res.json();
+
+        if (data.ok && data.url) {
+          window.location.href = data.url;
+        } else {
+          alert(data.error || 'Failed to start checkout');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
+        alert('Failed to start checkout. Please try again.');
+      }
+    }
+
+    async function openBillingPortal() {
+      try {
+        const res = await fetch('/api/subscription/portal', {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        const data = await res.json();
+
+        if (data.ok && data.url) {
+          window.location.href = data.url;
+        } else {
+          alert(data.error || 'Failed to open billing portal');
+        }
+      } catch (err) {
+        console.error('Portal error:', err);
+        alert('Failed to open billing portal. Please try again.');
+      }
+    }
+
+    // Check for success return from Stripe
+    async function handleStripeReturn() {
+      const params = new URLSearchParams(window.location.search);
+      const success = params.get('success');
+      const sessionId = params.get('session_id');
+      
+      if (success === 'true' && sessionId) {
+        // Show loading state
+        document.getElementById('pricing-plans').innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 3rem;">
+            <div style="font-size: 2rem; margin-bottom: 1rem;">⏳</div>
+            <div>Activating your subscription...</div>
+          </div>
+        `;
+        
+        try {
+          // Verify the checkout session and activate subscription
+          const res = await fetch('/api/subscription/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sessionId })
+          });
+          
+          const data = await res.json();
+          
+          if (data.ok && data.subscribed) {
+            // Success! Show confirmation
+            document.getElementById('pricing-plans').innerHTML = `
+              <div style="grid-column: 1/-1; text-align: center; padding: 3rem; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 16px;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                <h2 style="color: #22c55e; margin-bottom: 0.5rem;">Welcome to Premium!</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Your ${data.plan} subscription is now active</p>
+                <a href="/" style="display: inline-block; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #6f42c1, #007bff); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Start Exploring →</a>
+              </div>
+            `;
+            
+            // Clear URL params
+            window.history.replaceState({}, '', '/pricing.html');
+          } else {
+            // Verification failed, but might still be processing
+            await checkStatus();
+          }
+        } catch (err) {
+          console.error('Verify error:', err);
+          await checkStatus();
+        }
+      } else if (success === 'true') {
+        // Success but no session ID - check status anyway
+        await checkStatus();
+      } else {
+        await checkStatus();
+      }
+    }
+    
+    // Check status on load (handles Stripe return too)
+    handleStripeReturn();
+  </script>
+</body>
+</html>

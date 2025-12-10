@@ -5,11 +5,11 @@ import { pgQuery } from "../db.js";
 
 dotenv.config();
 
-const BATCH_LIMIT = 25000; // how many wallets to process per run
-const REQUEST_DELAY_MS = 200; // ~5 requests/second to avoid hammering
+const BATCH_LIMIT = 50000; // how many wallets to process per run
+const REQUEST_DELAY_MS = 10; // ~5 requests/second to avoid hammering
 
 async function ensureWalletProfilesTable() {
-    console.log("Ensuring Neon wallet_profiles table exists...");
+    console.log("Ensuring Render wallet_profiles table exists...");
     await pgQuery(`
     CREATE TABLE IF NOT EXISTS wallet_profiles (
       wallet_address TEXT PRIMARY KEY,
@@ -20,7 +20,7 @@ async function ensureWalletProfilesTable() {
   `);
 
     const before = await pgQuery(`SELECT COUNT(*) AS c FROM wallet_profiles;`);
-    console.log("Current Neon wallet_profiles row count (before sync):", before.rows[0].c);
+    console.log("Current Render wallet_profiles row count (before sync):", before.rows[0].c);
 }
 
 async function getWalletsToProcess(limit) {
@@ -98,7 +98,7 @@ function delay(ms) {
 }
 
 async function main() {
-    console.log("=== Sync wallet profiles from Dapper -> Neon ===");
+    console.log("=== Sync wallet profiles from Dapper -> Render ===");
     await ensureWalletProfilesTable();
 
     const wallets = await getWalletsToProcess(BATCH_LIMIT);

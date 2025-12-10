@@ -18,7 +18,7 @@ function escapeLiteral(str) {
 }
 
 async function ensureMetadataTable() {
-    console.log("Ensuring Neon nft_core_metadata table exists...");
+    console.log("Ensuring Render nft_core_metadata table exists...");
     await pgQuery(`
     CREATE TABLE IF NOT EXISTS nft_core_metadata (
       nft_id        TEXT PRIMARY KEY,
@@ -40,7 +40,7 @@ async function ensureMetadataTable() {
   `);
 
     const before = await pgQuery(`SELECT COUNT(*) AS c FROM nft_core_metadata;`);
-    console.log("Current Neon nft_core_metadata row count (before sync):", before.rows[0].c);
+    console.log("Current Render nft_core_metadata row count (before sync):", before.rows[0].c);
 }
 
 async function syncMetadata() {
@@ -54,7 +54,7 @@ async function syncMetadata() {
     await ensureMetadataTable();
 
     if (!isIncremental) {
-        console.log("Truncating Neon nft_core_metadata (full snapshot sync)...");
+        console.log("Truncating Render nft_core_metadata (full snapshot sync)...");
         await pgQuery(`TRUNCATE TABLE nft_core_metadata;`);
     } else {
         console.log("Incremental mode: skipping truncate, will upsert only");
@@ -199,7 +199,7 @@ async function syncMetadata() {
         set_name      = EXCLUDED.set_name;
     `;
 
-        console.log(`Inserting ${valueLiterals.length} metadata rows into Neon...`);
+        console.log(`Inserting ${valueLiterals.length} metadata rows into Render...`);
         await pgQuery(insertSql); // no params
 
         total += valueLiterals.length;
@@ -218,7 +218,7 @@ async function syncMetadata() {
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM nft_core_metadata;`);
-    console.log("✅ Final Neon nft_core_metadata row count:", after.rows[0].c);
+    console.log("✅ Final Render nft_core_metadata row count:", after.rows[0].c);
 
     connection.destroy(() => {
         console.log("Snowflake connection closed.");

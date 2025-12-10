@@ -10,7 +10,7 @@ A full‑stack app for exploring NFL ALL DAY wallets, moments, and collections.
 ```bash
 npm install
 cp .env.example .env
-# Fill in .env with your Snowflake + Postgres (Neon) creds
+# Fill in .env with your Snowflake + Postgres (Render) creds
 npm run dev
 # open http://localhost:3000
 ```
@@ -24,7 +24,7 @@ npm run dev
   - `ALLDAY_CORE_NFT_METADATA` – one row per `nft_id` (edition, play, player, team, tier, etc.)
   - `ALLDAY_WALLET_HOLDINGS_CURRENT` – one row per current `(wallet_address, nft_id)` with `is_locked` and `last_event_ts`
 
-**Neon / Postgres (app DB)**
+**Render Postgres (app DB)**
 
 - `nft_core_metadata` – synced from `ALLDAY_CORE_NFT_METADATA`
 - `wallet_holdings` – synced from `ALLDAY_WALLET_HOLDINGS_CURRENT`
@@ -40,7 +40,7 @@ npm run dev
   - Upserts into `nft_core_metadata`
 - `scripts/sync_wallet_holdings_from_snowflake.js`
   - Reads from Snowflake `ALLDAY_WALLET_HOLDINGS_CURRENT`
-  - **Incremental sync**: only pulls rows with `last_event_ts` newer than what Neon already has
+  - **Incremental sync**: only pulls rows with `last_event_ts` newer than what Render already has
   - Upserts into `wallet_holdings`
 - `scripts/load_edition_prices_from_csv.js`
   - Loads `edition_prices.csv` into `public.edition_price_scrape`
@@ -66,7 +66,7 @@ Use `run_etl.bat` to run common ETL flows:
 ## Backend API overview
 
 - `GET /api/query?wallet=0x…`
-  - Full wallet moments from Neon (`wallet_holdings` + `nft_core_metadata`)
+  - Full wallet moments from Render (`wallet_holdings` + `nft_core_metadata`)
 - `GET /api/wallet-summary?wallet=0x…`
   - Counts (total, locked/unlocked, per tier) and value estimates:
     - Floor value = sum of per‑edition `lowest_ask_usd` from `edition_price_scrape` times copies

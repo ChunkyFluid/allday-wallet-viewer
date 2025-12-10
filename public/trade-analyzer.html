@@ -69,6 +69,14 @@
         <div class="trade-side left">
           <h3>📤 You Give</h3>
           <input type="text" class="wallet-input" id="wallet1" placeholder="Search your wallet by name..." />
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <select id="filter-tier-1" class="wallet-input" style="flex: 1;" onchange="searchMoments(1)">
+              <option value="">All tiers</option>
+            </select>
+            <select id="filter-series-1" class="wallet-input" style="flex: 1;" onchange="searchMoments(1)">
+              <option value="">All series</option>
+            </select>
+          </div>
           <input type="text" class="wallet-input" id="search1" placeholder="Search moments to add..." oninput="searchMoments(1)"/>
           <div class="search-results" id="search-results-1"></div>
           <div class="trade-items" id="give-items"></div>
@@ -86,6 +94,14 @@
         <div class="trade-side right">
           <h3>📥 You Get</h3>
           <input type="text" class="wallet-input" id="wallet2" placeholder="Search their wallet by name..." />
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <select id="filter-tier-2" class="wallet-input" style="flex: 1;" onchange="searchMoments(2)">
+              <option value="">All tiers</option>
+            </select>
+            <select id="filter-series-2" class="wallet-input" style="flex: 1;" onchange="searchMoments(2)">
+              <option value="">All series</option>
+            </select>
+          </div>
           <input type="text" class="wallet-input" id="search2" placeholder="Search moments to add..." oninput="searchMoments(2)"/>
           <div class="search-results" id="search-results-2"></div>
           <div class="trade-items" id="get-items"></div>
@@ -105,6 +121,20 @@
     let wallet2Moments = [];
     let giveItems = [];
     let getItems = [];
+
+  function setFilterOptions(side, moments) {
+    const tierSelect = document.getElementById(`filter-tier-${side}`);
+    const seriesSelect = document.getElementById(`filter-series-${side}`);
+    if (!tierSelect || !seriesSelect) return;
+
+    const tiers = [...new Set(moments.map(m => (m.tier || "").trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const series = [...new Set(moments.map(m => (m.series_name || "").trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+
+    tierSelect.innerHTML = '<option value="">All tiers</option>' + tiers.map(t => `<option value="${t}">${t}</option>`).join('');
+    seriesSelect.innerHTML = '<option value="">All series</option>' + series.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
     
     async function loadWallet1() {
       const input = document.getElementById('wallet1');
@@ -113,11 +143,12 @@
       if (!wallet || !wallet.startsWith('0x')) return;
       document.getElementById('search1').placeholder = 'Loading wallet...';
       try {
-        const res = await fetch(`/api/query?wallet=${wallet}`);
+        const res = await fetch(`/api/query?wallet=${wallet}&source=database`);
         const data = await res.json();
         if (data.ok) {
           wallet1Moments = data.rows || [];
           document.getElementById('search1').placeholder = `Search ${wallet1Moments.length} moments to add...`;
+      setFilterOptions(1, wallet1Moments);
         }
       } catch (e) { 
         console.error(e);
@@ -132,11 +163,12 @@
       if (!wallet || !wallet.startsWith('0x')) return;
       document.getElementById('search2').placeholder = 'Loading wallet...';
       try {
-        const res = await fetch(`/api/query?wallet=${wallet}`);
+        const res = await fetch(`/api/query?wallet=${wallet}&source=database`);
         const data = await res.json();
         if (data.ok) {
           wallet2Moments = data.rows || [];
           document.getElementById('search2').placeholder = `Search ${wallet2Moments.length} moments to add...`;
+      setFilterOptions(2, wallet2Moments);
         }
       } catch (e) { 
         console.error(e);
@@ -154,6 +186,8 @@
     
     function searchMoments(side) {
       const query = document.getElementById(`search${side}`).value.toLowerCase();
+    const tierFilter = (document.getElementById(`filter-tier-${side}`)?.value || "").toLowerCase();
+    const seriesFilter = (document.getElementById(`filter-series-${side}`)?.value || "").toLowerCase();
       const moments = side === 1 ? wallet1Moments : wallet2Moments;
       const items = side === 1 ? giveItems : getItems;
       const resultsDiv = document.getElementById(`search-results-${side}`);
@@ -165,13 +199,15 @@
       
       // Filter moments and exclude already added ones
       const addedNftIds = new Set(items.map(i => i.nft_id));
-      const matches = moments.filter(m => {
+    const matches = moments.filter(m => {
         if (addedNftIds.has(m.nft_id)) return false; // Already added
-        const name = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
-        const team = (m.team_name || '').toLowerCase();
-        const serial = (m.serial_number || '').toString();
-        return name.includes(query) || team.includes(query) || serial.includes(query);
-      }).slice(0, 15);
+      if (tierFilter && (m.tier || "").toLowerCase() !== tierFilter) return false;
+      if (seriesFilter && (m.series_name || "").toLowerCase() !== seriesFilter) return false;
+      const name = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
+      const team = (m.team_name || '').toLowerCase();
+      const serial = (m.serial_number || '').toString();
+      return name.includes(query) || team.includes(query) || serial.includes(query);
+    }).slice(0, 50);
       
       resultsDiv.innerHTML = matches.map(m => `
         <div class="search-item" onclick="addItem(${side}, '${m.nft_id}')">

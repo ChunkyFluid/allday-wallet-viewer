@@ -747,7 +747,8 @@
 
                 for (const e of pageEditions) {
                     const tr = document.createElement("tr");
-                    const playerName = [e.first_name, e.last_name].filter(Boolean).join(" ");
+                    const rawPlayerName = [e.first_name, e.last_name].filter(Boolean).join(" ").trim();
+                    const playerName = rawPlayerName || "Team Moment";
                     const serialRange = e.min_serial && e.max_serial 
                         ? `${e.min_serial} - ${e.max_serial}` 
                         : e.min_serial 
@@ -766,7 +767,7 @@
 
                     tr.innerHTML = `
               <td style="font-family: ui-monospace, monospace; font-size: 0.7rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${e.edition_id || ""}">${e.edition_id || ""}</td>
-              <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;" title="${playerName || "(unknown)"}">${playerName || "(unknown)"}</td>
+              <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;" title="${playerName}">${playerName}</td>
               <td style="max-width: 100px; overflow: hidden; text-overflow: ellipsis;">${e.team_name || ""}</td>
               <td>${e.position || ""}</td>
               <td>
@@ -796,7 +797,7 @@
                             <div class="mobile-card-icon ${tier}">🏈</div>
                             <div class="mobile-card-main">
                                 <div class="mobile-card-header">
-                                    <span class="mobile-card-title">${playerName || "Unknown"}</span>
+                                    <span class="mobile-card-title">${playerName}</span>
                                     <span class="mobile-card-badge">${teamAbbrev}</span>
                                     <span class="mobile-card-badge tier ${tier}">${e.tier || "?"}</span>
                                 </div>
@@ -844,7 +845,7 @@
                 if (seriesList.length > 0) params.set("series", seriesList.join(','));
                 if (sets.length > 0) params.set("set", sets.join(','));
                 if (positions.length > 0) params.set("position", positions.join(','));
-                params.set("limit", "200");
+                params.set("limit", "10000");
 
                 const summary = document.getElementById("ex-results-summary");
                 const empty = document.getElementById("ex-empty");

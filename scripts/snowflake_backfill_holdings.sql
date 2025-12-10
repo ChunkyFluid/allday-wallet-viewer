@@ -1,0 +1,124 @@
+-- snowflake_backfill_holdings.sql
+-- Rebuild ALLDAY_WALLET_HOLDINGS_CURRENT from FLOW_ONCHAIN_CORE_DATA events
+-- Based on NFLAllDayWalletGrab.sql logic, generalized for ALL wallets
+
+USE DATABASE ALLDAY_VIEWER;
+USE SCHEMA ALLDAY;
+
+SELECT 'About to truncate and reload ALLDAY_WALLET_HOLDINGS_CURRENT' AS info;
+
+BEGIN;
+  TRUNCATE TABLE ALLDAY_WALLET_HOLDINGS_CURRENT;
+
+  INSERT INTO ALLDAY_WALLET_HOLDINGS_CURRENT (wallet_address, nft_id, is_locked, last_event_ts)
+  WITH burned_nfts AS (
+    SELECT EVENT_DATA:id::STRING AS NFT_ID
+    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+    WHERE EVENT_TYPE = 'MomentNFTBurned'
+      AND TX_SUCCEEDED = true
+      AND BLOCK_TIMESTAMP >= '2021-01-01'
+  ),
+  deposit_events AS (
+    SELECT
+      TX_ID,
+      BLOCK_TIMESTAMP,
+      BLOCK_HEIGHT,
+      EVENT_INDEX,
+      EVENT_TYPE,
+      EVENT_DATA:id::STRING AS NFT_ID,
+      LOWER(EVENT_DATA:to::STRING) AS Wallet_Address
+    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+    WHERE EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay'
+      AND EVENT_TYPE = 'Deposit'
+      AND TX_SUCCEEDED = true
+      AND BLOCK_TIMESTAMP >= '2021-01-01'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY EVENT_DATA:id::STRING ORDER BY BLOCK_HEIGHT DESC) = 1
+  ),
+  withdraw_events AS (
+    SELECT
+      TX_ID,
+      BLOCK_TIMESTAMP,
+      BLOCK_HEIGHT,
+      EVENT_INDEX,
+      EVENT_TYPE,
+      EVENT_DATA:id::STRING AS NFT_ID,
+      LOWER(EVENT_DATA:from::STRING) AS Wallet_Address
+    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+    WHERE EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay'
+      AND EVENT_TYPE = 'Withdraw'
+      AND TX_SUCCEEDED = true
+      AND BLOCK_TIMESTAMP >= '2021-01-01'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY EVENT_DATA:id::STRING ORDER BY BLOCK_HEIGHT DESC) = 1
+  ),
+  unlocked_nfts AS (
+    SELECT
+      d.NFT_ID,
+      d.Wallet_Address,
+      d.BLOCK_TIMESTAMP AS last_event_ts
+    FROM deposit_events AS d
+    LEFT JOIN withdraw_events AS w
+      ON d.NFT_ID = w.NFT_ID
+      AND d.Wallet_Address = w.Wallet_Address
+      AND w.BLOCK_TIMESTAMP >= d.BLOCK_TIMESTAMP
+    WHERE w.NFT_ID IS NULL
+      AND d.NFT_ID NOT IN (SELECT NFT_ID FROM burned_nfts)
+  ),
+  locked_events AS (
+    SELECT
+      TX_ID,
+      BLOCK_TIMESTAMP,
+      BLOCK_HEIGHT,
+      EVENT_INDEX,
+      EVENT_TYPE,
+      EVENT_DATA:id::STRING AS NFT_ID,
+      LOWER(EVENT_DATA:to::STRING) AS Wallet_Address
+    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+    WHERE EVENT_CONTRACT = 'A.b6f2481eba4df97b.NFTLocker'
+      AND EVENT_TYPE = 'NFTLocked'
+      AND TX_SUCCEEDED = true
+      AND BLOCK_TIMESTAMP >= '2021-01-01'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY EVENT_DATA:id::STRING ORDER BY BLOCK_HEIGHT DESC) = 1
+  ),
+  unlocked_events AS (
+    SELECT
+      BLOCK_TIMESTAMP,
+      BLOCK_HEIGHT,
+      EVENT_DATA:id::STRING AS NFT_ID
+    FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
+    WHERE EVENT_CONTRACT = 'A.b6f2481eba4df97b.NFTLocker'
+      AND EVENT_TYPE = 'NFTUnlocked'
+      AND TX_SUCCEEDED = true
+      AND BLOCK_TIMESTAMP >= '2021-01-01'
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY EVENT_DATA:id::STRING ORDER BY BLOCK_HEIGHT DESC) = 1
+  ),
+  locked_nfts AS (
+    SELECT
+      l.NFT_ID,
+      l.Wallet_Address,
+      l.BLOCK_TIMESTAMP AS last_event_ts
+    FROM locked_events AS l
+    LEFT JOIN unlocked_events AS u
+      ON l.NFT_ID = u.NFT_ID
+      AND u.BLOCK_TIMESTAMP >= l.BLOCK_TIMESTAMP
+    WHERE u.NFT_ID IS NULL
+      AND l.NFT_ID NOT IN (SELECT NFT_ID FROM burned_nfts)
+  ),
+  locked_ids AS (
+    SELECT DISTINCT NFT_ID FROM locked_nfts
+  ),
+  unlocked_nfts_filtered AS (
+    SELECT NFT_ID, Wallet_Address, last_event_ts
+    FROM unlocked_nfts
+    WHERE NFT_ID NOT IN (SELECT NFT_ID FROM locked_ids)
+  ),
+  all_holdings AS (
+    SELECT NFT_ID, Wallet_Address, FALSE AS is_locked, last_event_ts FROM unlocked_nfts_filtered
+    UNION
+    SELECT NFT_ID, Wallet_Address, TRUE AS is_locked, last_event_ts FROM locked_nfts
+  )
+  SELECT Wallet_Address, NFT_ID, is_locked, last_event_ts
+  FROM all_holdings;
+
+COMMIT;
+
+SELECT 'Reload complete' AS info, COUNT(*) AS rows_loaded FROM ALLDAY_WALLET_HOLDINGS_CURRENT;

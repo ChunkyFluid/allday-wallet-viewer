@@ -1,24 +1,26 @@
 // scripts/sync_prices_from_scrape.js
-// LEGACY: kept for analytics/experimentation. The main app now reads
-// prices from public.edition_price_scrape (see load_edition_prices_from_csv.js
-// and /api/prices). This script writes to edition_price_stats only.
 // Scrape Lowest Ask and Avg Sale from nflallday.com listing pages
-// and upsert into Neon edition_price_stats, with verbose logging.
+// and upsert into Render edition_price_scrape (used by wallet/leaderboards).
+// Uses Playwright to render pages (pricing is client-side). If data/nflad-auth.json
+// exists, it will use that storage state to stay logged in; otherwise it will try unauth.
 
 import * as dotenv from "dotenv";
 dotenv.config();
 
 import { pgQuery } from "../db.js";
-import fetch from "node-fetch";
+import { chromium } from "playwright";
+import fs from "fs";
+import path from "path";
 import { setTimeout as delay } from "timers/promises";
 
 async function ensureEditionPriceTable() {
     await pgQuery(`
-    CREATE TABLE IF NOT EXISTS edition_price_stats (
+    CREATE TABLE IF NOT EXISTS edition_price_scrape (
       edition_id TEXT PRIMARY KEY,
-      asp_90d NUMERIC,
-      low_ask NUMERIC,
-      last_updated_at TIMESTAMPTZ DEFAULT now()
+      lowest_ask_usd NUMERIC,
+      avg_sale_usd NUMERIC,
+      top_sale_usd NUMERIC,
+      scraped_at TIMESTAMPTZ DEFAULT now()
     );
   `);
 }
@@ -27,7 +29,7 @@ async function getEditionIdsToUpdate() {
     const sql = `
     SELECT DISTINCT m.edition_id
     FROM wallet_holdings w
-    JOIN moments m ON m.nft_id = w.nft_id
+    JOIN nft_core_metadata m ON m.nft_id = w.nft_id
     WHERE m.edition_id IS NOT NULL
     ORDER BY m.edition_id;
   `;
@@ -46,15 +48,12 @@ async function getEditionIdsToUpdate() {
     return editionIds;
 }
 
-function extractPricesFromHtml(html) {
-    const normalized = html.replace(/\s+/g, " ");
-
+function extractPricesFromText(text) {
+    const normalized = text.replace(/\s+/g, " ");
     let lowAsk = null;
     let asp = null;
+    let topSale = null;
 
-    // Examples in HTML:
-    // "Lowest Ask $6.00"
-    // "Avg Sale $87.95"
     const lowAskMatch = normalized.match(/Lowest Ask\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i);
     if (lowAskMatch) {
         const cleaned = lowAskMatch[1].replace(/,/g, "");
@@ -73,31 +72,38 @@ function extractPricesFromHtml(html) {
         }
     }
 
-    return { lowAsk, asp90d: asp };
+    const topMatch = normalized.match(/Top Sale\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i);
+    if (topMatch) {
+        const cleaned = topMatch[1].replace(/,/g, "");
+        const num = Number(cleaned);
+        if (!Number.isNaN(num)) {
+            topSale = num;
+        }
+    }
+
+    return { lowAsk, asp90d: asp, topSale };
 }
 
-async function fetchPricesForEdition(editionId) {
+async function fetchPricesWithPlaywright(page, editionId) {
     const url = `https://nflallday.com/listing/moment/${editionId}`;
     try {
-        const res = await fetch(url, {
-            headers: {
-                "user-agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            },
-            redirect: "follow"
-        });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+        // Wait a bit for client-side render
+        await page.waitForTimeout(2000);
 
-        if (!res.ok) {
-            console.warn(`  [HTTP ${res.status}] edition_id=${editionId} url=${url}`);
-            return { lowAsk: null, asp90d: null };
+        const text = await page.content();
+        const { lowAsk, asp90d } = extractPricesFromText(text);
+
+        // Try a fallback: grab visible text
+        if (lowAsk == null && asp90d == null) {
+            const bodyText = await page.evaluate(() => document.body.innerText);
+            const parsed = extractPricesFromText(bodyText);
+            return parsed;
         }
 
-        const html = await res.text();
-        return extractPricesFromHtml(html);
+        return { lowAsk, asp90d };
     } catch (err) {
-        console.warn(`  [fetch error] edition_id=${editionId}:`, err.message);
+        console.warn(`  [playwright error] edition_id=${editionId}:`, err.message);
         return { lowAsk: null, asp90d: null };
     }
 }
@@ -110,17 +116,18 @@ async function upsertPriceBatch(batch) {
     let idx = 1;
 
     for (const row of batch) {
-        params.push(row.edition_id, row.asp_90d, row.low_ask);
-        values.push(`($${idx++}, $${idx++}, $${idx++})`);
+        params.push(row.edition_id, row.low_ask, row.asp_90d, row.top_sale);
+        values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++})`);
     }
 
     const sql = `
-    INSERT INTO edition_price_stats (edition_id, asp_90d, low_ask)
+    INSERT INTO edition_price_scrape (edition_id, lowest_ask_usd, avg_sale_usd, top_sale_usd)
     VALUES ${values.join(", ")}
     ON CONFLICT (edition_id) DO UPDATE
-    SET asp_90d = EXCLUDED.asp_90d,
-        low_ask = EXCLUDED.low_ask,
-        last_updated_at = now();
+    SET lowest_ask_usd = EXCLUDED.lowest_ask_usd,
+        avg_sale_usd    = EXCLUDED.avg_sale_usd,
+        top_sale_usd    = COALESCE(EXCLUDED.top_sale_usd, edition_price_scrape.top_sale_usd),
+        scraped_at      = now();
   `;
 
     await pgQuery(sql, params);
@@ -141,55 +148,93 @@ async function main() {
         process.exit(0);
     }
 
-    // DEBUG SAFETY: only do the first N editions for now
-    const MAX_EDITIONS = 50; // bump this later once we see it working
+    // Cap via env if desired; default to all editions found.
+    const MAX_EDITIONS = process.env.PRICE_MAX_EDITIONS
+        ? parseInt(process.env.PRICE_MAX_EDITIONS, 10)
+        : editionIds.length;
     const limitedEditionIds = editionIds.slice(0, MAX_EDITIONS);
 
     console.log(`Starting price scrape for first ${limitedEditionIds.length} editions...`);
 
-    const batchForDb = [];
-    let processed = 0;
     const total = limitedEditionIds.length;
+    const DB_BATCH_SIZE = 50;
+    const DELAY_MS = parseInt(process.env.PRICE_DELAY_MS || "100", 10);
+    const CONCURRENCY = parseInt(process.env.PRICE_CONCURRENCY || "10", 10);
 
-    const DB_BATCH_SIZE = 10;
-    const DELAY_MS = 300; // a bit faster but still polite
+    // Playwright setup
+    const storagePath = path.join(process.cwd(), "data", "nflad-auth.json");
+    const hasStorage = fs.existsSync(storagePath);
+    const browser = await chromium.launch({ headless: true });
+    const context = hasStorage
+        ? await browser.newContext({ storageState: storagePath })
+        : await browser.newContext();
 
-    for (const editionId of limitedEditionIds) {
-        console.log(`- [${processed + 1}/${total}] Fetching edition_id=${editionId}...`);
+    let cursor = 0;
+    let processed = 0;
+    let found = 0;
 
-        const { lowAsk, asp90d } = await fetchPricesForEdition(editionId);
-
-        console.log(`  Parsed edition_id=${editionId} => lowAsk=${lowAsk}, asp90d=${asp90d}`);
-
-        if (lowAsk != null || asp90d != null) {
-            batchForDb.push({
-                edition_id: editionId,
-                asp_90d: asp90d,
-                low_ask: lowAsk
-            });
-        }
-
-        processed += 1;
-
-        if (batchForDb.length >= DB_BATCH_SIZE) {
-            await upsertPriceBatch(batchForDb);
-            console.log(
-                `  ✅ Upserted ${batchForDb.length} rows into edition_price_stats (processed ${processed}/${total}).`
-            );
-            batchForDb.length = 0;
-        }
-
-        await delay(DELAY_MS);
+    async function getNextId() {
+        if (cursor >= total) return null;
+        const id = limitedEditionIds[cursor];
+        cursor += 1;
+        return id;
     }
 
-    if (batchForDb.length > 0) {
-        await upsertPriceBatch(batchForDb);
-        console.log(
-            `  ✅ Upserted final ${batchForDb.length} rows into edition_price_stats (processed ${processed}/${total}).`
-        );
+    async function worker(workerId) {
+        const page = await context.newPage();
+        const batch = [];
+        while (true) {
+            const editionId = await getNextId();
+            if (!editionId) break;
+
+            const { lowAsk, asp90d, topSale } = await fetchPricesWithPlaywright(page, editionId);
+
+            if (lowAsk != null || asp90d != null || topSale != null) {
+                batch.push({
+                    edition_id: editionId,
+                    asp_90d: asp90d,
+                    low_ask: lowAsk,
+                    top_sale: topSale
+                });
+                found += 1;
+            }
+
+            processed += 1;
+
+            if (batch.length >= DB_BATCH_SIZE) {
+                await upsertPriceBatch(batch.splice(0, batch.length));
+            }
+
+            if (processed % 200 === 0) {
+                console.log(
+                    `[worker ${workerId}] progress ${processed}/${total}, found ${found} with prices`
+                );
+            }
+
+            await delay(DELAY_MS);
+        }
+
+        if (batch.length) {
+            await upsertPriceBatch(batch);
+        }
+
+        await page.close();
     }
 
-    console.log("✅ Finished scraping and syncing prices into edition_price_stats for first batch.");
+    const workers = [];
+    const start = Date.now();
+    for (let i = 0; i < CONCURRENCY; i++) {
+        workers.push(worker(i + 1));
+    }
+    await Promise.all(workers);
+
+    await browser.close();
+
+    console.log(
+        `✅ Finished scraping. Processed ${processed}/${total}, wrote ~${found} priced editions in ${
+            ((Date.now() - start) / 1000).toFixed(1)
+        }s`
+    );
     process.exit(0);
 }
 

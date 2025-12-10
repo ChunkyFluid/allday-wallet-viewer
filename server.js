@@ -86,9 +86,13 @@ const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
 
 const FINDLAB_API_BASE = "https://api.find.xyz";
 const FINDLAB_API_TIMEOUT = 10000; // 10 seconds
+const FINDLAB_ENABLED = (process.env.FINDLAB_ENABLED || "").toLowerCase() === "true";
 
 // FindLab API wrapper functions with error handling and timeout
 async function findlabRequest(endpoint, options = {}) {
+  if (!FINDLAB_ENABLED) {
+    throw new Error("FindLab disabled");
+  }
   const url = `${FINDLAB_API_BASE}${endpoint}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FINDLAB_API_TIMEOUT);
@@ -135,6 +139,7 @@ async function findlabRequest(endpoint, options = {}) {
 
 // Get latest block height from FindLab API (faster alternative to Flow REST API)
 async function getLatestBlockHeightFindLab() {
+  if (!FINDLAB_ENABLED) return null;
   try {
     const data = await findlabRequest('/flow/v1/block?limit=1');
     if (data && data.data && data.data.length > 0) {
@@ -153,6 +158,7 @@ async function getLatestBlockHeightFindLab() {
 
 // Get NFT holdings for an address using FindLab API
 async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDay') {
+  if (!FINDLAB_ENABLED) return null;
   try {
     // Try multiple endpoint formats - FindLab API might use different paths
     const encodedAddress = encodeURIComponent(address);
@@ -213,6 +219,7 @@ async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDa
 
 // Get specific NFT item data from FindLab API
 async function getNFTItemFindLab(nftType, nftId) {
+  if (!FINDLAB_ENABLED) return null;
   try {
     const encodedNftType = encodeURIComponent(nftType);
     const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/item/${nftId}`);
@@ -230,6 +237,7 @@ async function getNFTItemFindLab(nftType, nftId) {
 
 // Get account transaction history from FindLab API
 async function getAccountTransactionsFindLab(address, limit = 50) {
+  if (!FINDLAB_ENABLED) return null;
   try {
     const encodedAddress = encodeURIComponent(address);
     const data = await findlabRequest(`/flow/v1/account/${encodedAddress}/transaction?limit=${Math.min(limit, 100)}`);
@@ -247,6 +255,7 @@ async function getAccountTransactionsFindLab(address, limit = 50) {
 
 // Get NFT transfers from FindLab API
 async function getNFTTransfersFindLab(nftType, limit = 50) {
+  if (!FINDLAB_ENABLED) return null;
   try {
     const encodedNftType = encodeURIComponent(nftType);
     const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/transfer?limit=${Math.min(limit, 100)}`);
@@ -1178,7 +1187,7 @@ app.get("/api/search-editions", async (req, res) => {
     const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
 
     const rawLimit = parseInt(limit, 10);
-    const safeLimit = Math.min(Math.max(rawLimit || 200, 1), 1000);
+    const safeLimit = Math.min(Math.max(rawLimit || 5000, 1), 10000);
 
     // Parse comma-separated values for multi-select filters
     const tiers = tier ? tier.split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -1199,8 +1208,8 @@ app.get("/api/search-editions", async (req, res) => {
     }
 
     if (team) {
-      conditionsSnapshot.push(`team_name = $${idx}`);
-      conditionsLive.push(`e.team_name = $${idx}`);
+      conditionsSnapshot.push(`LOWER(team_name) = LOWER($${idx})`);
+      conditionsLive.push(`LOWER(e.team_name) = LOWER($${idx})`);
       params.push(team);
       idx++;
     }
@@ -1208,8 +1217,8 @@ app.get("/api/search-editions", async (req, res) => {
     // Tier filter (multi-select)
     if (tiers.length > 0) {
       const placeholders = tiers.map((_, i) => `$${idx + i}`).join(', ');
-      conditionsSnapshot.push(`tier IN (${placeholders})`);
-      conditionsLive.push(`e.tier IN (${placeholders})`);
+      conditionsSnapshot.push(`LOWER(tier) IN (${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
+      conditionsLive.push(`LOWER(e.tier) IN (${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
       params.push(...tiers);
       idx += tiers.length;
     }
@@ -1377,7 +1386,7 @@ app.get("/api/search-moments", async (req, res) => {
     const { player = "", team = "", tier = "", series = "", set = "", position = "", limit } = req.query;
 
     const rawLimit = parseInt(limit, 10);
-    const safeLimit = Math.min(Math.max(rawLimit || 200, 1), 1000);
+    const safeLimit = Math.min(Math.max(rawLimit || 5000, 1), 20000);
 
     const conditions = [];
     const params = [];
@@ -1394,7 +1403,7 @@ app.get("/api/search-moments", async (req, res) => {
     }
 
     if (tier) {
-      conditions.push(`tier = $${idx++}`);
+      conditions.push(`LOWER(tier) = LOWER($${idx++})`);
       params.push(tier);
     }
 
@@ -2320,7 +2329,7 @@ app.get("/api/query", async (req, res) => {
       source: 'database'
     });
   } catch (err) {
-    console.error("Error in /api/query (Neon):", err);
+    console.error("Error in /api/query (Render):", err);
     return res.status(500).json({
       ok: false,
       error: err.message || String(err)
@@ -2447,32 +2456,6 @@ app.get("/api/query-blockchain", async (req, res) => {
       ok: false,
       error: err.message || String(err)
     });
-  }
-});
-
-// Test Neon
-app.get("/api/test-neon", async (req, res) => {
-  try {
-    const client = await pool.connect();
-
-    try {
-      const { rows } = await client.query(
-        `SELECT nft_id, edition_id, play_id, serial_number, current_owner
-         FROM moments
-         ORDER BY nft_id
-         LIMIT 10`
-      );
-
-      res.json({
-        count: rows.length,
-        moments: rows
-      });
-    } finally {
-      client.release();
-    }
-  } catch (err) {
-    console.error("Error in /api/test-neon:", err);
-    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -3308,7 +3291,7 @@ app.get("/api/query-paged", async (req, res) => {
       rows: cleanedRows
     });
   } catch (err) {
-    console.error("Error in /api/query-paged (Neon):", err);
+    console.error("Error in /api/query-paged (Render):", err);
     return res.status(500).json({
       ok: false,
       error: err.message || String(err)

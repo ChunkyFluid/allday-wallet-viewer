@@ -33,7 +33,7 @@ function formatTimestampForSnowflake(ts) {
 }
 
 async function ensureWalletHoldingsTable() {
-    console.log("Ensuring Neon wallet_holdings table exists...");
+    console.log("Ensuring Render wallet_holdings table exists...");
     await pgQuery(`
     CREATE TABLE IF NOT EXISTS wallet_holdings (
       wallet_address TEXT NOT NULL,
@@ -46,7 +46,7 @@ async function ensureWalletHoldingsTable() {
   `);
 
     const before = await pgQuery(`SELECT COUNT(*) AS c FROM wallet_holdings;`);
-    console.log("Current Neon wallet_holdings row count (before sync):", before.rows[0].c);
+    console.log("Current Render wallet_holdings row count (before sync):", before.rows[0].c);
     return parseInt(before.rows[0].c, 10);
 }
 
@@ -282,7 +282,7 @@ async function syncWalletHoldings() {
         last_synced_at = now();
     `;
 
-        console.log(`Inserting ${valueLiterals.length} rows into Neon...`);
+        console.log(`Inserting ${valueLiterals.length} rows into Render...`);
         await pgQuery(insertSql);
 
         total += valueLiterals.length;
@@ -302,7 +302,7 @@ async function syncWalletHoldings() {
     }
 
     const after = await pgQuery(`SELECT COUNT(*) AS c FROM wallet_holdings;`);
-    console.log("✅ Final Neon wallet_holdings row count:", after.rows[0].c);
+    console.log("✅ Final Render wallet_holdings row count:", after.rows[0].c);
 
     connection.destroy(() => {
         console.log("Snowflake connection closed.");

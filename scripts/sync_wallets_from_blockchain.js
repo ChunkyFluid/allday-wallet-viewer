@@ -1,4 +1,4 @@
-// Background sync service: Sync wallet holdings from Flow blockchain to Neon database
+// Background sync service: Sync wallet holdings from Flow blockchain to Render database
 // Uses Cadence for NFT ownership and Snowflake for locked status
 // Run this periodically (e.g., every 5-15 minutes) to keep wallets synced
 

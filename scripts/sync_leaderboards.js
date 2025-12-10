@@ -3,10 +3,15 @@
 
 import * as dotenv from "dotenv";
 import { pgQuery } from "../db.js";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
 
 dotenv.config();
 
 async function syncLeaderboards() {
+  console.log("[Leaderboards] === Begin sync ===");
+  const startedAt = Date.now();
   console.log("[Leaderboards] Starting sync...");
   const startTime = Date.now();
   
@@ -19,6 +24,7 @@ async function syncLeaderboards() {
         wallet_address TEXT PRIMARY KEY,
         display_name TEXT,
         total_moments INTEGER DEFAULT 0,
+        unlocked_moments INTEGER DEFAULT 0,
         locked_moments INTEGER DEFAULT 0,
         tier_common INTEGER DEFAULT 0,
         tier_uncommon INTEGER DEFAULT 0,
@@ -34,14 +40,15 @@ async function syncLeaderboards() {
     
     await pgQuery(`
       INSERT INTO top_wallets_snapshot (
-        wallet_address, display_name, total_moments, locked_moments,
+        wallet_address, display_name, total_moments, unlocked_moments, locked_moments,
         tier_common, tier_uncommon, tier_rare, tier_legendary, tier_ultimate, updated_at
       )
       SELECT 
         h.wallet_address,
         COALESCE(p.display_name, h.wallet_address) as display_name,
         COUNT(*)::int as total_moments,
-        COUNT(*) FILTER (WHERE h.is_locked = true)::int as locked_moments,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false) = false)::int as unlocked_moments,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false) = true)::int as locked_moments,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int as tier_common,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int as tier_uncommon,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int as tier_rare,
@@ -221,10 +228,13 @@ async function syncLeaderboards() {
 }
 
 // Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && process.argv[1] === __filename) {
+  console.log("[Leaderboards] Script invoked via CLI");
   syncLeaderboards()
     .then((result) => {
+      const finishedAt = new Date().toISOString();
       console.log("[Leaderboards] ✅ Done!", result);
+      console.log("[Leaderboards] Finished at:", finishedAt);
       process.exit(0);
     })
     .catch((err) => {
