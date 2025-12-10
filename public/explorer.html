@@ -365,9 +365,8 @@
 
                     <div class="filter-group">
                         <div class="filter-label">Player</div>
-                        <select id="ex-player" class="filter-select">
-                            <option value="">All players</option>
-                        </select>
+                        <input id="ex-player" class="filter-select" list="ex-player-list" placeholder="All players" autocomplete="off" />
+                        <datalist id="ex-player-list"></datalist>
                     </div>
 
                     <div class="filter-group">
@@ -502,7 +501,8 @@
                     }
 
                     // Helpers
-                    const playerSelect = document.getElementById("ex-player");
+                    const playerInput = document.getElementById("ex-player");
+                    const playerDatalist = document.getElementById("ex-player-list");
                     const teamSelect = document.getElementById("ex-team");
 
                     function addOptions(selectEl, items, makeLabel) {
@@ -516,13 +516,18 @@
                         });
                     }
 
-                    // Players (still a single select)
-                    playerSelect.innerHTML = '<option value="">All players</option>';
-                    addOptions(
-                        playerSelect,
-                        data.players || [],
-                        (p) => [p.first_name, p.last_name].filter(Boolean).join(" ") || null
-                    );
+                    // Players (datalist autocomplete)
+                    if (playerDatalist) {
+                        const playerOptions = (data.players || [])
+                          .map((p) => [p.first_name, p.last_name].filter(Boolean).join(" ").trim())
+                          .filter(Boolean);
+                        playerDatalist.innerHTML = playerOptions
+                          .map(name => `<option value="${name}"></option>`)
+                          .join("");
+                    }
+                    if (playerInput) {
+                        playerInput.value = "";
+                    }
 
                     // Teams (still a single select)
                     teamSelect.innerHTML = '<option value="">All teams</option>';
