@@ -32,7 +32,6 @@
           <a href="/trade-analyzer.html" class="${path === '/trade-analyzer.html' ? 'active' : ''}">🔄 Trades</a>
           <a href="/playbook.html" class="${path === '/playbook.html' ? 'active' : ''}">📖 Playbook</a>
           <a href="/challenges.html" class="${path === '/challenges.html' ? 'active' : ''}">🎮 Challenges</a>
-          <a href="/offers.html" class="${path === '/offers.html' ? 'active' : ''}">💬 Offers</a>
           <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
           <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>

@@ -38,6 +38,16 @@
     .filter-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .filter-btn { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
     .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .desktop-only { display: block; }
+    .mobile-only { display: none; }
+    .table thead th.sortable { cursor: pointer; }
+    .table thead th.sortable::after { content: ' ⇅'; font-size: 0.75em; color: var(--text-muted); }
+    .table thead th.sortable.sort-asc::after { content: ' ↑'; }
+    .table thead th.sortable.sort-desc::after { content: ' ↓'; }
+    @media (max-width: 768px) {
+      .desktop-only { display: none; }
+      .mobile-only { display: grid; }
+    }
   </style>
 </head>
 <body>
@@ -53,6 +63,7 @@
         <button onclick="loadCompletion()">Check Progress</button>
       </div>
       <script src="/wallet-search.js"></script>
+      <script src="/js/multi-select.js"></script>
       
       <div id="results"></div>
     </div>
@@ -62,13 +73,53 @@
     const results = document.getElementById('results');
     let allSets = [];
     let currentFilter = 'all';
+    let autoLoaded = false;
+    let catalogSets = [];
+    let setNameFilter = [];
+    let currentSort = "set_name";
+    let currentSortDir = "asc";
+    let setMulti = null;
+    let teamProgress = [];
+    let walletLoading = false;
+
+    async function loadCatalog() {
+      // show placeholder immediately
+      if (!results.innerHTML.trim()) {
+        results.innerHTML = '<div class="loading">Loading sets…</div>';
+      }
+      try {
+        const res = await fetch('/api/set-completion/all');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "Failed to load sets");
+        catalogSets = (data.sets || []).map(s => ({
+          set_name: s.set_name,
+          total: s.total,
+          is_team_set: !!s.is_team_set,
+          owned: 0,
+          completion: 0,
+          by_tier: { Common: 0, Uncommon: 0, Rare: 0, Legendary: 0, Ultimate: 0 }
+        }));
+        if (setMulti) {
+          setMulti.setItems(catalogSets.map(s => s.set_name));
+        }
+        if (!allSets.length) {
+          allSets = catalogSets;
+          renderResults({ summary: summarize(allSets), sets: allSets, team_progress: [] });
+        }
+      } catch (err) {
+        console.error("loadCatalog error:", err);
+        results.innerHTML = `<div class="empty">❌ Failed to load set catalog: ${err.message}</div>`;
+      }
+    }
+    loadCatalog();
     
     async function loadCompletion() {
       // Use data attribute if available (from autocomplete), otherwise use input value
       const wallet = (input.dataset.walletAddress || input.value).trim().toLowerCase();
       if (!wallet || !wallet.startsWith('0x')) return;
       
-      results.innerHTML = '<div class="loading">Analyzing set completion...</div>';
+      walletLoading = true;
+      updateStatus("Analyzing set completion…");
       
       try {
         const res = await fetch(`/api/set-completion?wallet=${wallet}`);
@@ -76,10 +127,18 @@
         
         if (!data.ok) throw new Error(data.error);
         
-        allSets = data.sets;
-        renderResults(data);
+        const ownedMap = new Map((data.sets || []).map(s => [s.set_name, s]));
+        const base = catalogSets.length ? catalogSets : data.sets || [];
+        allSets = base.map(s => {
+          const owned = ownedMap.get(s.set_name);
+          return owned ? owned : { ...s, owned: 0, completion: 0, by_tier: { Common:0, Uncommon:0, Rare:0, Legendary:0, Ultimate:0 }, cost_to_complete: s.cost_to_complete || 0 };
+        });
+        renderResults({ summary: summarize(allSets), sets: allSets, team_progress: data.team_progress || [] });
       } catch (err) {
-        results.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
+        updateStatus(`❌ ${err.message}`);
+      } finally {
+        walletLoading = false;
+        updateStatus("");
       }
     }
     
@@ -93,6 +152,39 @@
     if (params.get('wallet')) {
       input.value = params.get('wallet');
       loadCompletion();
+      autoLoaded = true;
+    }
+    
+    // If logged in with a default wallet, auto-load it
+    (async () => {
+      if (autoLoaded) return;
+      try {
+        const meRes = await fetch('/api/me');
+        if (!meRes.ok) return;
+        const meData = await meRes.json();
+        const wallet = meData?.user?.default_wallet_address;
+        if (wallet && wallet.startsWith('0x')) {
+          input.value = wallet;
+          autoLoaded = true;
+          loadCompletion();
+        }
+      } catch (_) {
+        // silently ignore
+      }
+    })();
+
+    function summarize(sets) {
+      return {
+        total_sets: sets.length,
+        completed_sets: sets.filter(s => s.completion === 100).length,
+        in_progress: sets.filter(s => s.completion > 0 && s.completion < 100).length,
+        avg_completion: sets.length > 0 ? sets.reduce((a, b) => a + (b.completion || 0), 0) / sets.length : 0
+      };
+    }
+    
+    function setFilterName(list) {
+      setNameFilter = list || [];
+      renderSets();
     }
     
     function filterSets(filter) {
@@ -104,7 +196,13 @@
     }
     
     function renderResults(data) {
-      const { summary, sets } = data;
+      const { summary, sets, team_progress = [] } = data;
+      teamProgress = team_progress;
+      const inProgress = sets
+        .filter(s => s.completion > 0 && s.completion < 100)
+        .map(s => ({ ...s, missing: Math.max(0, (s.total || 0) - (s.owned || 0)) }))
+        .sort((a, b) => a.missing - b.missing)
+        .slice(0, 3);
       
       let html = `
         <div class="summary-cards">
@@ -125,39 +223,213 @@
             <div class="label">Avg Completion</div>
           </div>
         </div>
+        <div id="set-status" style="margin:0 0 0.5rem 0; color:var(--text-muted); min-height:1.2rem;"></div>
+        
+        <div class="summary-card" style="margin-bottom:1rem; text-align:left;">
+          <div class="label" style="margin-bottom:0.35rem; text-transform:uppercase; letter-spacing:0.08em; font-size:0.75rem;">Next up</div>
+          ${
+            inProgress.length
+              ? inProgress.map(s => 
+                  `<div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:0.15rem;">
+                    <span>${s.set_name}</span>
+                    <span style="color:var(--accent); font-weight:600;">-${s.missing} need (${Math.round(s.completion || 0)}%)</span>
+                  </div>`
+                ).join('')
+              : '<div style="color:var(--text-muted);">No in-progress sets</div>'
+          }
+        </div>
         
         <div class="filter-row">
           <button class="filter-btn active" data-filter="all" onclick="filterSets('all')">All Sets</button>
           <button class="filter-btn" data-filter="complete" onclick="filterSets('complete')">✅ Complete</button>
           <button class="filter-btn" data-filter="inprogress" onclick="filterSets('inprogress')">🔄 In Progress</button>
           <button class="filter-btn" data-filter="notstarted" onclick="filterSets('notstarted')">⬜ Not Started</button>
+          <button class="filter-btn" data-filter="team" onclick="filterSets('team')">🏈 Team Sets</button>
+          <button class="filter-btn" data-filter="nonteam" onclick="filterSets('nonteam')">🎯 Non-Team</button>
+          <div id="set-filter" style="flex:1; min-width:200px;"></div>
         </div>
         
-        <div id="sets-container" class="sets-grid"></div>
+        <div id="sets-table-container" class="table-container desktop-only">
+          <table class="table" id="sets-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort="set_name">Set</th>
+                <th class="sortable" data-sort="owned">Owned / Total</th>
+                <th class="sortable" data-sort="pct">%</th>
+                <th class="sortable" data-sort="cost">Cost</th>
+                <th class="sortable" data-sort="common">Common</th>
+                <th class="sortable" data-sort="uncommon">Uncommon</th>
+                <th class="sortable" data-sort="rare">Rare</th>
+                <th class="sortable" data-sort="legendary">Legendary</th>
+                <th class="sortable" data-sort="ultimate">Ultimate</th>
+              </tr>
+            </thead>
+            <tbody id="sets-tbody"></tbody>
+          </table>
+        </div>
+        <div id="sets-container" class="sets-grid mobile-only"></div>
+        <div style="margin-top:1rem;">
+          <h3 style="margin:0 0 0.5rem 0;">Team Progress</h3>
+          <div id="team-table-container" class="table-container desktop-only">
+            <table class="table" id="team-table">
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  <th>Owned / Total</th>
+                  <th>%</th>
+                </tr>
+              </thead>
+              <tbody id="team-tbody"></tbody>
+            </table>
+          </div>
+          <div id="team-cards" class="mobile-only sets-grid"></div>
+        </div>
       `;
       
       results.innerHTML = html;
+      
+      // init multi-select after DOM exists
+      if (!setMulti) {
+        setMulti = new MultiSelect('set-filter', {
+          placeholder: 'All sets',
+          searchable: true,
+          onChange: (vals) => {
+            setFilterName(vals);
+          }
+        });
+        if (catalogSets.length) {
+          setMulti.setItems(catalogSets.map(s => s.set_name));
+        }
+      } else {
+        // refresh items if catalog changed
+        if (catalogSets.length) setMulti.setItems(catalogSets.map(s => s.set_name));
+      }
+      
+      // wire sortable headers
+      const headers = document.querySelectorAll('#sets-table th.sortable');
+      headers.forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+          const sortKey = th.dataset.sort;
+          if (currentSort === sortKey) {
+            currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            currentSort = sortKey;
+            currentSortDir = 'asc';
+          }
+          renderSets();
+        });
+      });
+      
       renderSets();
+      renderTeams();
     }
     
+    function updateStatus(msg) {
+      const status = document.getElementById('set-status');
+      if (status) status.textContent = msg || '';
+    }
+
+    function sortSets(list) {
+      const arr = [...list];
+      const dir = currentSortDir === 'asc' ? 1 : -1;
+      arr.sort((a, b) => {
+        switch (currentSort) {
+          case "owned":
+            return dir * (((a.owned || 0) / (a.total || 1)) - ((b.owned || 0) / (b.total || 1)));
+          case "pct":
+            return dir * ((a.completion || 0) - (b.completion || 0));
+          case "cost":
+            return dir * ((a.cost_to_complete || 0) - (b.cost_to_complete || 0));
+          case "common":
+            return dir * ((a.by_tier?.Common || 0) - (b.by_tier?.Common || 0));
+          case "uncommon":
+            return dir * ((a.by_tier?.Uncommon || 0) - (b.by_tier?.Uncommon || 0));
+          case "rare":
+            return dir * ((a.by_tier?.Rare || 0) - (b.by_tier?.Rare || 0));
+          case "legendary":
+            return dir * ((a.by_tier?.Legendary || 0) - (b.by_tier?.Legendary || 0));
+          case "ultimate":
+            return dir * ((a.by_tier?.Ultimate || 0) - (b.by_tier?.Ultimate || 0));
+          case "set_name":
+          default:
+            return dir * (a.set_name || "").localeCompare(b.set_name || "");
+        }
+      });
+      return arr;
+    }
+
+    function renderTeams() {
+      const tbody = document.getElementById('team-tbody');
+      const cards = document.getElementById('team-cards');
+      if (!tbody || !cards) return;
+      tbody.innerHTML = teamProgress.map(t => `
+        <tr>
+          <td>${t.team_name}</td>
+          <td>${t.owned || 0} / ${t.total || 0}</td>
+          <td>${Math.round(t.completion || 0)}%</td>
+        </tr>
+      `).join('');
+      cards.innerHTML = teamProgress.map(t => `
+        <div class="set-card">
+          <div class="set-header">
+            <div class="set-name">${t.team_name}</div>
+            <div class="set-progress">${t.owned || 0}/${t.total || 0} (${Math.round(t.completion||0)}%)</div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${t.completion || 0}%"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
     function renderSets() {
       const container = document.getElementById('sets-container');
+      const tbody = document.getElementById('sets-tbody');
       let filtered = allSets;
       
       if (currentFilter === 'complete') filtered = allSets.filter(s => s.completion === 100);
       else if (currentFilter === 'inprogress') filtered = allSets.filter(s => s.completion > 0 && s.completion < 100);
       else if (currentFilter === 'notstarted') filtered = allSets.filter(s => s.completion === 0);
+      else if (currentFilter === 'team') filtered = allSets.filter(s => s.is_team_set);
+      else if (currentFilter === 'nonteam') filtered = allSets.filter(s => !s.is_team_set);
+      if (setNameFilter && setNameFilter.length) {
+        const selected = new Set(setNameFilter.map(v => v.toLowerCase()));
+        filtered = filtered.filter(s => selected.has((s.set_name || "").toLowerCase()));
+      }
+      
+      filtered = sortSets(filtered);
       
       if (filtered.length === 0) {
         container.innerHTML = '<div class="empty">No sets match this filter</div>';
+        if (tbody) tbody.innerHTML = '';
         return;
+      }
+      
+      if (tbody) {
+        tbody.innerHTML = filtered.map(set => `
+          <tr>
+            <td>${set.set_name}</td>
+            <td>${set.owned || 0} / ${set.total || 0}</td>
+            <td>${Math.round(set.completion || 0)}%</td>
+            <td>${set.cost_to_complete != null ? `$${(set.cost_to_complete||0).toFixed(2)}` : '—'}</td>
+            <td>${set.by_tier?.Common || 0}</td>
+            <td>${set.by_tier?.Uncommon || 0}</td>
+            <td>${set.by_tier?.Rare || 0}</td>
+            <td>${set.by_tier?.Legendary || 0}</td>
+            <td>${set.by_tier?.Ultimate || 0}</td>
+          </tr>
+        `).join('');
       }
       
       container.innerHTML = filtered.map(set => `
         <div class="set-card ${set.completion === 100 ? 'complete' : ''}">
           <div class="set-header">
             <div class="set-name">${set.set_name} ${set.completion === 100 ? '✅' : ''}</div>
-            <div class="set-progress">${set.owned}/${set.total} (${Math.round(set.completion)}%)</div>
+            <div class="set-progress">
+              ${set.owned}/${set.total} (${Math.round(set.completion)}%)
+              ${set.cost_to_complete != null ? `<div style="font-size:0.8rem; color:var(--text-muted);">Cost to complete: $${(set.cost_to_complete||0).toFixed(2)}</div>` : ''}
+            </div>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" style="width: ${set.completion}%"></div>

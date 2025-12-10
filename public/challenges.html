@@ -354,8 +354,14 @@
 
     async function fetchChallenges() {
       try {
-        const res = await fetch('/api/challenges/cached');
-        const data = await res.json();
+        // Prefer cached first (avoids Cloudflare blocks), then live fallback
+        let res = await fetch('/api/challenges/cached');
+        let data = await res.json();
+
+        if (!data.ok || !data.challenges || !data.challenges.length) {
+          res = await fetch('/api/challenges/live');
+          data = await res.json();
+        }
 
         if (data.ok && data.challenges && data.challenges.length > 0) {
           challenges = data.challenges;

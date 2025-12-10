@@ -205,6 +205,39 @@
                 background: #050815;
             }
 
+            /* Desktop-first: show table, hide mobile cards */
+            #ex-table {
+                width: 100%;
+            }
+
+            #ex-mobile-cards {
+                display: none;
+                gap: 0.6rem;
+                flex-direction: column;
+            }
+
+            @media (min-width: 961px) {
+                #ex-mobile-cards {
+                    display: none !important;
+                }
+            }
+
+            @media (max-width: 960px) {
+                /* On mobile, hide the table and show only cards */
+                #ex-table {
+                    display: none !important;
+                }
+
+                #ex-mobile-cards {
+                    display: flex !important;
+                }
+
+                .table-container {
+                    max-height: none;
+                    overflow: visible;
+                }
+            }
+
             table.table {
                 width: 100%;
                 border-collapse: collapse;

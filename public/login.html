@@ -503,12 +503,14 @@
                 loginView.style.display = "block";
                 signupView.style.display = "none";
                 settingsView.style.display = "none";
+                setStatus(loginStatus, "", null);
             }
 
             function showSignupView() {
                 loginView.style.display = "none";
                 signupView.style.display = "block";
                 settingsView.style.display = "none";
+                setStatus(signupStatus, "", null);
             }
 
             function showSettingsView(user) {

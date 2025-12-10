@@ -178,23 +178,38 @@
     /* Slots/Requirements */
     .slots-container {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 0.5rem;
     }
 
-    .slot {
+    .slot-row {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
       padding: 0.35rem 0.6rem;
       background: rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      font-size: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    .slot-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-weight: 600;
+    }
+
+    .slot-order {
+      color: var(--text-muted);
     }
 
     .slot-pos {
-      font-weight: 600;
       color: var(--cyan);
+      font-weight: 700;
     }
 
     .slot-stat {
@@ -203,7 +218,7 @@
 
     .slot-value {
       color: var(--gold);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     /* Empty State */
@@ -216,6 +231,15 @@
     .empty-state h2 {
       color: var(--text);
       margin-bottom: 0.5rem;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 2rem 0 0.75rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     /* Loading */
@@ -252,6 +276,7 @@
     <div id="content" class="kickoffs-grid">
       <div class="loading">Loading kickoffs...</div>
     </div>
+
   </main>
 
   <script>
@@ -274,6 +299,7 @@
 
     let kickoffs = [];
     let currentTab = 'current';
+    // Challenges are intentionally not shown on this page (see challenges page)
 
     function getKickoffStatus(kickoff) {
       const now = new Date();
@@ -307,19 +333,21 @@
     }
 
     function renderSlots(slots) {
-      if (!slots || slots.length === 0) return '<span class="slot">No requirements</span>';
+      if (!slots || slots.length === 0) return '<div class="slot-row">No requirements</div>';
       
       return slots.map(slot => {
         const pos = slot.requirements?.[0]?.playerPositions?.[0] || 'ANY';
         const stat = slot.stats?.[0];
         const statLabel = stat ? (STAT_LABELS[stat.stat] || stat.stat) : '';
         const value = stat?.valueNeeded || '';
-        
-        return `<span class="slot">
-          <span class="slot-pos">${POSITION_LABELS[pos] || pos}</span>
-          <span class="slot-stat">${statLabel}</span>
-          <span class="slot-value">${value}+</span>
-        </span>`;
+        return `
+          <div class="slot-row">
+            <span class="slot-order">Slot ${slot.slotOrder ?? ''}</span>
+            <span class="slot-pill slot-pos">${POSITION_LABELS[pos] || pos}</span>
+            ${statLabel ? `<span class="slot-pill slot-stat">${statLabel}</span>` : ''}
+            ${value ? `<span class="slot-pill slot-value">${value}+</span>` : ''}
+          </div>
+        `;
       }).join('');
     }
 
@@ -392,8 +420,41 @@
 
     async function fetchKickoffs() {
       try {
-        const res = await fetch('/api/kickoffs/cached');
-        const data = await res.json();
+        // Prefer cached first (avoids Cloudflare blocks), then live fallback
+        let res = await fetch('/api/kickoffs/cached');
+        let data = await res.json();
+
+        // If no flat kickoffs, try to flatten from slates
+        if (data.ok && (!data.kickoffs || !data.kickoffs.length) && Array.isArray(data.slates)) {
+          const flat = [];
+          data.slates.forEach(s => {
+            if (s?.kickoffs?.length) {
+              s.kickoffs.forEach(k => flat.push({ ...k, slateName: s.name, slateStatus: s.status, slateStartDate: s.startDate, slateEndDate: s.endDate }));
+            }
+          });
+          if (flat.length) {
+            data.kickoffs = flat;
+          }
+        }
+
+        // If still no kickoffs but we have raw edges (browser dump), map them
+        if (data.ok && (!data.kickoffs || !data.kickoffs.length) && data.data?.searchKickoffSlates?.edges) {
+          const flat = [];
+          data.data.searchKickoffSlates.edges.forEach(edge => {
+            const s = edge?.node;
+            if (s?.kickoffs?.length) {
+              s.kickoffs.forEach(k => flat.push({ ...k, slateName: s.name, slateStatus: s.status, slateStartDate: s.startDate, slateEndDate: s.endDate }));
+            }
+          });
+          if (flat.length) {
+            data.kickoffs = flat;
+          }
+        }
+
+        if (!data.ok || !data.kickoffs || !data.kickoffs.length) {
+          res = await fetch('/api/kickoffs/live');
+          data = await res.json();
+        }
 
         if (data.ok && data.kickoffs && data.kickoffs.length > 0) {
           kickoffs = data.kickoffs;
@@ -423,6 +484,44 @@
             <a href="https://nflallday.com/games" target="_blank" class="play-btn" style="display: inline-block; margin-top: 1rem;">
               Go to NFL All Day ↗
             </a>
+          </div>
+        `;
+      }
+    }
+
+    async function fetchChallenges() {
+      const container = document.getElementById('challenges-content');
+      try {
+        const res = await fetch('/api/challenges/live');
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.challenges)) {
+          challenges = data.challenges;
+          renderChallenges();
+          if (data.lastUpdated) {
+            document.getElementById('lastUpdated').textContent = `Data from: ${new Date(data.lastUpdated).toLocaleString()}`;
+          }
+          return;
+        }
+        // fallback to cached endpoint
+        const cachedRes = await fetch('/api/challenges/cached');
+        const cachedData = await cachedRes.json();
+        if (cachedData.ok && Array.isArray(cachedData.challenges)) {
+          challenges = cachedData.challenges;
+          renderChallenges();
+          return;
+        }
+        container.innerHTML = `
+          <div class="empty-state">
+            <h2>No challenges available</h2>
+            <p>Visit NFL All Day directly.</p>
+          </div>
+        `;
+      } catch (err) {
+        console.error('Error loading challenges:', err);
+        container.innerHTML = `
+          <div class="empty-state">
+            <h2>Error loading challenges</h2>
+            <p>Visit NFL All Day directly.</p>
           </div>
         `;
       }

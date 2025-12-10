@@ -1,0 +1,563 @@
+{
+  "data": {
+    "searchChallenges": {
+      "edges": [
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "df866dd3-6a68-424a-8f39-352bc351ab47",
+            "name": "🔒 Lock the entire 2024 Season Holo Icon Set",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>every Moment from the 2024 Holo Icon set:</p><p><br></p><p>Lock the entire 2024 Season Holo Icon set to earn 1 Legendary Holo Icon Moment from one of the new Holo Icon Moments released Dec 11.</p>",
+            "category": "LOCK",
+            "startDate": "2025-12-08T20:00:00Z",
+            "endDate": "2025-12-11T03:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "70b587f2-798b-4c17-bc80-bf723dd4f2d6",
+            "name": "🔒 Lock the entire 2024 Season Metallic Gold LE Set",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>every Moment from the 2024 Metallic Gold LE set:</p><p><br></p><p>Lock the entire 2024 Season Metallic Gold LE set to earn 1 Rare Metallic Gold LE Moment from one of the new Metallic Gold LE Moments released Dec 11.</p>",
+            "category": "LOCK",
+            "startDate": "2025-12-08T20:00:00Z",
+            "endDate": "2025-12-11T03:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "bd49837f-df0e-46b5-b255-e154298712b2",
+            "name": "🔒 Lock for Randall Cunningham's Relentless Expert Challenge Reward Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Moments to earn <strong>Randall Cunningham's mint to completion Relentless Moment!</strong></p><p><br></p><ul><li>Lock the <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/3b712abb-810b-4d88-92e2-6e0a1f138051\" target=\"_blank\">Relentless Rare from Richard Sherman</a></li><li>Lock the <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/43fc6e99-ead3-415c-b855-d6436afc6519\" target=\"_blank\">Relentless Rare from Cris Carter</a></li></ul>",
+            "category": "LOCK",
+            "startDate": "2025-12-05T17:00:00Z",
+            "endDate": "2025-12-12T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "90208541-9436-47ae-b43f-9727b0f32aa2",
+            "name": "🔒 Lock for the 2025 All Day Feast Turkey Accolade!",
+            "description": "<p>Lock any Moment from the top performers from Thursday’s games to earn the community favorite, 2025 Turkey Accolade!&nbsp;</p><p><br></p><ul><li>QB: Passing + Rushing Yards (1st or 2nd highest)</li><li>WR/TE: Receptions (1st or 2nd highest)</li><li>RB: Rushing Yards (1st or 2nd highest)</li></ul><p><br></p>",
+            "category": "LOCK",
+            "startDate": "2025-11-28T21:00:00Z",
+            "endDate": "2025-12-03T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "f4985d71-d336-49cd-a730-29afd84e5e73",
+            "name": "🔥  MULTI-COMPLETE - Trade In 5 UNCOMMONS for a Pack",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 5 Uncommon Moments to earn a <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/drops/6372\" target=\"_blank\">4-Moment Chase Pack</a>.</p><ul><li>Only 6000 completions possible total between these three challenges this challenge, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/6634d3d8-bad7-4296-afc5-c6fa9481649e\" target=\"_blank\">10 Commons</a>, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/ccea898d-2064-4c2d-8a36-03be9fde20a0\" target=\"_blank\">1 Hist. Rare</a>.</li><li>Collectors can complete this challenge as many times as they would like.</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-11-28T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "ccea898d-2064-4c2d-8a36-03be9fde20a0",
+            "name": "🔥  MULTI-COMPLETE - Trade in 1 RARE for a Pack",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 5 Uncommon Moments to earn a <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/drops/6372\" target=\"_blank\">4-Moment Chase Pack</a>.</p><ul><li>Only 6000 completions possible total between these three challenges this challenge, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/6634d3d8-bad7-4296-afc5-c6fa9481649e\" target=\"_blank\">10 Commons</a>, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/f4985d71-d336-49cd-a730-29afd84e5e73\" target=\"_blank\">5 Uncommons</a>.</li><li>Collectors can complete this challenge as many times as they would like.</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-11-28T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "c389bb76-d8a7-43f5-b460-24a85f250ef6",
+            "name": "🔒 Lock for Emmitt Smith's Legendary Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Moments to earn <strong>Emmitt Smith's mint to completion Legends of the Turf Moment!</strong></p><p><br></p><ul><li>Lock the Legends of the Turf Legendary from Michael Vick</li><li>Lock the Legends of the Turf Legendary from Earl Campbell</li><li>Lock the Legends of the Turf Legendary from Eric Allen</li><li>Lock the Legends of the Turf Legendary from Marvin Harrison</li><li>Lock the Legends of the Turf Legendary from Dave Williams</li><li>Lock the Legends of the Turf Legendary from Herman Moore</li></ul><p><br></p>",
+            "category": "LOCK",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-12-05T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "6634d3d8-bad7-4296-afc5-c6fa9481649e",
+            "name": "🔥  MULTI-COMPLETE - Trade In 10 COMMONS for a Pack",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 5 Uncommon Moments to earn a <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/drops/6372\" target=\"_blank\">4-Moment Chase Pack</a>.</p><ul><li>Only 6000 completions possible total between these three challenges this challenge, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/f4985d71-d336-49cd-a730-29afd84e5e73\" target=\"_blank\">5 Uncommons</a>, <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/challenges/ccea898d-2064-4c2d-8a36-03be9fde20a0\" target=\"_blank\">1 Historical Rare</a>.</li><li>Collectors can complete this challenge as many times as they would like.</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-11-28T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "58dfbfa7-c9db-4179-a10c-79137a148722",
+            "name": "🔥  Trade 1 COMMON For a 1 Moment Pack! Ultimate hit available ",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 1 Historical Common Moment to earn a <a rel=\"noopener noreferrer\" href=\"https://nflallday.com/drops/6371\" target=\"_blank\">1-Moment Chase Pack</a>. (1 Ultimate Moment and 16 Legendary Moments included as possible hits!)</p>",
+            "category": "BURN",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-12-03T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "43fc6e99-ead3-415c-b855-d6436afc6519",
+            "name": "🔒 Lock for Cris Carter's Relentless Rare Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Moments to earn <strong>Cris Carter's mint to completion Relentless Moment!</strong></p><p><br></p><ul><li>Lock the Relentless Rare from Herschel Walker</li><li>Lock the Relentless Rare from Kevin Jones</li><li>Lock the Relentless Rare from Ryan Grant</li><li>Lock the Relentless Rare from Randy Wright</li><li>Lock the Relentless Rare from Kurt Warner</li><li>Lock the Relentless Rare from Herman Moore</li></ul>",
+            "category": "LOCK",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-12-05T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "3b712abb-810b-4d88-92e2-6e0a1f138051",
+            "name": "🔒 Lock for Richard Sherman's Relentless Rare Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Moments to earn <strong>Richard Sherman's mint to completion Relentless Moment!</strong></p><p><br></p><ul><li>Lock the Relentless Rare from Calvin Johnson</li><li>Lock the Relentless Rare from Darrin Nelson</li><li>Lock the Relentless Rare from Luke Kuechly</li><li>Lock the Relentless Rare from Walter Stanley</li><li>Lock the Relentless Rare from Bryant Westbrook </li><li>Lock the Relentless Rare from Pete Stoyanovich</li></ul><p><br></p>",
+            "category": "LOCK",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-12-05T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "268fbab4-92fe-4565-bf4f-1de3b32c35e0",
+            "name": "🔒 Lock for Signed Jerseys From Emmitt Smith & LeSean McCoy",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Moments to earn <strong> Signed Jerseys From Emmitt Smith &amp; LeSean McCoy!</strong></p><p><br></p><ul><li>Lock the Emmitt Smith Ultimate</li><li>Lock the LeSean McCoy Ultimate</li><li>Lock the Calvin Johnson Ultimate</li></ul>",
+            "category": "LOCK",
+            "startDate": "2025-11-27T17:00:00Z",
+            "endDate": "2025-12-12T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "8d4810d9-8d89-4560-9e78-8e4bc5eae2b8",
+            "name": "Craft for Jahmyr Gibbs' Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Jahmyr Gibbs's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2023 Season Dynamic Rare Moment with Rookie Mint Badge from Jahmyr Gibbs</li><li>2024 Season Legendary from a RB</li><li>2024 Season Legendary from a RB</li><li>2025 Season Rare from the Lions</li><li>2023 Season Rare from the Lions</li><li>2025 Season Draw It Up from Christian McCaffrey</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "753939e6-b7cb-4585-b92f-e41ef44419de",
+            "name": "Craft for CeeDee Lamb's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>CeeDee Lamb's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 with Debut Badge from CeeDee Lamb</li><li>Series 1 with Debut Badge from CeeDee Lamb</li><li>2025 Season Rare from the Cowboys</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "62080700-935b-4005-bc88-0c56fc69bbff",
+            "name": "Craft for Jordan Love's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Jordan Love's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 with Debut Badge from Jordan Love</li><li>Series 1 with Debut Badge from the Packers</li><li>2025 Season Packers Rare Moment</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "3e772584-7256-4610-8807-8a3dbac06750",
+            "name": "Craft for Rome Odunze's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;burn<strong>&nbsp;</strong>the following Moments to earn <strong>Rome Odunze's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2025 Season Moment from the Bears</li><li>Series 1 Moment with Debut Badge from the Bears</li><li>2025 Season Regal Rookies Rare Moment from a WR</li><li>2025 Season Bears Rare Moment</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "2fce45e8-5d5d-4c6b-a342-70bc26df236b",
+            "name": "Craft for Tee Higgins' Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Tee Higgins' mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2025 Season Rookie Debut from the Bengals</li><li>2025 Season Rookie Debut from a WR</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "21d8464a-1300-4543-8385-51ae1bdf7bed",
+            "name": "Craft for Jalen Hurts' Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Jalen Hurts' mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 with Debut Badge from Jalen Hurts</li><li>2025 Season Rookie Debut from Jihaad Campbell</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "0d1a380b-4d4b-4696-b440-fe7a82203a33",
+            "name": "Craft for Derrick Henry's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Derrick Henry's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2025 Season Rookie Debut from Running Back</li><li>Series 1 Moment with Debut Badge from Derrick Henry</li><li>2025 Season Rare from the Ravens</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "03e6b11d-3f59-4b2c-8096-08d8929829e1",
+            "name": "Craft for Rashee Rice's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Rashee Rice's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Moment from Rashee Rice</li><li>Moment with Rookie Mint badge from Xavier Worthy</li><li>2025 Season Patrick Mahomes Draw It Up Rare Moment</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-26T17:00:00Z",
+            "endDate": "2025-11-30T22:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "a0a3ea82-d2b4-4183-9c0b-dec90a983879",
+            "name": "Craft for Josh Allen's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Josh Allen's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 Moment with Debut badge from Josh Allen</li><li>Series 1 Moment with Debut badge from Josh Allen</li><li>2025 Season base Moment from QB</li><li>2024 Season base Moment from QB</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-20T17:00:00Z",
+            "endDate": "2025-11-23T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "857567cb-5fa3-4049-b3c3-8606fae19fd8",
+            "name": "Craft for Ja'Marr Chase's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Ja'Marr Chase's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Moment with debut badge from Ja'Marr Chase</li><li>2025 Season Base Set Moment from WR</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-20T17:00:00Z",
+            "endDate": "2025-11-23T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "56b959f9-2b72-460b-8b2b-c9fda3b04d2e",
+            "name": "Craft for Jonathan Taylor's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Jonathan Taylor's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 Legendary Moment with Debut Badge from Jonathan Taylor</li><li>2023 Season Legendary Dynamic Moment from Jonathan Taylor</li><li>2025 Season Legendary Moment from a RB</li><li>Legendary Moment from LaDainian Tomlinson</li><li>Rare Moment from LaDainian Tomlinson</li><li>Rare Moment from Jonathan Taylor</li><li>Rare Moment from Marshall Faulk</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-20T17:00:00Z",
+            "endDate": "2025-11-23T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "d73f101b-903f-4d0f-89a8-fc53e749118c",
+            "name": "🔒 Lock for Kimani Vidal's Spark of Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following mint to completion Moments to earn <strong>Kimani Vidal's mint to completion Moment!</strong></p><p><br></p><ul><li>Lock the Wan’Dale Robinson Spark of Greatness Rare Moment</li><li>Lock the Sterling Shepard Spark of Greatness Rare Moment</li><li>Lock the Xavier Hutchinson Spark of Greatness Rare Moment</li><li>Lock the Kendre Miller Spark of Greatness RareMoment</li><li>Lock the Chris Rodriguez Spark of Greatness Rare Moment</li><li>Lock the Jacoby Brissett Spark of Greatness Rare Moment</li><li>Lock the Jonathon Cooper Spark of Greatness Rare Moment</li><li>Lock the Uchenna Nwosu Spark of Greatness Rare Moment</li><li>Lock the Dorance Armstrong Jr. Spark of Greatness Rare Moment</li><li>Lock the K'Lavon Chaisson Spark of Greatness Rare Moment</li><li>Lock the Camryn Bynum Spark of Greatness Rare Moment</li></ul>",
+            "category": "LOCK",
+            "startDate": "2025-11-19T18:00:00Z",
+            "endDate": "2025-11-26T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "e3d7325c-17b5-48b8-8608-f87df32c9a46",
+            "name": "Craft for Jaxon Smith-Njigba's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Jaxon Smith-Njigba's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2023 Season Dynamic Set Rare Moment from Jaxon Smith-Njigba's Moment</li><li>2023 Season ‘23 Rookies Set Rare Moment from Jaxon Smith-Njigba's Moment</li><li>2025 Season Wideout Wonders Set Rare Moment</li><li>2023 Season Legendary Moment from a WR</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-19T17:00:00Z",
+            "endDate": "2025-11-22T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "94fb0545-7312-42c1-b718-38c2536973e6",
+            "name": "Craft for Micah Parsons' Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Micah Parsons' mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 2 Draw It Up Rare from Parsons</li><li>2023 Season Dynamic Rare from Parsons</li><li>2025 Season Packers Rare</li><li>2025 Season Packers Rare</li><li>2025 Season Cowboys Rare</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-19T17:00:00Z",
+            "endDate": "2025-11-22T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "516ea50a-d3b2-4ccc-9aa2-811af39792b5",
+            "name": "Craft for Patrick Mahomes' Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Patrick Mahomes' mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Any Moment from Patrick Mahomes</li><li>2025 Season Rookie Debut from a QB</li></ul><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-19T17:00:00Z",
+            "endDate": "2025-11-22T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "d32448e5-763a-41b0-8bda-9e0fdb4e4244",
+            "name": "Craft for Matthew Stafford's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Matthew Stafford's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Series 1 Rare from Matthew Stafford Moment</li><li>2023 Season Dynamic Rare from Matthew Stafford Moment</li><li>2025 Season Rams Rare Moment</li><li>2024 Season Rams Rare Moment</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-18T17:00:00Z",
+            "endDate": "2025-11-21T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "d2313d45-662c-4559-a991-e6e4944acc69",
+            "name": "Craft for Christian McCaffrey's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in<strong>&nbsp;</strong>the following Moments to earn <strong>Christian McCaffrey's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>Christian McCaffrey Moment with an all day debut badge</li><li>2025 Season Rookie Debut from a RB Moment</li></ul><p><br></p><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-18T17:00:00Z",
+            "endDate": "2025-11-21T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "16365ab8-91ca-42b9-9fa9-05284897041c",
+            "name": "Craft for Myles Garrett's Draw it Up Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;burn<strong>&nbsp;</strong>the following Moments to earn <strong>Myles Garrett's mint to completion Draw it Up Moment!</strong></p><p><br></p><ul><li>2025 Season Rookie Debut from Browns player Moment</li><li>2024 Season Rookie Debut from Browns players Moment</li><li>Series 1 Rare from defensive player Moment</li><li>2023 Season Rare from Browns player Moment</li></ul><p><br></p><p><strong>Earn Exclusive End Of Season Leaderboard Rewards For Locking 2025 Season Moments From Top Stars</strong></p><p><br></p><p>As we’ve said before, the top collectors don’t just earn bragging rights, they earn exclusive rewards directly tied to their collection.</p><p><br></p><p>This season, collecting and locking 2025 Season Moments from 2025 Award Winners can earn you ultra-scarce player parallel Moments:</p><p><br></p><ul><li>1/1 for 1st</li><li>1/5 for 2nd–6th</li><li>1/15 for 7th–21st</li><li>1/25 for 22nd–46th</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-18T17:00:00Z",
+            "endDate": "2025-11-21T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "fb7333d9-44ab-4f2b-9c6c-aa2843a9e24c",
+            "name": "🔒 Lock for Myles Garrett's Sapphire Parallel Defensive Gems Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Myles Garrett's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "eb0da940-0b43-4238-aaec-1d13b7649ec3",
+            "name": "🔒 Lock for Derrick Henry' Emerald Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Derrick Henry's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "e97648e5-5051-4309-9d9c-5bac36fe3dc1",
+            "name": "🔒 Lock for Myles Garrett's Ruby Parallel Defensive Gems Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Myles Garrett's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /299 Ruby Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "cee8c147-9ddd-4a3b-a32f-f6d082001d25",
+            "name": "🔥  MULTI-COMPLETE - Trade In RARES For A Ground Greatness or Defensive Gems Parallel Moment!",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 3 Rare Moments to earn a 1-Moment pack containing a Ground Greatness or Defensive Gems Parallel! 95% chance at /299+ Ruby; 5% chance at /50 Emerald Moment!.</p><p><br></p><p><br></p><ul><li>Only 750 completions possible for this challenge and <a href='https://nflallday.com/challenges/10e4d195-ebfc-41f4-94a2-ca92cdcfc2a9'>this challenge</a>.</li><li>Collectors can complete this challenge as many times as they would like.</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-13T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "ca99fd63-c323-4c4b-a6e5-d3e50b292e84",
+            "name": "🔒 Instant Reward: Lock for Myles Garrett's Emerald Parallel Defensive Gems",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Myles Garrett's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "b54d7beb-d89f-4c51-8973-fba1334c1836",
+            "name": "🔒 Lock for Myles Garrett's Emerald Parallel Defensive Gems Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Myles Garrett's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /50 Emerald Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "af1c32a8-bd12-41c8-9edf-ecb9f488fdce",
+            "name": "🔒 Instant Reward: Lock for Myles Garrett's Sapphire Parallel Defensive Gems",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Myles Garrett's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /25 Sapphire Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "9a3fea6e-8b68-4c6a-81ec-2f9be768ad7c",
+            "name": "🔒 Instant Reward: Lock for Myles Garrett's Ruby Parallel Defensive Gems",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Myles Garrett's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the Nik Bonitto Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Trey Hendrickson Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Jeffery Simmons Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Montez Sweat Defensive Gems Rare /299 Ruby Parallel Moment</li><li>Lock the Brian Burns Defensive Gems Rare /299 Ruby Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "91c5dbad-efc8-4ea3-99c0-7394f4049063",
+            "name": "🔒 Lock for Derrick Henry' Ruby Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Derrick Henry's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /299 Ruby Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "73401827-fa55-436a-b263-8cea84081bcc",
+            "name": "🔒 Instant Reward: Lock for Jahmyr Gibbs's Ruby Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Jahmyr Gibbs's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /299 Ruby Parallel Moment</li></ul>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "6e0e4bba-4173-4998-a9ae-ca53f6575676",
+            "name": "🔒 Instant Reward: Lock for Derrick Henry's Emerald Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Derrick Henry's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "66198652-8604-4030-a411-07252dbf436a",
+            "name": "🔒 Instant Reward: Lock for Jahmyr Gibbs's Sapphire Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Jahmyr Gibbs's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "55b426d4-6f2b-4aad-86fd-680826caf823",
+            "name": "🔒 Lock for Jahmyr Gibbs's Emerald Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Jahmyr Gibbs's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "41fab03b-53b9-48ad-8fb3-e0e166492458",
+            "name": "🔒 Instant Reward: Lock for Derrick Henry's Ruby Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Derrick Henry's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /299 Ruby Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "3fe8d0d8-d1ee-4868-b240-bf1217ba2ad2",
+            "name": "🔒 Lock for Jahmyr Gibbs's Sapphire Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Jahmyr Gibbs's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "34908b1f-e4af-41f6-92c3-579eb8439d54",
+            "name": "🔒 Instant Reward: Lock for Derrick Henry's Sapphire Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Derrick Henry's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "2ed99203-f9f6-44bb-bd37-a3cfc728bb93",
+            "name": "🔒 Lock for Jahmyr Gibbs's Ruby Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Ruby Parallel /299 Moments to earn <strong>Jahmyr Gibbs's Ruby Parallel /299 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /299 Ruby Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /299 Ruby Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "290696c0-5813-4a52-8199-0982a91284d5",
+            "name": "🔒 Lock for Derrick Henry' Sapphire Parallel Ground Greatness Moment",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Sapphire Parallel /25 Moments to earn <strong>Derrick Henry's Sapphire Parallel /25 Moment!</strong></p><p><br></p><ul><li>Lock the De'Von Achane Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the D'Andre Swift Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Breece Hall Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Tank Bigsby Ground Greatness Rare /25 Sapphire Parallel Moment</li><li>Lock the Kareem Hunt Ground Greatness Rare /25 Sapphire Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-20T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "10e4d195-ebfc-41f4-94a2-ca92cdcfc2a9",
+            "name": "🔥  MULTI-COMPLETE - Trade In COMMONS For A Ground Greatness or Defensive Gems Parallel Moment!",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;trade in any 15 Common Moments to earn a 1-Moment pack containing a Ground Greatness or Defensive Gems Parallel! 95% chance at /299+ Ruby; 5% chance at /50 Emerald Moment!.</p><p><br></p><p><br></p><ul><li>Only 750 completions possible for this challenge and <a href='https://nflallday.com/challenges/cee8c147-9ddd-4a3b-a32f-f6d082001d25'>this challenge</a>.</li><li>Collectors can complete this challenge as many times as they would like.</li></ul>",
+            "category": "BURN",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2025-11-13T17:00:00Z"
+          }
+        },
+        {
+          "node": {
+            "__typename": "Challenge",
+            "id": "02a72137-c338-4b1f-8282-5db6b315e0c6",
+            "name": "🔒 Instant Reward: Lock for Jahmyr Gibbs's Emerald Parallel Ground Greatness",
+            "description": "<p>To complete this challenge, collectors will need to&nbsp;lock<strong>&nbsp;</strong>the following Emerald Parallel /50 Moments to earn <strong>Jahmyr Gibbs's Emerald Parallel /50 Moment!</strong></p><p><br></p><ul><li>Lock the Saquon Barkley Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Alvin Kamara Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Chase Brown Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Rhamondre Stevenson Ground Greatness Rare /50 Emerald Parallel Moment</li><li>Lock the Jaylen Warren Ground Greatness Rare /50 Emerald Parallel Moment</li></ul><p><br></p><p>Special serials will only be found in reward packs earn from this first Challenge window.</p><p><br></p><p>Read the Challenge rules for more details on what it means to Lock a Moment.</p>",
+            "category": "LOCK",
+            "startDate": "2025-11-13T17:00:00Z",
+            "endDate": "2026-02-16T18:00:00Z"
+          }
+        }
+      ],
+      "totalCount": 2064,
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "MDJhNzIxMzctYzMzOC00YjFmLTgyODItNWRiNmIzMTVlMGM2LDIwMjUtMTEtMTNUMTc6MDA6MDBaLDAsLDA="
+      }
+    }
+  }
+}

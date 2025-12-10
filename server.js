@@ -7542,6 +7542,16 @@ const graphqlCache = new Map(); // key -> { data, timestamp, expiresAt }
 const CACHE_TTL = 2 * 60 * 1000; // Cache for 2 minutes
 const MAX_GRAPHQL_CACHE_SIZE = 50; // Limit cache size to prevent memory issues
 
+// Live challenges cache (lightweight, unauthenticated searchChallenges)
+const CHALLENGES_LIVE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let challengesLiveCache = null;
+let challengesLiveCacheTime = 0;
+
+// Live kickoffs cache (searchKickoffSlates, unauthenticated)
+const KICKOFFS_LIVE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let kickoffsLiveCache = null;
+let kickoffsLiveCacheTime = 0;
+
 // Rate limiting for GraphQL requests
 let graphqlRequestCount = 0;
 let graphqlRequestWindowStart = Date.now();
@@ -7767,13 +7777,244 @@ function isResponseCached(query, variables) {
 // Cached data files (populated by admin script: node scripts/refresh-kickoffs.js)
 const CACHED_KICKOFFS_FILE = path.join(__dirname, 'data', 'kickoffs.json');
 const CACHED_CHALLENGES_FILE = path.join(__dirname, 'data', 'challenges.json');
+// Allow a root-level challenges.json fallback if data/ file is missing
+const ALT_CACHED_CHALLENGES_FILE = path.join(__dirname, 'challenges.json');
+
+// Fetch live challenges via public consumer GraphQL endpoint (no auth)
+async function fetchLiveChallenges() {
+  const now = Date.now();
+  if (challengesLiveCache && (now - challengesLiveCacheTime) < CHALLENGES_LIVE_CACHE_TTL) {
+    return challengesLiveCache;
+  }
+
+  const body = {
+    operationName: "SearchChallenges",
+    variables: {
+      input: {
+        after: "",
+        first: 50,
+        filters: {}
+      }
+    },
+    query: `query SearchChallenges($input: SearchChallengesInput!) {
+      searchChallenges(input: $input) {
+        edges {
+          node {
+            id
+            slug
+            title
+            subtitle
+            description
+            category
+            status
+            startsAt
+            endsAt
+            completedAt
+            rewardsDescription
+            submissions { totalCount }
+            requirements {
+              description
+              count
+              filters {
+                byTiers
+                byPlayerPositions
+                bySetIDs
+                byTeamIDs
+                byPlayerIDs
+              }
+            }
+          }
+          cursor
+        }
+        totalCount
+        pageInfo {
+          endCursor
+          hasNextPage
+        }
+      }
+    }`
+  };
+
+  const res = await fetch("https://nflallday.com/consumer/graphql?searchChallenges", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    throw new Error(`searchChallenges HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  const edges = json?.data?.searchChallenges?.edges || [];
+  const challenges = edges.map(e => e?.node).filter(Boolean);
+
+  const payload = {
+    ok: true,
+    lastUpdated: new Date().toISOString(),
+    totalChallenges: challenges.length,
+    challenges
+  };
+
+  challengesLiveCache = payload;
+  challengesLiveCacheTime = now;
+  return payload;
+}
+
+// Fetch live kickoffs via public consumer GraphQL endpoint (no auth)
+async function fetchLiveKickoffs() {
+  const now = Date.now();
+  if (kickoffsLiveCache && (now - kickoffsLiveCacheTime) < KICKOFFS_LIVE_CACHE_TTL) {
+    return kickoffsLiveCache;
+  }
+
+  const body = {
+    operationName: "SearchKickoffSlates",
+    variables: {
+      input: {
+        after: "",
+        first: 100,
+        filters: {},
+        sortBy: "START_DATE_DESC"
+      }
+    },
+    query: `query SearchKickoffSlates($input: SearchKickoffSlatesInput!) {
+      searchKickoffSlates(input: $input) {
+        edges {
+          node {
+            id
+            name
+            startDate
+            endDate
+            status
+            kickoffs {
+              id
+              name
+              slateID
+              difficulty
+              status
+              submissionDeadline
+              gamesStartAt
+              completedAt
+              numParticipants
+              slots {
+                id
+                slotOrder
+                stats {
+                  id
+                  stat
+                  valueNeeded
+                  valueType
+                  groupV2
+                }
+                requirements {
+                  playerPositions
+                  tiers
+                  badgeSlugs
+                  setIDs
+                  teamIDs
+                }
+              }
+            }
+          }
+          cursor
+        }
+        totalCount
+        pageInfo {
+          endCursor
+          hasNextPage
+        }
+      }
+    }`
+  };
+
+  const res = await fetch("https://nflallday.com/consumer/graphql?searchKickoffSlates", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    throw new Error(`searchKickoffSlates HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  const slates = (json?.data?.searchKickoffSlates?.edges || []).map(e => e?.node).filter(Boolean);
+
+  // Flatten kickoffs with slate metadata
+  const allKickoffs = [];
+  for (const slate of slates) {
+    if (slate?.kickoffs?.length) {
+      for (const k of slate.kickoffs) {
+        allKickoffs.push({
+          ...k,
+          slateName: slate.name,
+          slateStatus: slate.status,
+          slateStartDate: slate.startDate,
+          slateEndDate: slate.endDate
+        });
+      }
+    }
+  }
+
+  const payload = {
+    ok: true,
+    lastUpdated: new Date().toISOString(),
+    totalSlates: slates.length,
+    slates,
+    totalKickoffs: allKickoffs.length,
+    kickoffs: allKickoffs
+  };
+
+  kickoffsLiveCache = payload;
+  kickoffsLiveCacheTime = now;
+  return payload;
+}
 
 // Get cached kickoffs data
 app.get("/api/kickoffs/cached", (req, res) => {
   try {
     if (fs.existsSync(CACHED_KICKOFFS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(CACHED_KICKOFFS_FILE, 'utf8'));
-      res.json({ ok: true, ...data });
+      const raw = JSON.parse(fs.readFileSync(CACHED_KICKOFFS_FILE, 'utf8'));
+      // Normalize: accept browser dump (data.searchKickoffSlates.edges) or server shape
+      let slates = raw.slates;
+      if (!slates && raw.data?.searchKickoffSlates?.edges) {
+        slates = raw.data.searchKickoffSlates.edges.map(e => e?.node).filter(Boolean);
+      }
+
+      // Flatten kickoffs even if file only has slates
+      let kickoffs = raw.kickoffs;
+      if ((!kickoffs || !kickoffs.length) && Array.isArray(slates)) {
+        kickoffs = [];
+        for (const slate of slates) {
+          if (slate?.kickoffs?.length) {
+            for (const k of slate.kickoffs) {
+              kickoffs.push({
+                ...k,
+                slateName: slate.name,
+                slateStatus: slate.status,
+                slateStartDate: slate.startDate,
+                slateEndDate: slate.endDate
+              });
+            }
+          }
+        }
+      }
+      const payload = {
+        ok: true,
+        lastUpdated: raw.lastUpdated || new Date().toISOString(),
+        totalSlates: raw.totalSlates || (slates ? slates.length : undefined),
+        totalKickoffs: kickoffs ? kickoffs.length : raw.totalKickoffs,
+        slates,
+        kickoffs
+      };
+      res.json(payload);
     } else {
       res.json({ ok: false, error: "No cached data available. Run: node scripts/refresh-kickoffs.js" });
     }
@@ -7786,15 +8027,172 @@ app.get("/api/kickoffs/cached", (req, res) => {
 // Get cached challenges data
 app.get("/api/challenges/cached", (req, res) => {
   try {
-    if (fs.existsSync(CACHED_CHALLENGES_FILE)) {
-      const data = JSON.parse(fs.readFileSync(CACHED_CHALLENGES_FILE, 'utf8'));
-      res.json({ ok: true, ...data });
+    const challengesPath = fs.existsSync(CACHED_CHALLENGES_FILE)
+      ? CACHED_CHALLENGES_FILE
+      : (fs.existsSync(ALT_CACHED_CHALLENGES_FILE) ? ALT_CACHED_CHALLENGES_FILE : null);
+
+    if (challengesPath) {
+      const raw = JSON.parse(fs.readFileSync(challengesPath, 'utf8'));
+      // Normalize: if browser dump (raw.data.searchChallenges.edges) convert to challenges array
+      let challenges = raw.challenges;
+      let lastUpdated = raw.lastUpdated;
+      if (!challenges && raw.data?.searchChallenges?.edges) {
+        challenges = raw.data.searchChallenges.edges.map(e => e?.node).filter(Boolean);
+        lastUpdated = lastUpdated || new Date().toISOString();
+      }
+      // Map fields to frontend expectations
+      if (Array.isArray(challenges)) {
+        challenges = challenges.map(c => ({
+          id: c.id,
+          title: c.title || c.name || "Challenge",
+          name: c.name,
+          description: c.description,
+          category: c.category,
+          status: c.status || "ACTIVE",
+          startsAt: c.startsAt || c.startDate,
+          endsAt: c.endsAt || c.endDate,
+          slug: c.slug || c.id,
+          subtitle: c.subtitle,
+          rewardsDescription: c.rewardsDescription || c.description,
+          submissions: c.submissions,
+          requirements: c.requirements
+        }));
+      }
+      const payload = {
+        ok: true,
+        lastUpdated: lastUpdated || new Date().toISOString(),
+        totalChallenges: raw.totalChallenges || (challenges ? challenges.length : undefined),
+        challenges
+      };
+      res.json(payload);
     } else {
       res.json({ ok: false, error: "No cached data available. Run: node scripts/refresh-kickoffs.js" });
     }
   } catch (err) {
     console.error("Error reading cached challenges:", err);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Live challenges endpoint; falls back to cached file on failure
+app.get("/api/challenges/live", async (_req, res) => {
+  try {
+    const data = await fetchLiveChallenges();
+    return res.json(data);
+  } catch (err) {
+    console.error("Error fetching live challenges:", err);
+    const challengesPath = fs.existsSync(CACHED_CHALLENGES_FILE)
+      ? CACHED_CHALLENGES_FILE
+      : (fs.existsSync(ALT_CACHED_CHALLENGES_FILE) ? ALT_CACHED_CHALLENGES_FILE : null);
+    if (challengesPath) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(challengesPath, "utf8"));
+        let challenges = raw.challenges;
+        let lastUpdated = raw.lastUpdated;
+        if (!challenges && raw.data?.searchChallenges?.edges) {
+          challenges = raw.data.searchChallenges.edges.map(e => e?.node).filter(Boolean);
+          lastUpdated = lastUpdated || new Date().toISOString();
+        }
+        if (Array.isArray(challenges)) {
+          challenges = challenges.map(c => ({
+            id: c.id,
+            title: c.title || c.name || "Challenge",
+            name: c.name,
+            description: c.description,
+            category: c.category,
+            status: c.status || "ACTIVE",
+            startsAt: c.startsAt || c.startDate,
+            endsAt: c.endsAt || c.endDate,
+            slug: c.slug || c.id,
+            subtitle: c.subtitle,
+            rewardsDescription: c.rewardsDescription || c.description,
+            submissions: c.submissions,
+            requirements: c.requirements
+          }));
+        }
+        const payload = {
+          ok: true,
+          lastUpdated: lastUpdated || new Date().toISOString(),
+          totalChallenges: raw.totalChallenges || (challenges ? challenges.length : undefined),
+          challenges,
+          fallback: true,
+          error: err.message
+        };
+        return res.json(payload);
+      } catch (e) {
+        console.error("Error reading cached challenges after live failure:", e);
+      }
+    }
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Live challenges endpoint; falls back to cached file on failure
+app.get("/api/challenges/live", async (_req, res) => {
+  try {
+    const data = await fetchLiveChallenges();
+    return res.json(data);
+  } catch (err) {
+    console.error("Error fetching live challenges:", err);
+    if (fs.existsSync(CACHED_CHALLENGES_FILE)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(CACHED_CHALLENGES_FILE, "utf8"));
+        return res.json({ ok: true, ...data, fallback: true, error: err.message });
+      } catch (e) {
+        console.error("Error reading cached challenges after live failure:", e);
+      }
+    }
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Live kickoffs endpoint; falls back to cached file on failure
+app.get("/api/kickoffs/live", async (_req, res) => {
+  try {
+    const data = await fetchLiveKickoffs();
+    return res.json(data);
+  } catch (err) {
+    console.error("Error fetching live kickoffs:", err);
+    if (fs.existsSync(CACHED_KICKOFFS_FILE)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(CACHED_KICKOFFS_FILE, "utf8"));
+        let slates = raw.slates;
+        if (!slates && raw.data?.searchKickoffSlates?.edges) {
+          slates = raw.data.searchKickoffSlates.edges.map(e => e?.node).filter(Boolean);
+        }
+        let kickoffs = raw.kickoffs;
+        if ((!kickoffs || !kickoffs.length) && Array.isArray(slates)) {
+          kickoffs = [];
+          for (const slate of slates) {
+            if (slate?.kickoffs?.length) {
+              for (const k of slate.kickoffs) {
+                kickoffs.push({
+                  ...k,
+                  slateName: slate.name,
+                  slateStatus: slate.status,
+                  slateStartDate: slate.startDate,
+                  slateEndDate: slate.endDate
+                });
+              }
+            }
+          }
+        }
+        const payload = {
+          ok: true,
+          lastUpdated: raw.lastUpdated || new Date().toISOString(),
+          totalSlates: raw.totalSlates || (slates ? slates.length : undefined),
+          totalKickoffs: kickoffs ? kickoffs.length : raw.totalKickoffs,
+          slates,
+          kickoffs,
+          fallback: true,
+          error: err.message
+        };
+        return res.json(payload);
+      } catch (e) {
+        console.error("Error reading cached kickoffs after live failure:", e);
+      }
+    }
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -9480,25 +9878,95 @@ let setTotalsCache = null;
 let setTotalsCacheTime = 0;
 const SET_TOTALS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
+async function ensureSetsCatalogTable() {
+  await pgQuery(`
+    CREATE TABLE IF NOT EXISTS sets_catalog (
+      set_name TEXT PRIMARY KEY,
+      total_editions INTEGER DEFAULT 0,
+      common INTEGER DEFAULT 0,
+      uncommon INTEGER DEFAULT 0,
+      rare INTEGER DEFAULT 0,
+      legendary INTEGER DEFAULT 0,
+      ultimate INTEGER DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+}
+
+async function refreshSetsCatalog() {
+  await ensureSetsCatalogTable();
+  const rows = await pgQuery(`
+    INSERT INTO sets_catalog (set_name, total_editions, common, uncommon, rare, legendary, ultimate, updated_at)
+    SELECT 
+      set_name,
+      COUNT(DISTINCT edition_id) as total_editions,
+      COUNT(DISTINCT CASE WHEN UPPER(tier) = 'COMMON' THEN edition_id END) as common,
+      COUNT(DISTINCT CASE WHEN UPPER(tier) = 'UNCOMMON' THEN edition_id END) as uncommon,
+      COUNT(DISTINCT CASE WHEN UPPER(tier) = 'RARE' THEN edition_id END) as rare,
+      COUNT(DISTINCT CASE WHEN UPPER(tier) = 'LEGENDARY' THEN edition_id END) as legendary,
+      COUNT(DISTINCT CASE WHEN UPPER(tier) = 'ULTIMATE' THEN edition_id END) as ultimate,
+      now()
+    FROM nft_core_metadata
+    WHERE set_name IS NOT NULL
+    GROUP BY set_name
+    ON CONFLICT (set_name) DO UPDATE SET
+      total_editions = EXCLUDED.total_editions,
+      common        = EXCLUDED.common,
+      uncommon      = EXCLUDED.uncommon,
+      rare          = EXCLUDED.rare,
+      legendary     = EXCLUDED.legendary,
+      ultimate      = EXCLUDED.ultimate,
+      updated_at    = now()
+    RETURNING set_name;
+  `);
+  console.log(`[Set Completion] Refreshed sets_catalog (${rows.rowCount} rows)`);
+}
+
 async function getSetTotals() {
   const now = Date.now();
   if (setTotalsCache && (now - setTotalsCacheTime) < SET_TOTALS_CACHE_TTL) {
     return setTotalsCache;
   }
-  
-  console.log("[Set Completion] Refreshing set totals cache...");
-  const result = await pgQuery(`
-    SELECT set_name, COUNT(DISTINCT edition_id) as total_editions
-    FROM nft_core_metadata
-    WHERE set_name IS NOT NULL
-    GROUP BY set_name
-  `);
-  
-  setTotalsCache = new Map(result.rows.map(r => [r.set_name, parseInt(r.total_editions)]));
+
+  await ensureSetsCatalogTable();
+  // Try to read from catalog if it exists and is fresh
+  const catalog = await pgQuery(
+    `SELECT set_name, total_editions, updated_at FROM sets_catalog WHERE updated_at > now() - interval '15 minutes'`
+  );
+  if (catalog.rowCount > 0) {
+    setTotalsCache = new Map(catalog.rows.map(r => [r.set_name, parseInt(r.total_editions)]));
+    setTotalsCacheTime = now;
+    console.log(`[Set Completion] Loaded set totals from sets_catalog (${catalog.rowCount} rows)`);
+    return setTotalsCache;
+  }
+
+  // Fallback: rebuild catalog, then return as map
+  await refreshSetsCatalog();
+  const fresh = await pgQuery(`SELECT set_name, total_editions FROM sets_catalog`);
+  setTotalsCache = new Map(fresh.rows.map(r => [r.set_name, parseInt(r.total_editions)]));
   setTotalsCacheTime = now;
-  console.log(`[Set Completion] Cached ${setTotalsCache.size} set totals`);
+  console.log(`[Set Completion] Cached ${setTotalsCache.size} set totals (rebuilt)`);
   return setTotalsCache;
 }
+
+// Public: list all sets with total editions
+app.get("/api/set-completion/all", async (_req, res) => {
+  try {
+    const setTotals = await getSetTotals();
+
+    const sets = Array.from(setTotals.entries())
+      .map(([set_name, total]) => ({
+        set_name,
+        total,
+        is_team_set: false // computed on wallet fetch; keeps this endpoint fast
+      }))
+      .sort((a, b) => a.set_name.localeCompare(b.set_name));
+    return res.json({ ok: true, sets });
+  } catch (err) {
+    console.error("Error in /api/set-completion/all:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 app.get("/api/set-completion", async (req, res) => {
   try {
@@ -9527,16 +9995,52 @@ app.get("/api/set-completion", async (req, res) => {
       ORDER BY m.set_name`,
       [wallet]
     );
+
+    // Cost to complete (sum lowest ask of missing editions) using set_editions_snapshot for speed
+    const costRes = await pgQuery(
+      `
+      WITH owned AS (
+        SELECT DISTINCT m.edition_id
+        FROM wallet_holdings h
+        JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+        WHERE h.wallet_address = $1
+      ),
+      missing AS (
+        SELECT s.set_name, s.edition_id, s.lowest_ask_usd
+        FROM set_editions_snapshot s
+        LEFT JOIN owned o ON s.edition_id = o.edition_id
+        WHERE o.edition_id IS NULL
+      )
+      SELECT set_name, COALESCE(SUM(lowest_ask_usd), 0) AS cost_to_complete
+      FROM missing
+      GROUP BY set_name;
+      `,
+      [wallet]
+    );
+    const costMap = new Map(costRes.rows.map(r => [r.set_name, Number(r.cost_to_complete) || 0]));
+
+    // Team totals (for team-level tracking)
+    const teamTotalsRes = await pgQuery(`
+      SELECT team_name, COUNT(DISTINCT edition_id) AS total_editions
+      FROM nft_core_metadata
+      WHERE team_name IS NOT NULL AND team_name <> ''
+      GROUP BY team_name
+    `);
+    const teamTotals = new Map(teamTotalsRes.rows.map(r => [(r.team_name || "").toLowerCase(), parseInt(r.total_editions)]));
     
     // Merge with cached totals
     const sets = result.rows.map(r => {
       const total = setTotals.get(r.set_name) || 0;
       const owned = parseInt(r.owned_editions);
+      const cost = costMap.get(r.set_name) || 0;
       return {
         set_name: r.set_name,
         total,
         owned,
         completion: total > 0 ? Math.round(owned * 1000 / total) / 10 : 0,
+        cost_to_complete: cost,
+        // classify team set if set name contains a known team name
+        is_team_set: Array.from(teamTotals.keys()).some(t => (r.set_name || "").toLowerCase().includes(t)),
         by_tier: {
           Common: parseInt(r.common) || 0,
           Uncommon: parseInt(r.uncommon) || 0,
@@ -9547,6 +10051,29 @@ app.get("/api/set-completion", async (req, res) => {
       };
     }).sort((a, b) => b.completion - a.completion || a.set_name.localeCompare(b.set_name));
     
+    // Team progress
+    const teamOwnedRes = await pgQuery(
+      `
+      SELECT m.team_name, COUNT(DISTINCT m.edition_id) AS owned_editions
+      FROM wallet_holdings h
+      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      WHERE h.wallet_address = $1 AND m.team_name IS NOT NULL AND m.team_name <> ''
+      GROUP BY m.team_name;
+      `,
+      [wallet]
+    );
+    const teamProgress = teamOwnedRes.rows.map(r => {
+      const key = (r.team_name || "").toLowerCase();
+      const total = teamTotals.get(key) || 0;
+      const owned = parseInt(r.owned_editions);
+      return {
+        team_name: r.team_name,
+        total,
+        owned,
+        completion: total > 0 ? Math.round(owned * 1000 / total) / 10 : 0
+      };
+    }).sort((a, b) => b.completion - a.completion || a.team_name.localeCompare(b.team_name));
+
     const summary = {
       total_sets: sets.length,
       completed_sets: sets.filter(s => s.completion === 100).length,
@@ -9557,7 +10084,7 @@ app.get("/api/set-completion", async (req, res) => {
     const elapsed = Date.now() - startTime;
     console.log(`[Set Completion] Query for ${wallet.substring(0, 10)}... completed in ${elapsed}ms (${sets.length} sets)`);
     
-    return res.json({ ok: true, summary, sets });
+    return res.json({ ok: true, summary, sets, team_progress: teamProgress });
   } catch (err) {
     console.error("Error in /api/set-completion:", err);
     return res.status(500).json({ ok: false, error: err.message });
