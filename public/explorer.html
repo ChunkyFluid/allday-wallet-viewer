@@ -721,13 +721,17 @@
                     empty.style.display = "block";
                     empty.textContent = "No editions matched your filters.";
                     table.style.display = "none";
-                    pagerInfo.style.display = "none";
-                    if (mobileCards) mobileCards.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">🔍 No editions found</div>';
+                    if (pagerInfo) pagerInfo.style.display = "none";
+                    if (mobileCards) {
+                        mobileCards.style.display = "none";
+                        mobileCards.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">🔍 No editions found</div>';
+                    }
                     return;
                 }
 
                 empty.style.display = "none";
                 table.style.display = "table";
+                if (mobileCards) mobileCards.style.display = "flex";
 
                 // Pagination
                 const total = editions.length;
@@ -738,11 +742,13 @@
                 const pageEditions = editions.slice(start, end);
 
                 // Update pager info
-                if (totalPages > 1) {
-                    pagerInfo.style.display = "block";
-                    pagerInfo.textContent = `Page ${currentPage} of ${totalPages} • Showing ${start + 1}-${end} of ${total.toLocaleString()} editions`;
-                } else {
-                    pagerInfo.style.display = "none";
+                if (pagerInfo) {
+                    if (totalPages > 1) {
+                        pagerInfo.style.display = "block";
+                        pagerInfo.textContent = `Page ${currentPage} of ${totalPages} • Showing ${start + 1}-${end} of ${total.toLocaleString()} editions`;
+                    } else {
+                        pagerInfo.style.display = "none";
+                    }
                 }
 
                 for (const e of pageEditions) {

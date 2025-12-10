@@ -320,16 +320,15 @@ input, select, textarea {
 }
 
 @media (max-width: 768px) {
-    /* Hide tables on mobile, show cards */
-    .table-wrapper,
-    .table-container {
+    /* Hide tables on mobile; show cards */
+    #ex-table,
+    #wallet-table,
+    .table-wrapper {
         display: none !important;
     }
-    
     .mobile-cards {
         display: flex;
     }
-    
     /* Export buttons and pagination still visible */
     .table-header,
     #wallet-pager,
