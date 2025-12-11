@@ -37,6 +37,10 @@
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>
         </nav>
       </header>
+      <div class="site-banner">
+        Website made with ❤️ by Chunky. Its an ongoing Project. Not my job/income. May be paid to use in future. Donations Welcome.</span>
+        <a href="https://www.paypal.com/ncp/payment/7L6XYSZY9TQBJ" target="_blank" class="donate-link">💖 Donate</a>
+      </div>
     `;
     }
 
