@@ -521,15 +521,33 @@
                 onChange: () => {}
             });
 
-            async function loadFilterOptions() {
+            // Keep base filters for reset when player is cleared
+            let baseTeams = [];
+            let baseTiers = [];
+
+            function setSummaryStatus(msg) {
                 const summary = document.getElementById("ex-results-summary");
+                if (!summary) return;
+                if (!msg) {
+                    summary.textContent = "";
+                    return;
+                }
+                if (window.footballStatus?.set) {
+                    window.footballStatus.set(summary, msg, { randomPhrase: true });
+                } else {
+                    summary.textContent = msg;
+                }
+            }
+
+            async function loadFilterOptions() {
+                    const summary = document.getElementById("ex-results-summary");
                 try {
                     const res = await fetch("/api/explorer-filters");
                     const data = await res.json();
 
                     if (!data.ok) {
                         console.error("explorer-filters error:", data.error);
-                        summary.textContent = "Filters failed to load: " + (data.error || "unknown error");
+                            setSummaryStatus("Filters failed to load: " + (data.error || "unknown error"));
                         return;
                     }
 
@@ -582,10 +600,10 @@
                     // Positions (multi-select)
                     positionMultiSelect.setItems((data.positions || []).filter(Boolean));
 
-                    summary.textContent = "Ready to search";
+                    setSummaryStatus("Ready to search");
                 } catch (err) {
                     console.error("loadFilterOptions error:", err);
-                    summary.textContent = "Filters failed to load – open DevTools Console for details.";
+                    setSummaryStatus("Filters failed to load – open DevTools Console for details.");
                 }
             }
 
@@ -904,7 +922,7 @@
                     return;
                 }
 
-                summary.textContent = "Searching…";
+                setSummaryStatus("Searching…");
                 empty.style.display = "block";
                 empty.textContent = "Loading…";
                 table.style.display = "none";
@@ -925,7 +943,7 @@
                     }
 
                     currentEditions = data.editions || [];
-                    summary.textContent = "Found " + currentEditions.length.toLocaleString() + " edition(s).";
+                    setSummaryStatus("Found " + currentEditions.length.toLocaleString() + " edition(s).");
                     
                     // Show/hide pagination
                     const pager = document.getElementById("ex-pager");
@@ -944,7 +962,7 @@
                         stack: err.stack,
                         name: err.name
                     });
-                    summary.textContent = "Search failed: " + (err.message || "Unknown error");
+                    setSummaryStatus("Search failed: " + (err.message || "Unknown error"));
                     empty.style.display = "block";
                     empty.textContent = "Something went wrong. Check console for details.";
                     table.style.display = "none";

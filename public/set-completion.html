@@ -44,6 +44,7 @@
     .table thead th.sortable::after { content: ' ⇅'; font-size: 0.75em; color: var(--text-muted); }
     .table thead th.sortable.sort-asc::after { content: ' ↑'; }
     .table thead th.sortable.sort-desc::after { content: ' ↓'; }
+    /* spinner styles are provided globally in styles.css */
     @media (max-width: 768px) {
       .desktop-only { display: none; }
       .mobile-only { display: grid; }
@@ -327,7 +328,12 @@
     
     function updateStatus(msg) {
       const status = document.getElementById('set-status');
-      if (status) status.textContent = msg || '';
+      if (!status) return;
+      if (!msg) {
+        status.textContent = '';
+      } else {
+        status.textContent = msg;
+      }
     }
 
     function sortSets(list) {

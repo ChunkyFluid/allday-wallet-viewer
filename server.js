@@ -7779,6 +7779,7 @@ const CACHED_KICKOFFS_FILE = path.join(__dirname, 'data', 'kickoffs.json');
 const CACHED_CHALLENGES_FILE = path.join(__dirname, 'data', 'challenges.json');
 // Allow a root-level challenges.json fallback if data/ file is missing
 const ALT_CACHED_CHALLENGES_FILE = path.join(__dirname, 'challenges.json');
+const RARITY_LEADERBOARD_SNAPSHOT_FILE = path.join(__dirname, 'data', 'rarity-leaderboard.json');
 
 // Fetch live challenges via public consumer GraphQL endpoint (no auth)
 async function fetchLiveChallenges() {
@@ -9928,6 +9929,19 @@ async function getSetTotals() {
     return setTotalsCache;
   }
 
+  // Fast path: set_totals_snapshot (prebuilt, small)
+  try {
+    const snap = await pgQuery(`SELECT set_name, total_editions FROM set_totals_snapshot`);
+    if (snap.rowCount > 0) {
+      setTotalsCache = new Map(snap.rows.map(r => [r.set_name, parseInt(r.total_editions)]));
+      setTotalsCacheTime = now;
+      console.log(`[Set Completion] Loaded set totals from set_totals_snapshot (${snap.rowCount} rows)`);
+      return setTotalsCache;
+    }
+  } catch (err) {
+    console.warn("[Set Completion] set_totals_snapshot not available, falling back:", err.message);
+  }
+
   await ensureSetsCatalogTable();
   // Try to read from catalog if it exists and is fresh
   const catalog = await pgQuery(
@@ -10333,6 +10347,26 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
         cache_age_minutes: Math.round((now - rarityLeaderboardCacheTime) / 60000)
       });
     }
+
+    // Try on-disk snapshot to avoid recompute
+    if (!forceRefresh && fs.existsSync(RARITY_LEADERBOARD_SNAPSHOT_FILE)) {
+      try {
+        const snapshot = JSON.parse(fs.readFileSync(RARITY_LEADERBOARD_SNAPSHOT_FILE, "utf8"));
+        if (Array.isArray(snapshot)) {
+          rarityLeaderboardCache = snapshot;
+          rarityLeaderboardCacheTime = now;
+          return res.json({
+            ok: true,
+            leaderboard: snapshot,
+            cached: true,
+            fromSnapshot: true,
+            cache_age_minutes: null
+          });
+        }
+      } catch (e) {
+        console.warn("[Rarity Leaderboard] Failed to read snapshot:", e.message);
+      }
+    }
     
     console.log("[Rarity Leaderboard] Computing leaderboard (this may take a moment)...");
     const startTime = Date.now();
@@ -10406,6 +10440,12 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
     // Cache the result
     rarityLeaderboardCache = rankedLeaderboard;
     rarityLeaderboardCacheTime = now;
+    try {
+      fs.mkdirSync(path.dirname(RARITY_LEADERBOARD_SNAPSHOT_FILE), { recursive: true });
+      fs.writeFileSync(RARITY_LEADERBOARD_SNAPSHOT_FILE, JSON.stringify(rankedLeaderboard, null, 2), "utf8");
+    } catch (e) {
+      console.warn("[Rarity Leaderboard] Failed to write snapshot:", e.message);
+    }
     
     const elapsed = Date.now() - startTime;
     console.log(`[Rarity Leaderboard] Computed ${rankedLeaderboard.length} entries in ${elapsed}ms`);
