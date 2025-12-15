@@ -5,8 +5,14 @@ data/*.csv
 # Dependencies
 node_modules/
 
-# Log files
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
 *.log
 
-# Environment variables - NEVER commit
-.env
+# Build output
+dist/
+build/
