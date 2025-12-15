@@ -29,9 +29,7 @@
           <a href="/serial-finder.html" class="${path === '/serial-finder.html' ? 'active' : ''}">🏆 Serials</a>
           <a href="/wallet-compare.html" class="${path === '/wallet-compare.html' ? 'active' : ''}">⚖️ Compare</a>
           <a href="/rarity-score.html" class="${path === '/rarity-score.html' ? 'active' : ''}">📈 Rarity</a>
-          <a href="/trade-analyzer.html" class="${path === '/trade-analyzer.html' ? 'active' : ''}">🔄 Trades</a>
-          <a href="/playbook.html" class="${path === '/playbook.html' ? 'active' : ''}">📖 Playbook</a>
-          <a href="/challenges.html" class="${path === '/challenges.html' ? 'active' : ''}">🎮 Challenges</a>
+          <a href="/trades.html" class="${path === '/trades.html' ? 'active nav-hot' : 'nav-hot'}">🔄 Trading</a>
           <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
           <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>

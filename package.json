@@ -25,5 +25,18 @@
     "playwright": "^1.49.0",
     "snowflake-sdk": "^1.11.3",
     "ws": "^8.18.3"
-  }
+  },
+  "description": "A full‑stack app for exploring NFL ALL DAY wallets, moments, and collections.",
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChunkyFluid/allday-wallet-viewer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ChunkyFluid/allday-wallet-viewer/issues"
+  },
+  "homepage": "https://github.com/ChunkyFluid/allday-wallet-viewer#readme"
 }

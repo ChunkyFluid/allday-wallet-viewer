@@ -96,7 +96,7 @@ async function findlabRequest(endpoint, options = {}) {
   const url = `${FINDLAB_API_BASE}${endpoint}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FINDLAB_API_TIMEOUT);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -107,9 +107,9 @@ async function findlabRequest(endpoint, options = {}) {
         ...options.headers
       }
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
       // Try to get error details from response body
       let errorBody = '';
@@ -118,14 +118,14 @@ async function findlabRequest(endpoint, options = {}) {
       } catch (e) {
         // Ignore
       }
-      
+
       const errorMsg = `FindLab API error: ${response.status} ${response.statusText}`;
       const error = new Error(errorMsg);
       error.response = response;
       error.body = errorBody;
       throw error;
     }
-    
+
     const data = await response.json();
     return data;
   } catch (err) {
@@ -163,7 +163,7 @@ async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDa
     // Try multiple endpoint formats - FindLab API might use different paths
     const encodedAddress = encodeURIComponent(address);
     const encodedNftType = encodeURIComponent(nftType);
-    
+
     // Try different endpoint formats
     const endpoints = [
       `/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`,
@@ -171,11 +171,11 @@ async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDa
       `/flow/v1/nft/${encodedNftType}/owner/${encodedAddress}?limit=1000`,
       `/api/flow/v1/account/${encodedAddress}/nft/${encodedNftType}?limit=1000`
     ];
-    
+
     for (const endpoint of endpoints) {
       try {
         const data = await findlabRequest(endpoint);
-        
+
         // Handle different response structures
         let nftArray = null;
         if (data.data && Array.isArray(data.data)) {
@@ -187,14 +187,14 @@ async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDa
         } else if (data.items && Array.isArray(data.items)) {
           nftArray = data.items;
         }
-        
+
         if (nftArray) {
           // Extract NFT IDs from the response
           const nftIds = nftArray.map(item => {
             if (typeof item === 'string' || typeof item === 'number') return String(item);
             return item.id || item.nft_id || item.identifier || item.tokenId || String(item);
           }).filter(Boolean);
-          
+
           if (nftIds.length > 0 || nftArray.length === 0) {
             // Success - return the IDs (empty array is valid - wallet has no NFTs)
             return nftIds;
@@ -205,7 +205,7 @@ async function getWalletNFTsFindLab(address, nftType = 'A.e4cf4bdc1751c65d.AllDa
         continue;
       }
     }
-    
+
     // All endpoints failed
     console.warn(`[FindLab] All endpoint formats failed for ${address.substring(0, 10)}...`);
     return null;
@@ -223,11 +223,11 @@ async function getNFTItemFindLab(nftType, nftId) {
   try {
     const encodedNftType = encodeURIComponent(nftType);
     const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/item/${nftId}`);
-    
+
     if (data.data) {
       return data.data;
     }
-    
+
     return null;
   } catch (err) {
     console.warn(`[FindLab] Failed to get NFT item ${nftType}/${nftId}:`, err.message);
@@ -241,11 +241,11 @@ async function getAccountTransactionsFindLab(address, limit = 50) {
   try {
     const encodedAddress = encodeURIComponent(address);
     const data = await findlabRequest(`/flow/v1/account/${encodedAddress}/transaction?limit=${Math.min(limit, 100)}`);
-    
+
     if (data.data && Array.isArray(data.data)) {
       return data.data;
     }
-    
+
     return [];
   } catch (err) {
     console.warn(`[FindLab] Failed to get transactions for ${address}:`, err.message);
@@ -259,11 +259,11 @@ async function getNFTTransfersFindLab(nftType, limit = 50) {
   try {
     const encodedNftType = encodeURIComponent(nftType);
     const data = await findlabRequest(`/flow/v1/nft/${encodedNftType}/transfer?limit=${Math.min(limit, 100)}`);
-    
+
     if (data.data && Array.isArray(data.data)) {
       return data.data;
     }
-    
+
     return [];
   } catch (err) {
     console.warn(`[FindLab] Failed to get NFT transfers for ${nftType}:`, err.message);
@@ -300,14 +300,14 @@ function connectToFlowWebSocket() {
   }
 
   console.log("Connecting to Flow WebSocket Stream API...");
-  
+
   try {
     flowWsConnection = new WebSocket(FLOW_WS_URL);
-    
+
     flowWsConnection.on("open", () => {
       console.log("Flow WebSocket connected!");
       flowWsConnected = true;
-      
+
       // Subscribe to AllDay events
       const subscribeMsg = {
         subscription_id: `ad-${Date.now().toString().slice(-12)}`, // Max 20 chars: "ad-" + 12 digits = 15 chars
@@ -321,23 +321,23 @@ function connectToFlowWebSocket() {
       flowWsConnection.send(JSON.stringify(subscribeMsg));
       console.log(`Subscribed to AllDay events: ${ALLDAY_EVENT_TYPES.join(', ')}`);
     });
-    
+
     flowWsConnection.on("message", async (data) => {
       try {
         const rawData = data.toString();
         const msg = JSON.parse(rawData);
-        
+
         // Handle subscription confirmation (silently)
         if (msg.subscription_id && !msg.events) {
           return;
         }
-        
+
         // Handle error messages
         if (msg.error) {
           console.error("Flow WS error:", msg.error);
           return;
         }
-        
+
         // Handle events - they come in various formats
         if (msg.events && Array.isArray(msg.events)) {
           console.log(`Received ${msg.events.length} events`);
@@ -355,16 +355,16 @@ function connectToFlowWebSocket() {
         console.error("Error processing Flow WebSocket message:", err.message, err.stack);
       }
     });
-    
+
     flowWsConnection.on("error", (err) => {
       console.error("Flow WebSocket error:", err.message);
       flowWsConnected = false;
     });
-    
+
     flowWsConnection.on("close", (code, reason) => {
       console.log(`Flow WebSocket closed: ${code} - ${reason}`);
       flowWsConnected = false;
-      
+
       // Reconnect after 5 seconds
       if (!flowWsReconnectTimer) {
         flowWsReconnectTimer = setTimeout(() => {
@@ -376,7 +376,7 @@ function connectToFlowWebSocket() {
   } catch (err) {
     console.error("Failed to create Flow WebSocket connection:", err.message);
     flowWsConnected = false;
-    
+
     // Retry connection after 10 seconds
     if (!flowWsReconnectTimer) {
       flowWsReconnectTimer = setTimeout(() => {
@@ -392,7 +392,7 @@ async function processFlowEvent(event) {
     // Parse the event data
     const eventType = event.type ? event.type.split(".").pop() : "Unknown";
     let payload = {};
-    
+
     // Handle different payload formats
     if (event.payload) {
       if (typeof event.payload === 'string') {
@@ -410,7 +410,7 @@ async function processFlowEvent(event) {
         payload = event.payload;
       }
     }
-    
+
     // Extract NFT ID from payload - Flow events use Cadence value format
     let nftId = null;
     if (payload.value && payload.value.fields) {
@@ -422,7 +422,7 @@ async function processFlowEvent(event) {
     } else {
       nftId = payload.id || payload.nftID || payload.nft_id || null;
     }
-    
+
     // Extract addresses
     let fromAddr = null;
     let toAddr = null;
@@ -439,11 +439,11 @@ async function processFlowEvent(event) {
       fromAddr = payload.from ? payload.from.toString().toLowerCase() : null;
       toAddr = payload.to ? payload.to.toString().toLowerCase() : null;
     }
-    
+
     const timestamp = new Date().toISOString(); // Use current time for live events
     const blockHeight = event.block_height || event.height || 0;
     const txId = event.transaction_id || event.tx_id || null;
-    
+
     // Create the event object
     const liveEvent = {
       type: eventType,
@@ -455,16 +455,16 @@ async function processFlowEvent(event) {
       txId: txId,
       source: 'live'
     };
-    
+
     console.log(`Live event: ${eventType} NFT=${nftId} from=${fromAddr} to=${toAddr}`);
-    
+
     // Update wallet holdings in real-time
     if (nftId && eventType === 'Deposit' && toAddr) {
       await updateWalletHoldingOnDeposit(toAddr, nftId, timestamp, blockHeight);
     } else if (nftId && eventType === 'Withdraw' && fromAddr) {
       await updateWalletHoldingOnWithdraw(fromAddr, nftId);
     }
-    
+
     // Try to enrich with wallet names and moment details
     if (liveEvent.from) {
       try {
@@ -475,7 +475,7 @@ async function processFlowEvent(event) {
         liveEvent.sellerName = sellerResult.rows[0]?.display_name || null;
       } catch (err) { /* ignore */ }
     }
-    
+
     if (liveEvent.to) {
       try {
         const buyerResult = await pgQuery(
@@ -485,7 +485,7 @@ async function processFlowEvent(event) {
         liveEvent.buyerName = buyerResult.rows[0]?.display_name || null;
       } catch (err) { /* ignore */ }
     }
-    
+
     if (liveEvent.nftId) {
       try {
         const momentResult = await pgQuery(
@@ -496,7 +496,7 @@ async function processFlowEvent(event) {
         const moment = momentResult.rows[0];
         if (moment) {
           liveEvent.moment = {
-            playerName: moment.first_name && moment.last_name 
+            playerName: moment.first_name && moment.last_name
               ? `${moment.first_name} ${moment.last_name}` : null,
             teamName: moment.team_name,
             position: moment.position,
@@ -507,7 +507,7 @@ async function processFlowEvent(event) {
         }
       } catch (err) { /* ignore */ }
     }
-    
+
     addLiveEvent(liveEvent);
   } catch (err) {
     console.error("Error processing Flow event:", err.message);
@@ -518,10 +518,10 @@ async function processFlowEvent(event) {
 async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blockHeight) {
   try {
     if (!walletAddress || !nftId) return;
-    
+
     const walletAddr = walletAddress.toLowerCase();
     const ts = timestamp ? new Date(timestamp) : new Date();
-    
+
     // Upsert: add NFT to wallet holdings (or update timestamp if already exists)
     // Only update if the new timestamp is newer (avoid overwriting with old data)
     await pgQuery(
@@ -538,7 +538,7 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
          last_synced_at = NOW()`,
       [walletAddr, nftId.toString(), false, ts]
     );
-    
+
     console.log(`[Wallet Sync] ✅ Added NFT ${nftId} to wallet ${walletAddr.substring(0, 8)}...`);
   } catch (err) {
     // Don't spam logs for expected errors (e.g., duplicate key during race conditions)
@@ -552,16 +552,16 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
 async function updateWalletHoldingOnWithdraw(walletAddress, nftId) {
   try {
     if (!walletAddress || !nftId) return;
-    
+
     const walletAddr = walletAddress.toLowerCase();
-    
+
     // Delete the NFT from wallet holdings
     const result = await pgQuery(
       `DELETE FROM wallet_holdings 
        WHERE wallet_address = $1 AND nft_id = $2`,
       [walletAddr, nftId.toString()]
     );
-    
+
     if (result.rowCount > 0) {
       console.log(`[Wallet Sync] ✅ Removed NFT ${nftId} from wallet ${walletAddr.substring(0, 8)}...`);
     }
@@ -577,17 +577,17 @@ app.post("/api/wallet/refresh", async (req, res) => {
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing wallet address" });
     }
-    
+
     const walletAddr = wallet.toString().trim().toLowerCase();
     if (!/^0x[0-9a-f]{4,64}$/.test(walletAddr)) {
       return res.status(400).json({ ok: false, error: "Invalid wallet format" });
     }
-    
+
     console.log(`[Wallet Refresh] Fetching current holdings for ${walletAddr.substring(0, 8)}...`);
-    
+
     // Try new Flow blockchain service first (most reliable)
     let nftIds = null;
-    
+
     try {
       const flowService = await import("./services/flow-blockchain.js");
       const nftIdNumbers = await flowService.getWalletNFTIds(walletAddr);
@@ -598,7 +598,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
     } catch (err) {
       console.warn(`[Wallet Refresh] Flow blockchain service failed, trying FindLab API...`, err.message);
     }
-    
+
     // Fallback to FindLab API
     if (!nftIds || nftIds.length === 0) {
       try {
@@ -610,7 +610,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
         console.warn(`[Wallet Refresh] FindLab API failed, trying Flow REST API...`);
       }
     }
-    
+
     // Final fallback to Flow REST API
     if (!nftIds || nftIds.length === 0) {
       try {
@@ -622,7 +622,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
         console.warn(`[Wallet Refresh] Flow REST API failed:`, err.message);
       }
     }
-    
+
     // If still no NFTs, treat as empty wallet
     if (!nftIds || nftIds.length === 0) {
       // Wallet has no NFTs - remove all holdings
@@ -630,7 +630,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
         `DELETE FROM wallet_holdings WHERE wallet_address = $1`,
         [walletAddr]
       );
-      
+
       return res.json({
         ok: true,
         wallet: walletAddr,
@@ -640,7 +640,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
         current: 0
       });
     }
-    
+
     // Get current holdings from database
     const currentResult = await pgQuery(
       `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1`,
@@ -648,23 +648,23 @@ app.post("/api/wallet/refresh", async (req, res) => {
     );
     const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
     const newNftIds = new Set(nftIds.map(id => id.toString()));
-    
+
     // Find NFTs to add (in new list but not in current)
     const toAdd = nftIds.filter(id => !currentNftIds.has(id.toString()));
-    
+
     // Find NFTs to remove (in current but not in new)
     const toRemove = Array.from(currentNftIds).filter(id => !newNftIds.has(id));
-    
+
     // Add new NFTs
     let added = 0;
     if (toAdd.length > 0) {
       const now = new Date();
-      const values = toAdd.map((nftId, idx) => 
+      const values = toAdd.map((nftId, idx) =>
         `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`
       ).join(', ');
-      
+
       const params = toAdd.flatMap(nftId => [walletAddr, nftId.toString(), false, now]);
-      
+
       await pgQuery(
         `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
          VALUES ${values}
@@ -677,7 +677,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
       );
       added = toAdd.length;
     }
-    
+
     // Remove NFTs that are no longer in the wallet
     let removed = 0;
     if (toRemove.length > 0) {
@@ -688,9 +688,9 @@ app.post("/api/wallet/refresh", async (req, res) => {
       );
       removed = result.rowCount;
     }
-    
+
     console.log(`[Wallet Refresh] ✅ Updated wallet ${walletAddr.substring(0, 8)}... - Added: ${added}, Removed: ${removed}, Total: ${newNftIds.size}`);
-    
+
     return res.json({
       ok: true,
       wallet: walletAddr,
@@ -1286,10 +1286,10 @@ app.get("/api/search-editions", async (req, res) => {
       // If snapshot table doesn't exist, fall back to live query
       if (snapshotError.message && (snapshotError.message.includes("does not exist") || snapshotError.message.includes("relation") && snapshotError.message.includes("editions_snapshot"))) {
         console.log("editions_snapshot table not found, falling back to live query");
-        
+
         // Remove the limit param we just added
         params.pop();
-        
+
         // Use live query with GROUP BY
         sql = `
           SELECT
@@ -1315,7 +1315,7 @@ app.get("/api/search-editions", async (req, res) => {
           ORDER BY MAX(e.last_name) NULLS LAST, MAX(e.first_name) NULLS LAST, e.edition_id
           LIMIT $${idx};
         `;
-        
+
         params.push(safeLimit);
         result = await pgQuery(sql, params);
       } else {
@@ -1634,14 +1634,14 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
     if (flowAddress.startsWith('0x')) {
       flowAddress = flowAddress.substring(2);
     }
-    
+
     // Ensure address is properly formatted (remove any extra characters, pad if needed)
     flowAddress = flowAddress.replace(/[^0-9a-f]/g, '');
-    
+
     // Flow REST API expects arguments in a specific format
     // The address needs to be in the correct format
     const flowAddressWithPrefix = `0x${flowAddress}`;
-    
+
     // Flow REST API v1 scripts endpoint expects arguments as an array
     // Each argument is a JSON-CDC encoded value
     // For Address, we pass it as: { "type": "Address", "value": "0x..." }
@@ -1649,7 +1649,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
       type: "Address",
       value: flowAddressWithPrefix
     };
-    
+
     const scriptResponse = await fetch(`${FLOW_REST_API}/v1/scripts`, {
       method: 'POST',
       headers: {
@@ -1661,14 +1661,14 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
       }),
       signal: AbortSignal.timeout(20000) // 20 second timeout (scripts can be slow)
     });
-    
+
     if (!scriptResponse.ok) {
       const errorText = await scriptResponse.text().catch(() => '');
       throw new Error(`Flow API error: ${scriptResponse.status} ${scriptResponse.statusText} - ${errorText.substring(0, 200)}`);
     }
-    
+
     const scriptData = await scriptResponse.json();
-    
+
     // The response should contain the NFT IDs array (as UInt64 values)
     if (scriptData && Array.isArray(scriptData)) {
       const nftIds = scriptData.map(id => String(id)).filter(Boolean);
@@ -1681,7 +1681,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
         return nftIds;
       }
     }
-    
+
     return [];
   } catch (err) {
     console.warn(`[LiveWallet] Flow REST API script execution failed for ${walletAddress.substring(0, 10)}...:`, err.message);
@@ -1701,7 +1701,7 @@ async function fetchLiveWalletNFTs(walletAddress) {
   } catch (err) {
     // Continue to next method
   }
-  
+
   // Fallback to Flow REST API with Cadence script
   try {
     const nftIds = await fetchWalletNFTsViaFlowAPI(walletAddress);
@@ -1712,7 +1712,7 @@ async function fetchLiveWalletNFTs(walletAddress) {
   } catch (err) {
     console.warn(`[LiveWallet] Flow REST API failed:`, err.message);
   }
-  
+
   // Final fallback: query recent Deposit events for this wallet (last 7 days)
   // This is a compromise - we can't get ALL NFTs this way, but we can get recently received ones
   try {
@@ -1725,7 +1725,7 @@ async function fetchLiveWalletNFTs(walletAddress) {
   } catch (err) {
     console.warn(`[LiveWallet] Event-based fetch failed:`, err.message);
   }
-  
+
   // All methods failed - return null to use database
   return null;
 }
@@ -1736,24 +1736,24 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
     // Get latest block height
     const latestHeight = await getLatestBlockHeightFindLab() || await getLatestBlockHeight();
     if (!latestHeight) return null;
-    
+
     // Query last 7 days of blocks (~1.2M blocks = 7 days * 24 hours * 60 min * 60 sec * 2 blocks/sec)
     const blocksPerDay = 24 * 60 * 60 * 2; // ~172,800 blocks per day
     const startHeight = Math.max(0, latestHeight - (7 * blocksPerDay));
-    
+
     const walletAddr = walletAddress.toLowerCase();
-    
+
     // Query Deposit events where this wallet is the recipient
     const depositRes = await fetch(
       `${FLOW_REST_API}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${latestHeight}`,
       { signal: AbortSignal.timeout(10000) }
     );
-    
+
     if (!depositRes.ok) return null;
-    
+
     const depositData = await depositRes.json();
     const nftIds = new Set();
-    
+
     for (const block of depositData) {
       if (!block.events) continue;
       for (const event of block.events) {
@@ -1762,16 +1762,16 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
           if (typeof payload === 'string') {
             payload = JSON.parse(Buffer.from(payload, 'base64').toString());
           }
-          
+
           if (payload?.value?.fields) {
             const fields = payload.value.fields;
             const toField = fields.find(f => f.name === 'to');
             const idField = fields.find(f => f.name === 'id');
-            
+
             if (toField && idField) {
               const toAddr = (toField.value?.value || toField.value || '').toString().toLowerCase();
               const nftId = (idField.value?.value || idField.value || '').toString();
-              
+
               if (toAddr === walletAddr && nftId) {
                 nftIds.add(nftId);
               }
@@ -1782,7 +1782,7 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
         }
       }
     }
-    
+
     return Array.from(nftIds);
   } catch (err) {
     console.warn(`[LiveWallet] Event-based fetch error:`, err.message);
@@ -1809,13 +1809,13 @@ app.get("/api/wallet-summary", async (req, res) => {
     let liveNftIds = null;
     let dataSource = 'database';
     const useBlockchain = req.query.source === 'blockchain' || useLive;
-    
+
     if (useBlockchain) {
       try {
         console.log(`[Wallet Summary] Fetching live data from Flow blockchain for ${wallet}...`);
         const flowService = await import("./services/flow-blockchain.js");
         const nftIds = await flowService.getWalletNFTIds(wallet);
-        
+
         if (nftIds && nftIds.length >= 0) {
           liveNftIds = nftIds.map(id => id.toString());
           dataSource = 'blockchain';
@@ -1854,7 +1854,7 @@ app.get("/api/wallet-summary", async (req, res) => {
 
     // 2) Stats + value based on edition_price_scrape
     let statsResult;
-    
+
     if (liveNftIds !== null && liveNftIds.length > 0) {
       // Use LIVE blockchain data - but prioritize wallet_holdings for locked status
       // First check if wallet_holdings has locked status data
@@ -1863,9 +1863,9 @@ app.get("/api/wallet-summary", async (req, res) => {
          FROM wallet_holdings WHERE wallet_address = $1`,
         [wallet]
       );
-      
+
       const hasLockedData = holdingsCheck.rows[0]?.locked > 0 || holdingsCheck.rows[0]?.total === liveNftIds.length;
-      
+
       if (hasLockedData) {
         // Use wallet_holdings as source of truth for locked status (it has the data)
         // Don't filter by blockchain NFT IDs - use ALL wallet_holdings data
@@ -1896,7 +1896,7 @@ app.get("/api/wallet-summary", async (req, res) => {
           `,
           [wallet]
         );
-        
+
         console.log(`[Wallet Summary] Using wallet_holdings: ${statsResult.rows[0]?.locked_count || 0} locked out of ${statsResult.rows[0]?.moments_total || 0} total`);
       } else {
         // Fall back to blockchain NFT IDs with wallet_holdings join (for when wallet_holdings doesn't have locked data yet)
@@ -1933,16 +1933,18 @@ app.get("/api/wallet-summary", async (req, res) => {
       }
     } else if (liveNftIds !== null && liveNftIds.length === 0) {
       // Live data returned empty wallet
-      statsResult = { rows: [{ 
-        wallet_address: wallet,
-        moments_total: 0, locked_count: 0, unlocked_count: 0,
-        common_count: 0, uncommon_count: 0, rare_count: 0, legendary_count: 0, ultimate_count: 0,
-        floor_value: 0, asp_value: 0, priced_moments: 0
-      }] };
+      statsResult = {
+        rows: [{
+          wallet_address: wallet,
+          moments_total: 0, locked_count: 0, unlocked_count: 0,
+          common_count: 0, uncommon_count: 0, rare_count: 0, legendary_count: 0, ultimate_count: 0,
+          floor_value: 0, asp_value: 0, priced_moments: 0
+        }]
+      };
     } else {
       // Fall back to database snapshot
       statsResult = await pgQuery(
-      `
+        `
       SELECT
         h.wallet_address,
 
@@ -1987,8 +1989,8 @@ app.get("/api/wallet-summary", async (req, res) => {
       WHERE h.wallet_address = $1
       GROUP BY h.wallet_address;
       `,
-      [wallet]
-    );
+        [wallet]
+      );
     }
 
     // 3) Holdings + price freshness metadata
@@ -2016,35 +2018,35 @@ app.get("/api/wallet-summary", async (req, res) => {
 
     const stats = statsRow
       ? {
-          momentsTotal: statsRow.moments_total,
-          lockedCount: statsRow.locked_count,
-          unlockedCount: statsRow.unlocked_count,
-          byTier: {
-            Common: statsRow.common_count,
-            Uncommon: statsRow.uncommon_count,
-            Rare: statsRow.rare_count,
-            Legendary: statsRow.legendary_count,
-            Ultimate: statsRow.ultimate_count
-          },
-          floorValue: Number(statsRow.floor_value) || 0,
-          aspValue: Number(statsRow.asp_value) || 0,
-          pricedMoments: Number(statsRow.priced_moments) || 0
-        }
+        momentsTotal: statsRow.moments_total,
+        lockedCount: statsRow.locked_count,
+        unlockedCount: statsRow.unlocked_count,
+        byTier: {
+          Common: statsRow.common_count,
+          Uncommon: statsRow.uncommon_count,
+          Rare: statsRow.rare_count,
+          Legendary: statsRow.legendary_count,
+          Ultimate: statsRow.ultimate_count
+        },
+        floorValue: Number(statsRow.floor_value) || 0,
+        aspValue: Number(statsRow.asp_value) || 0,
+        pricedMoments: Number(statsRow.priced_moments) || 0
+      }
       : {
-          momentsTotal: 0,
-          lockedCount: 0,
-          unlockedCount: 0,
-          byTier: {
-            Common: 0,
-            Uncommon: 0,
-            Rare: 0,
-            Legendary: 0,
-            Ultimate: 0
-          },
-          floorValue: 0,
-          aspValue: 0,
-          pricedMoments: 0
-        };
+        momentsTotal: 0,
+        lockedCount: 0,
+        unlockedCount: 0,
+        byTier: {
+          Common: 0,
+          Uncommon: 0,
+          Rare: 0,
+          Legendary: 0,
+          Ultimate: 0
+        },
+        floorValue: 0,
+        aspValue: 0,
+        pricedMoments: 0
+      };
 
     return res.json({
       ok: true,
@@ -2123,7 +2125,7 @@ app.get("/api/query", async (req, res) => {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
     const useBlockchain = req.query.source === 'blockchain' || req.query.blockchain === 'true';
-    
+
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
@@ -2137,12 +2139,12 @@ app.get("/api/query", async (req, res) => {
       try {
         const flowService = await import("./services/flow-blockchain.js");
         const startTime = Date.now();
-        
+
         console.log(`[Wallet Query] Using blockchain source for ${wallet.substring(0, 8)}...`);
-        
+
         // Get NFT IDs from blockchain
         const nftIds = await flowService.getWalletNFTIds(wallet);
-        
+
         if (nftIds.length === 0) {
           return res.json({
             ok: true,
@@ -2153,7 +2155,7 @@ app.get("/api/query", async (req, res) => {
             queryTime: Date.now() - startTime
           });
         }
-        
+
         // Get metadata from database - start from blockchain NFT IDs, then join to metadata
         // This ensures we get ALL NFTs from blockchain, even if metadata doesn't exist yet
         // Also join with wallet_holdings to preserve locked status
@@ -2188,10 +2190,10 @@ app.get("/api/query", async (req, res) => {
           `,
           [...nftIds.map(id => id.toString()), wallet]
         );
-        
+
         const queryTime = Date.now() - startTime;
         console.log(`[Wallet Query] ✅ Blockchain query completed in ${queryTime}ms - Found ${result.rowCount} moments`);
-        
+
         return res.json({
           ok: true,
           wallet,
@@ -2219,7 +2221,7 @@ app.get("/api/query", async (req, res) => {
         [wallet]
       );
       const count = parseInt(countResult.rows[0]?.count || 0);
-      
+
       // Only refresh if wallet has no holdings (might be a new wallet that needs initial sync)
       // Otherwise, trust the database which is kept up-to-date via WebSocket real-time events
       if (count === 0) {
@@ -2233,7 +2235,7 @@ app.get("/api/query", async (req, res) => {
       try {
         console.log(`[Wallet Query] Auto-refreshing wallet ${wallet.substring(0, 8)}... (stale data or forced)`);
         const nftIds = await getWalletNFTsFindLab(wallet, 'A.e4cf4bdc1751c65d.AllDay');
-        
+
         if (nftIds && nftIds.length >= 0) {
           // Get current holdings from database
           const currentResult = await pgQuery(
@@ -2242,22 +2244,22 @@ app.get("/api/query", async (req, res) => {
           );
           const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
           const newNftIds = new Set(nftIds.map(id => id.toString()));
-          
+
           // Find NFTs to add
           const toAdd = nftIds.filter(id => !currentNftIds.has(id.toString()));
-          
+
           // Find NFTs to remove
           const toRemove = Array.from(currentNftIds).filter(id => !newNftIds.has(id));
-          
+
           // Add new NFTs
           if (toAdd.length > 0) {
             const now = new Date();
-            const values = toAdd.map((nftId, idx) => 
+            const values = toAdd.map((nftId, idx) =>
               `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`
             ).join(', ');
-            
+
             const params = toAdd.flatMap(nftId => [wallet, nftId.toString(), false, now]);
-            
+
             await pgQuery(
               `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
                VALUES ${values}
@@ -2269,7 +2271,7 @@ app.get("/api/query", async (req, res) => {
               params
             );
           }
-          
+
           // Remove NFTs that are no longer in the wallet
           if (toRemove.length > 0) {
             await pgQuery(
@@ -2278,7 +2280,7 @@ app.get("/api/query", async (req, res) => {
               [wallet, toRemove]
             );
           }
-          
+
           if (toAdd.length > 0 || toRemove.length > 0) {
             console.log(`[Wallet Query] ✅ Refreshed wallet ${wallet.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length}`);
           }
@@ -2342,7 +2344,7 @@ app.get("/api/query", async (req, res) => {
 app.get("/api/query-blockchain", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
-    
+
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
     }
@@ -2356,10 +2358,10 @@ app.get("/api/query-blockchain", async (req, res) => {
 
     try {
       const flowService = await import("./services/flow-blockchain.js");
-      
+
       // Get NFT IDs directly from blockchain
       const nftIds = await flowService.getWalletNFTIds(wallet);
-      
+
       // Auto-sync to database for future fast queries (non-blocking)
       if (nftIds.length > 0) {
         try {
@@ -2378,7 +2380,7 @@ app.get("/api/query-blockchain", async (req, res) => {
           // Ignore
         }
       }
-      
+
       if (nftIds.length === 0) {
         return res.json({
           ok: true,
@@ -2753,7 +2755,7 @@ app.get("/api/teams", async (req, res) => {
         LIMIT 1;
         `
       );
-      
+
       if (snapshotRes.rows.length > 0 && snapshotRes.rows[0].teams) {
         // PostgreSQL JSONB columns are automatically parsed to JavaScript arrays
         teams = snapshotRes.rows[0].teams;
@@ -2780,7 +2782,7 @@ app.get("/api/teams", async (req, res) => {
       );
       teams = rows.map(r => r.team_name);
     }
-    
+
     // Update cache
     teamsCache = teams;
     teamsCacheTime = now;
@@ -2819,10 +2821,10 @@ async function ensureInsightsSnapshotTable() {
 app.post("/api/insights/refresh", async (req, res) => {
   try {
     await ensureInsightsSnapshotTable();
-    
+
     console.log("Refreshing insights snapshot...");
     const startTime = Date.now();
-    
+
     // Run all queries in parallel for speed
     const [
       statsResult,
@@ -2859,7 +2861,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
-      
+
       // Size distribution
       pool.query(`
       SELECT
@@ -2870,7 +2872,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
-      
+
       // Biggest collector
       pool.query(`
         SELECT 
@@ -2882,7 +2884,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY total_moments DESC
         LIMIT 1;
       `),
-      
+
       // Low serial counts
       pool.query(`
         SELECT
@@ -2892,7 +2894,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           COUNT(*) FILTER (WHERE serial_number <= 1000)::bigint AS serial_1000
         FROM nft_core_metadata;
       `),
-      
+
       // Top 5 teams
       pool.query(`
         SELECT team_name, COUNT(*)::bigint AS count
@@ -2902,7 +2904,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY count DESC
         LIMIT 5;
       `),
-      
+
       // Top 5 players
       pool.query(`
         SELECT 
@@ -2915,7 +2917,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY count DESC
         LIMIT 5;
       `),
-      
+
       // Top 5 sets
       pool.query(`
         SELECT set_name, COUNT(*)::bigint AS count
@@ -2925,7 +2927,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY count DESC
         LIMIT 5;
       `),
-      
+
       // Position breakdown
       pool.query(`
         SELECT position, COUNT(*)::bigint AS count
@@ -2934,7 +2936,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         GROUP BY position
         ORDER BY count DESC;
       `),
-      
+
       // Market stats
       pool.query(`
         SELECT 
@@ -2946,14 +2948,14 @@ app.post("/api/insights/refresh", async (req, res) => {
         FROM edition_price_scrape
         WHERE lowest_ask_usd > 0;
       `),
-      
+
       // Median collection size
       pool.query(`
         SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_moments) AS median
         FROM top_wallets_snapshot
         WHERE wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b');
       `),
-      
+
       // 🐳 Whale stats
       pool.query(`
         WITH ranked AS (
@@ -2970,7 +2972,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           SUM(total_moments)::bigint AS all_moments
         FROM ranked;
       `),
-      
+
       // 📅 Series breakdown
       pool.query(`
         SELECT series_name, COUNT(*)::bigint AS count
@@ -2979,7 +2981,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         GROUP BY series_name
         ORDER BY series_name;
       `),
-      
+
       // 🔢 Popular jersey numbers
       pool.query(`
         SELECT jersey_number, COUNT(*)::bigint AS count
@@ -2989,7 +2991,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY count DESC
         LIMIT 10;
       `),
-      
+
       // 📦 Edition size distribution
       pool.query(`
         SELECT
@@ -3001,7 +3003,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         FROM nft_core_metadata
         WHERE max_mint_size IS NOT NULL AND max_mint_size > 0;
       `),
-      
+
       // 🔥 Most valuable editions
       pool.query(`
         SELECT 
@@ -3017,7 +3019,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         ORDER BY e.lowest_ask_usd DESC
         LIMIT 5;
       `),
-      
+
       // 🎯 Serial distribution
       pool.query(`
         SELECT
@@ -3029,7 +3031,7 @@ app.post("/api/insights/refresh", async (req, res) => {
         FROM nft_core_metadata
         WHERE serial_number IS NOT NULL;
       `),
-      
+
       // 🏆 Richest collections
       pool.query(`
         SELECT 
@@ -3193,7 +3195,7 @@ app.post("/api/insights/refresh", async (req, res) => {
 app.get("/api/insights", async (req, res) => {
   try {
     await ensureInsightsSnapshotTable();
-    
+
     // Fetch cached snapshot
     const result = await pool.query(`
       SELECT data, updated_at
@@ -3212,7 +3214,7 @@ app.get("/api/insights", async (req, res) => {
 
     const snapshot = result.rows[0];
     const data = typeof snapshot.data === 'string' ? JSON.parse(snapshot.data) : snapshot.data;
-    
+
     // Add metadata about freshness
     data.snapshotUpdatedAt = snapshot.updated_at;
     data.fromCache = true;
@@ -3393,17 +3395,17 @@ app.post("/api/login-dapper", async (req, res) => {
 app.post("/api/login-flow", async (req, res) => {
   try {
     let { wallet_address, signed_message, signature, wallet_provider, dapper_username } = req.body || {};
-    
+
     // Only allow Dapper wallets
     if (wallet_provider !== "dapper") {
       console.log("[Flow Login] Rejected non-Dapper wallet attempt");
-      return res.status(403).json({ 
-        ok: false, 
-        error: "Only Dapper wallets are supported. Please use Dapper Wallet to sign in." 
+      return res.status(403).json({
+        ok: false,
+        error: "Only Dapper wallets are supported. Please use Dapper Wallet to sign in."
       });
     }
 
-    console.log("[Flow Login] Received request:", { 
+    console.log("[Flow Login] Received request:", {
       wallet_address: wallet_address ? wallet_address.substring(0, 20) + '...' : 'missing',
       has_signed_message: !!signed_message,
       has_signature: !!signature,
@@ -3427,14 +3429,14 @@ app.post("/api/login-flow", async (req, res) => {
       console.error("[Flow Login] Invalid address format:", wallet_address);
       return res.status(400).json({ ok: false, error: `Invalid Flow wallet address format: ${wallet_address}` });
     }
-    
+
     // Normalize to 16 characters (pad with zeros if needed)
     const addressPart = wallet_address.substring(2);
     const normalizedAddress = "0x" + addressPart.padStart(16, '0');
 
     // TODO: Verify signature if provided (for production security)
     // For now, we'll trust the wallet address from FCL
-    
+
     // Use synthetic email format: flow:wallet_address
     const syntheticEmail = `flow:${normalizedAddress}`;
 
@@ -3450,7 +3452,7 @@ app.post("/api/login-flow", async (req, res) => {
         AND table_name = 'users' 
         AND column_name = 'password_hash';
       `);
-      
+
       if (checkResult.rows.length > 0 && checkResult.rows[0].is_nullable === 'NO') {
         await pool.query(`
           ALTER TABLE public.users 
@@ -3484,12 +3486,12 @@ app.post("/api/login-flow", async (req, res) => {
         RETURNING id, email, default_wallet_address, display_name;
       `;
 
-    const queryParams = dapper_username 
+    const queryParams = dapper_username
       ? [syntheticEmail, normalizedAddress, dapper_username]
       : [syntheticEmail, normalizedAddress];
 
     const { rows } = await pool.query(upsertSql, queryParams);
-    
+
     if (!rows || rows.length === 0) {
       console.error("[Flow Login] Database query returned no rows");
       return res.status(500).json({ ok: false, error: "Failed to create user account" });
@@ -3516,8 +3518,8 @@ app.post("/api/login-flow", async (req, res) => {
       stack: err.stack,
       code: err.code
     });
-    return res.status(500).json({ 
-      ok: false, 
+    return res.status(500).json({
+      ok: false,
       error: "Failed to log in with Flow wallet: " + (err.message || String(err))
     });
   }
@@ -3534,21 +3536,21 @@ app.get("/api/flow-events", async (req, res) => {
     // Validate and parse block heights
     start_height = start_height ? parseInt(start_height, 10) : null;
     end_height = end_height ? parseInt(end_height, 10) : null;
-    
+
     if (start_height !== null && (isNaN(start_height) || start_height < 0)) {
       return res.status(400).json({
         ok: false,
         error: "Invalid start_height: must be a non-negative integer"
       });
     }
-    
+
     if (end_height !== null && (isNaN(end_height) || end_height < 0)) {
       return res.status(400).json({
         ok: false,
         error: "Invalid end_height: must be a non-negative integer"
       });
     }
-    
+
     if (start_height !== null && end_height !== null && start_height > end_height) {
       return res.status(400).json({
         ok: false,
@@ -3561,7 +3563,7 @@ app.get("/api/flow-events", async (req, res) => {
       `${ALLDAY_CONTRACT}.Deposit`,
       `${ALLDAY_CONTRACT}.Withdraw`
     ];
-    
+
     // Limit block range to 1-2 blocks to avoid 500 errors
     const maxBlockRange = 2;
     if (start_height !== null && end_height !== null && (end_height - start_height) > maxBlockRange) {
@@ -3576,13 +3578,13 @@ app.get("/api/flow-events", async (req, res) => {
         urlParams.set("type", eventType);
         if (start_height !== null) urlParams.set("start_height", start_height.toString());
         if (end_height !== null) urlParams.set("end_height", end_height.toString());
-        
+
         const url = `${FLOW_ACCESS_NODE}/v1/events?${urlParams.toString()}`;
         console.log(`Fetching ${eventType} from blocks ${start_height}-${end_height}`);
 
         const flowRes = await fetch(url);
         const responseText = await flowRes.text();
-        
+
         if (!flowRes.ok) {
           if (flowRes.status === 500) {
             console.warn(`Flow API 500 error for ${eventType} (blocks ${start_height}-${end_height})`);
@@ -3592,7 +3594,7 @@ app.get("/api/flow-events", async (req, res) => {
             continue;
           }
         }
-        
+
         let data;
         try {
           data = JSON.parse(responseText);
@@ -3600,7 +3602,7 @@ app.get("/api/flow-events", async (req, res) => {
           console.error(`Failed to parse response for ${eventType}`);
           continue;
         }
-        
+
         if (data.results && Array.isArray(data.results)) {
           allEvents.push(...data.results);
           console.log(`Got ${data.results.length} ${eventType} events`);
@@ -3610,16 +3612,16 @@ app.get("/api/flow-events", async (req, res) => {
         continue;
       }
     }
-    
+
     // Process all collected events
     const data = { results: allEvents };
-    
+
     // Transform events to a simpler format
     const events = (data.results || []).map(event => {
       const eventType = event.type ? event.type.split(".").pop() : "Unknown";
       // Flow events have payload as base64 encoded, or as direct fields
       let payload = {};
-      
+
       if (event.payload) {
         // Try to parse if it's a string
         if (typeof event.payload === 'string') {
@@ -3637,12 +3639,12 @@ app.get("/api/flow-events", async (req, res) => {
           payload = event.payload;
         }
       }
-      
+
       // Also check event.data which might contain the actual event data
       if (event.data) {
         payload = { ...payload, ...event.data };
       }
-      
+
       return {
         type: eventType,
         nftId: payload.id || payload.nftID || payload.nft_id || null,
@@ -3655,7 +3657,7 @@ app.get("/api/flow-events", async (req, res) => {
     });
 
     console.log(`Fetched ${events.length} events from blocks ${start_height} to ${end_height}`);
-    
+
     // Debug: log raw events if we got any
     if (data.results && data.results.length > 0) {
       console.log("=== RAW EVENT STRUCTURE ===");
@@ -3687,35 +3689,35 @@ app.get("/api/test-flow-events", async (req, res) => {
   try {
     const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
     const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
-    
+
     // Get latest block first
     const blockRes = await fetch(`${FLOW_ACCESS_NODE}/v1/blocks?height=final`);
     const blockData = await blockRes.json();
     let currentBlock = 0;
-    
+
     if (Array.isArray(blockData) && blockData.length > 0) {
       currentBlock = parseInt(blockData[0].header?.height || blockData[0].height || 0);
     } else if (blockData.header?.height) {
       currentBlock = parseInt(blockData.header.height);
     }
-    
+
     console.log(`Current Flow block height: ${currentBlock}`);
-    
+
     // Query last 100 blocks for any AllDay events
     const startBlock = Math.max(0, currentBlock - 100);
     const endBlock = currentBlock;
-    
+
     const eventTypes = [
       `${ALLDAY_CONTRACT}.Deposit`,
       `${ALLDAY_CONTRACT}.Withdraw`
     ];
-    
+
     const allEvents = [];
     for (const eventType of eventTypes) {
       try {
         const url = `${FLOW_ACCESS_NODE}/v1/events?type=${encodeURIComponent(eventType)}&start_height=${startBlock}&end_height=${endBlock}`;
         console.log(`Querying Flow for ${eventType} from blocks ${startBlock}-${endBlock}`);
-        
+
         const flowRes = await fetch(url);
         if (flowRes.ok) {
           const data = await flowRes.json();
@@ -3730,14 +3732,14 @@ app.get("/api/test-flow-events", async (req, res) => {
         console.error(`Error querying ${eventType}:`, err.message);
       }
     }
-    
+
     return res.json({
       ok: true,
       currentBlock: currentBlock,
       queryRange: `${startBlock}-${endBlock}`,
       eventsFound: allEvents.length,
       events: allEvents.slice(0, 10), // Return first 10 for inspection
-      message: allEvents.length > 0 
+      message: allEvents.length > 0
         ? `Found ${allEvents.length} events in last 100 blocks`
         : "No events found in last 100 blocks"
     });
@@ -3755,7 +3757,7 @@ app.get("/api/test-findlab", async (req, res) => {
   try {
     const testType = req.query.type || 'block';
     const results = {};
-    
+
     // Test 1: Get latest block height
     if (testType === 'block' || testType === 'all') {
       try {
@@ -3772,7 +3774,7 @@ app.get("/api/test-findlab", async (req, res) => {
         };
       }
     }
-    
+
     // Test 2: Get wallet NFTs (if address provided)
     if ((testType === 'wallet' || testType === 'all') && req.query.address) {
       try {
@@ -3792,7 +3794,7 @@ app.get("/api/test-findlab", async (req, res) => {
         };
       }
     }
-    
+
     // Test 3: Get NFT item (if nftId provided)
     if ((testType === 'nft' || testType === 'all') && req.query.nftId) {
       try {
@@ -3811,7 +3813,7 @@ app.get("/api/test-findlab", async (req, res) => {
         };
       }
     }
-    
+
     // Test 4: Get account transactions (if address provided)
     if ((testType === 'transactions' || testType === 'all') && req.query.address) {
       try {
@@ -3831,7 +3833,7 @@ app.get("/api/test-findlab", async (req, res) => {
         };
       }
     }
-    
+
     return res.json({
       ok: true,
       message: 'FindLab API test results',
@@ -3857,7 +3859,7 @@ app.get("/api/test-findlab", async (req, res) => {
 app.get("/api/test-snowflake-events", async (req, res) => {
   try {
     await ensureSnowflakeConnected();
-    
+
     // Query for the most recent events regardless of time
     const sql = `
       SELECT
@@ -3876,22 +3878,22 @@ app.get("/api/test-snowflake-events", async (req, res) => {
       ORDER BY BLOCK_TIMESTAMP DESC, BLOCK_HEIGHT DESC, EVENT_INDEX DESC
       LIMIT 20
     `;
-    
+
     console.log("Test query: Getting most recent events from Snowflake...");
-    
+
     const result = await executeSql(sql);
     console.log(`Test query returned ${result ? result.length : 0} events`);
-    
+
     if (result && result.length > 0) {
       console.log("Most recent event timestamp:", result[0].block_timestamp || result[0].BLOCK_TIMESTAMP);
       console.log("Sample event:", JSON.stringify(result[0]).substring(0, 500));
     }
-    
+
     return res.json({
       ok: true,
       count: result ? result.length : 0,
       events: result || [],
-      message: result && result.length > 0 
+      message: result && result.length > 0
         ? `Found ${result.length} recent events. Most recent: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP}`
         : "No events found in Snowflake"
     });
@@ -3911,14 +3913,14 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
     const { limit = 100, hours = 2 } = req.query;
     const limitNum = Math.min(parseInt(limit, 10) || 100, 500);
     const hoursAgo = parseInt(hours, 10) || 2; // Default to 2 hours which captures recent activity with typical Snowflake delay
-    
+
     // Calculate timestamp for X hours ago (Snowflake data is delayed)
     const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
     // Format for Snowflake: 'YYYY-MM-DD HH:MM:SS'
     const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
-    
+
     await ensureSnowflakeConnected();
-    
+
     // Query for multiple event types: Deposit, Withdraw, MomentNFTMinted, MomentNFTBurned
     // Note: Snowflake returns fields in uppercase, so we need to handle both cases
     const sql = `
@@ -3939,13 +3941,13 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       ORDER BY BLOCK_TIMESTAMP DESC, BLOCK_HEIGHT DESC, EVENT_INDEX DESC
       LIMIT ${limitNum}
     `;
-    
+
     console.log(`Querying Snowflake for events in last ${hoursAgo} hours (since ${cutoffStr})`);
     console.log(`Current time: ${new Date().toISOString()}`);
-    
+
     const result = await executeSql(sql);
     console.log(`Snowflake returned ${result ? result.length : 0} events`);
-    
+
     if (result && result.length > 0) {
       console.log(`Sample event:`, JSON.stringify(result[0]).substring(0, 300));
       console.log(`Most recent event timestamp: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP}`);
@@ -3956,7 +3958,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       console.log("2. Snowflake data is delayed beyond", hoursAgo, "hours");
       console.log("3. Events are in a different contract or have different event types");
     }
-    
+
     // First, map all events
     const rawEvents = (result || []).map(row => {
       // Snowflake returns fields in uppercase (NFT_ID, TO_ADDR, etc.)
@@ -3978,7 +3980,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       const blockHeight = row.BLOCK_HEIGHT || row.block_height;
       const txId = row.TX_ID || row.tx_id;
       const eventIndex = row.EVENT_INDEX || row.event_index;
-      
+
       return {
         type: eventType,
         nftId: nftId,
@@ -3990,13 +3992,13 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
         eventIndex: eventIndex
       };
     });
-    
+
     // Group events by transaction ID and NFT ID to combine Withdraw/Deposit pairs
     const eventMap = new Map();
-    
+
     for (const event of rawEvents) {
       const key = `${event.txId}-${event.nftId}`;
-      
+
       if (!eventMap.has(key)) {
         eventMap.set(key, {
           withdraw: null,
@@ -4007,7 +4009,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           blockHeight: event.blockHeight
         });
       }
-      
+
       const group = eventMap.get(key);
       if (event.type === 'Withdraw') {
         group.withdraw = event;
@@ -4015,7 +4017,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
         group.deposit = event;
       }
     }
-    
+
     // Convert grouped events into combined "Sold" events
     const events = [];
     for (const group of eventMap.values()) {
@@ -4054,15 +4056,15 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
         });
       }
     }
-    
+
     // Sort by timestamp descending (most recent first)
     events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     // Now enrich events with wallet names and moment details
     const enrichedEvents = [];
     for (const event of events) {
       const enriched = { ...event };
-      
+
       // Get wallet names for seller and buyer
       if (event.from) {
         try {
@@ -4075,7 +4077,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           console.error(`Error fetching seller name for ${event.from}:`, err.message);
         }
       }
-      
+
       if (event.to) {
         try {
           const buyerResult = await pgQuery(
@@ -4087,7 +4089,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           console.error(`Error fetching buyer name for ${event.to}:`, err.message);
         }
       }
-      
+
       // Get moment details (player, team, etc.)
       if (event.nftId) {
         try {
@@ -4107,8 +4109,8 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           const moment = momentResult.rows[0];
           if (moment) {
             enriched.moment = {
-              playerName: moment.first_name && moment.last_name 
-                ? `${moment.first_name} ${moment.last_name}` 
+              playerName: moment.first_name && moment.last_name
+                ? `${moment.first_name} ${moment.last_name}`
                 : null,
               teamName: moment.team_name,
               position: moment.position,
@@ -4121,10 +4123,10 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           console.error(`Error fetching moment details for ${event.nftId}:`, err.message);
         }
       }
-      
+
       enrichedEvents.push(enriched);
     }
-    
+
     // Calculate the freshness of the data
     let newestEventTime = null;
     let dataAgeHours = null;
@@ -4133,7 +4135,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       const ageMs = Date.now() - new Date(newestEventTime).getTime();
       dataAgeHours = Math.round(ageMs / (1000 * 60 * 60) * 10) / 10; // Round to 1 decimal
     }
-    
+
     return res.json({
       ok: true,
       events: enrichedEvents,
@@ -4143,7 +4145,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       currentTime: new Date().toISOString(),
       newestEventTime: newestEventTime,
       dataAgeHours: dataAgeHours,
-      note: dataAgeHours !== null 
+      note: dataAgeHours !== null
         ? `Snowflake data is ${dataAgeHours} hours old (newest event: ${newestEventTime})`
         : "No events found in the specified time window"
     });
@@ -4169,7 +4171,7 @@ async function getLatestBlockHeight() {
   if (cachedLatestBlockHeight && (now - lastBlockHeightFetch) < 10000) {
     return cachedLatestBlockHeight;
   }
-  
+
   // Try FindLab API first (often faster and more reliable)
   try {
     const height = await getLatestBlockHeightFindLab();
@@ -4181,7 +4183,7 @@ async function getLatestBlockHeight() {
   } catch (err) {
     console.warn("[BlockHeight] FindLab API failed, trying Flow REST API:", err.message);
   }
-  
+
   // Fallback to Flow REST API
   try {
     // Query the public Flow REST API for the latest block
@@ -4200,7 +4202,7 @@ async function getLatestBlockHeight() {
   } catch (err) {
     console.error("Failed to fetch latest block height:", err.message);
   }
-  
+
   // Fallback to cached or a reasonable estimate
   return cachedLatestBlockHeight || 134160000;
 }
@@ -4208,30 +4210,30 @@ async function getLatestBlockHeight() {
 app.get("/api/lightnode-events", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-    
+
     // Get the actual latest block height from the network
     const latestHeight = await getLatestBlockHeight();
-    
+
     // Query last ~100 blocks for AllDay events (about 80 seconds of blocks)
     // The light node will proxy this to the upstream access node
     const endHeight = latestHeight;
     const startHeight = latestHeight - 100;
-    
+
     // Query both Deposit and Withdraw events
     // The light node proxies these requests to the upstream access node
     console.log(`Querying light node for events in blocks ${startHeight}-${endHeight}`);
-    
+
     const [depositRes, withdrawRes] = await Promise.all([
       fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${endHeight}`),
       fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Withdraw&start_height=${startHeight}&end_height=${endHeight}`)
     ]);
-    
+
     const depositData = depositRes.ok ? await depositRes.json() : [];
     const withdrawData = withdrawRes.ok ? await withdrawRes.json() : [];
-    
+
     // Extract events from the block-grouped response
     const allEvents = [];
-    
+
     for (const block of depositData) {
       if (block.events && block.events.length > 0) {
         for (const event of block.events) {
@@ -4246,7 +4248,7 @@ app.get("/api/lightnode-events", async (req, res) => {
         }
       }
     }
-    
+
     for (const block of withdrawData) {
       if (block.events && block.events.length > 0) {
         for (const event of block.events) {
@@ -4261,13 +4263,13 @@ app.get("/api/lightnode-events", async (req, res) => {
         }
       }
     }
-    
+
     // Parse event payloads to extract NFT IDs and addresses
     const parsedEvents = allEvents.map(event => {
       let nftId = null;
       let fromAddr = null;
       let toAddr = null;
-      
+
       if (event.payload) {
         try {
           // Flow REST API returns base64-encoded JSON-CDC payloads
@@ -4280,9 +4282,9 @@ app.get("/api/lightnode-events", async (req, res) => {
               // Not base64, try as-is
             }
           }
-          
+
           const payload = typeof payloadStr === 'string' ? JSON.parse(payloadStr) : payloadStr;
-          
+
           if (payload.value && payload.value.fields) {
             for (const field of payload.value.fields) {
               if (field.name === 'id' && field.value) {
@@ -4311,7 +4313,7 @@ app.get("/api/lightnode-events", async (req, res) => {
           console.error("Error parsing event payload:", e.message);
         }
       }
-      
+
       return {
         type: event.type,
         nftId: nftId ? nftId.toString() : null,
@@ -4323,7 +4325,7 @@ app.get("/api/lightnode-events", async (req, res) => {
         source: 'lightnode'
       };
     });
-    
+
     // Group events by txId+nftId to combine Withdraw/Deposit pairs into "Sold"
     const eventMap = new Map();
     for (const event of parsedEvents) {
@@ -4335,7 +4337,7 @@ app.get("/api/lightnode-events", async (req, res) => {
       if (event.type === 'Withdraw') group.withdraw = event;
       if (event.type === 'Deposit') group.deposit = event;
     }
-    
+
     // Convert to combined events
     const combinedEvents = [];
     for (const group of eventMap.values()) {
@@ -4356,29 +4358,29 @@ app.get("/api/lightnode-events", async (req, res) => {
         combinedEvents.push({ ...group.deposit, type: 'Purchased' });
       }
     }
-    
+
     // Sort by timestamp descending
     combinedEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     // Enrich with wallet names and moment details (limit to first 20 to avoid slowdown)
     const enrichedEvents = [];
     for (const event of combinedEvents.slice(0, Math.min(limit, 20))) {
       const enriched = { ...event };
-      
+
       if (event.from) {
         try {
           const result = await pgQuery(`SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`, [event.from]);
           enriched.sellerName = result.rows[0]?.display_name || null;
         } catch (e) { /* ignore */ }
       }
-      
+
       if (event.to) {
         try {
           const result = await pgQuery(`SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`, [event.to]);
           enriched.buyerName = result.rows[0]?.display_name || null;
         } catch (e) { /* ignore */ }
       }
-      
+
       if (event.nftId) {
         try {
           const result = await pgQuery(
@@ -4398,10 +4400,10 @@ app.get("/api/lightnode-events", async (req, res) => {
           }
         } catch (e) { /* ignore */ }
       }
-      
+
       enrichedEvents.push(enriched);
     }
-    
+
     return res.json({
       ok: true,
       events: enrichedEvents,
@@ -4426,14 +4428,14 @@ app.get("/api/live-events", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const sinceTimestamp = req.query.since ? new Date(req.query.since) : null;
-    
+
     let events = liveEventsCache.slice(0, limit);
-    
+
     // Filter to events newer than 'since' timestamp if provided
     if (sinceTimestamp && !isNaN(sinceTimestamp.getTime())) {
       events = events.filter(e => new Date(e.timestamp) > sinceTimestamp);
     }
-    
+
     // Group Withdraw/Deposit pairs into "Sold" events (same logic as Snowflake)
     const eventMap = new Map();
     for (const event of events) {
@@ -4455,7 +4457,7 @@ app.get("/api/live-events", async (req, res) => {
         group.deposit = event;
       }
     }
-    
+
     // Convert to combined events
     const combinedEvents = [];
     for (const group of eventMap.values()) {
@@ -4501,10 +4503,10 @@ app.get("/api/live-events", async (req, res) => {
         });
       }
     }
-    
+
     // Sort by timestamp descending
     combinedEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     return res.json({
       ok: true,
       events: combinedEvents,
@@ -4539,12 +4541,12 @@ app.get("/api/flow-latest-block", async (req, res) => {
   try {
     const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
     const url = `${FLOW_ACCESS_NODE}/v1/blocks?height=final`;
-    
+
     console.log("Fetching latest block from:", url);
-    
+
     const flowRes = await fetch(url);
     const responseText = await flowRes.text();
-    
+
     if (!flowRes.ok) {
       console.error("Flow API error:", flowRes.status, responseText.substring(0, 500));
       throw new Error(`Flow API error: ${flowRes.status} - ${responseText.substring(0, 200)}`);
@@ -4557,22 +4559,22 @@ app.get("/api/flow-latest-block", async (req, res) => {
       console.error("Failed to parse Flow API response:", responseText.substring(0, 500));
       throw new Error("Invalid JSON response from Flow API");
     }
-    
+
     // Flow API returns blocks in an array, or a single block object
     let block = data;
     if (Array.isArray(data) && data.length > 0) {
       block = data[0];
     }
-    
+
     // Flow API returns height in block.header.height as a string
     const heightStr = block.header?.height || block.height;
     const height = parseInt(heightStr, 10);
-    
+
     if (!height || height <= 0 || isNaN(height)) {
       console.error("Invalid block height from Flow API. Response:", JSON.stringify(block).substring(0, 500));
       throw new Error("Invalid block height returned from Flow API (got: " + heightStr + ")");
     }
-    
+
     return res.json({
       ok: true,
       height: height,
@@ -4626,15 +4628,15 @@ async function scrapeFloorPrice(editionId) {
         "accept": "text/html,application/xhtml+xml"
       }
     });
-    
+
     if (!res.ok) return null;
-    
+
     const html = await res.text();
-    
+
     // Parse "Lowest Ask $X.XX" from the page
     const lowAskMatch = html.match(/Lowest\s+Ask[^$]*\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)/i);
     if (!lowAskMatch) return null;
-    
+
     const floor = Number(lowAskMatch[1].replace(/,/g, ''));
     return isNaN(floor) ? null : floor;
   } catch (err) {
@@ -4649,7 +4651,7 @@ async function getCachedFloor(editionId) {
   if (cached && Date.now() - cached.updatedAt < FLOOR_CACHE_TTL) {
     return cached.floor;
   }
-  
+
   const floor = await scrapeFloorPrice(editionId);
   if (floor !== null) {
     floorPriceCache.set(editionId, { floor, updatedAt: Date.now() });
@@ -4669,7 +4671,7 @@ function updateFloorCache(editionId, newFloor) {
   // Only update if we don't have a floor OR if it's been a while
   if (!existing || Date.now() - existing.updatedAt > 60000) { // 1 min
     floorPriceCache.set(editionId, { floor: newFloor, updatedAt: Date.now() });
-    
+
     // Cleanup if cache gets too large - remove oldest entries
     if (floorPriceCache.size > MAX_FLOOR_CACHE_SIZE) {
       const entries = Array.from(floorPriceCache.entries())
@@ -4706,7 +4708,7 @@ async function ensureSniperListingsTable() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `);
-    
+
     // Then, add columns if they don't exist (for existing tables)
     const alterStatements = [
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS listing_id TEXT`,
@@ -4716,7 +4718,7 @@ async function ensureSniperListingsTable() {
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS is_unlisted BOOLEAN NOT NULL DEFAULT FALSE`,
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS buyer_address TEXT`
     ];
-    
+
     for (const alterStmt of alterStatements) {
       try {
         await pgQuery(alterStmt);
@@ -4727,14 +4729,14 @@ async function ensureSniperListingsTable() {
         }
       }
     }
-    
+
     // Create indexes if they don't exist
     const indexStatements = [
       `CREATE INDEX IF NOT EXISTS idx_sniper_listings_listed_at ON sniper_listings (listed_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_sniper_listings_updated_at ON sniper_listings (updated_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_sniper_listings_status ON sniper_listings (is_sold, is_unlisted)`
     ];
-    
+
     for (const indexStmt of indexStatements) {
       try {
         await pgQuery(indexStmt);
@@ -4742,14 +4744,14 @@ async function ensureSniperListingsTable() {
         // Ignore index errors (they might already exist)
       }
     }
-    
+
     // Update existing rows that don't have listed_at set (use updated_at as fallback)
     await pgQuery(`
       UPDATE sniper_listings 
       SET listed_at = updated_at 
       WHERE listed_at IS NULL
-    `).catch(() => {}); // Ignore errors
-    
+    `).catch(() => { }); // Ignore errors
+
     console.log("[Sniper] Database table and columns verified");
   } catch (err) {
     console.error("[Sniper] Error ensuring sniper_listings table:", err.message);
@@ -4805,9 +4807,9 @@ async function addSniperListing(listing) {
     }
     return;
   }
-  
+
   seenListingNfts.set(listing.nftId, Date.now());
-  
+
   // Cleanup seenListingNfts if it gets too large
   if (seenListingNfts.size > MAX_SEEN_NFTS) {
     const entries = Array.from(seenListingNfts.entries())
@@ -4817,22 +4819,22 @@ async function addSniperListing(listing) {
       seenListingNfts.delete(entries[i][0]);
     }
   }
-  
+
   // NOTE: Don't override isSold/isUnlisted here - trust what's passed in the listing object
   // The calling code (processListingEvent) handles clearing sold/unlisted status for relistings
-  
+
   // Add to front of array
   sniperListings.unshift(listing);
-  
+
   // Keep only last N listings in memory
   if (sniperListings.length > MAX_SNIPER_LISTINGS) {
     const removed = sniperListings.pop();
     if (removed) seenListingNfts.delete(removed.nftId);
   }
-  
+
   // Persist to database (fire and forget)
-  persistSniperListing(listing).catch(() => {}); // Ignore errors
-  
+  persistSniperListing(listing).catch(() => { }); // Ignore errors
+
   // Log deals (below floor)
   if (listing.dealPercent > 0 && !listing.isSold && !listing.isUnlisted) {
     console.log(`[SNIPER] 🎯 DEAL: ${listing.playerName} #${listing.serialNumber || '?'} - $${listing.listingPrice} (floor $${listing.floor}) - ${listing.dealPercent.toFixed(1)}% off!`);
@@ -4841,7 +4843,7 @@ async function addSniperListing(listing) {
 
 async function markListingAsSold(nftId, buyerAddr = null) {
   soldNfts.set(nftId, Date.now());
-  
+
   // Cleanup soldNfts if it gets too large
   if (soldNfts.size > MAX_SOLD_NFTS) {
     const entries = Array.from(soldNfts.entries())
@@ -4851,7 +4853,7 @@ async function markListingAsSold(nftId, buyerAddr = null) {
       soldNfts.delete(entries[i][0]);
     }
   }
-  
+
   // Get buyer name if we have buyer address
   let buyerName = buyerAddr;
   if (buyerAddr) {
@@ -4865,7 +4867,7 @@ async function markListingAsSold(nftId, buyerAddr = null) {
       buyerName = buyerAddr;
     }
   }
-  
+
   // Mark existing listings as sold in memory
   for (const listing of sniperListings) {
     if (listing.nftId === nftId) {
@@ -4876,10 +4878,10 @@ async function markListingAsSold(nftId, buyerAddr = null) {
         listing.buyerName = buyerName;
       }
       // Update in database
-      persistSniperListing(listing).catch(() => {});
+      persistSniperListing(listing).catch(() => { });
     }
   }
-  
+
   // Also update database directly
   try {
     await pgQuery(
@@ -4897,20 +4899,20 @@ async function markListingAsSold(nftId, buyerAddr = null) {
 async function resetAllListingsToUnsold() {
   try {
     console.log('[Sniper] Resetting all listings to unsold...');
-    
+
     // Update database
     const result = await pgQuery(
       `UPDATE sniper_listings 
        SET is_sold = FALSE, buyer_address = NULL, updated_at = NOW()
        WHERE is_sold = TRUE`
     );
-    
+
     console.log(`[Sniper] ✅ Reset ${result.rowCount || 0} listings to unsold in database`);
-    
+
     // Clear in-memory soldNfts
     soldNfts.clear();
     console.log('[Sniper] ✅ Cleared in-memory soldNfts map');
-    
+
     // Reset isSold flag on all in-memory listings
     let resetCount = 0;
     for (const listing of sniperListings) {
@@ -4921,9 +4923,9 @@ async function resetAllListingsToUnsold() {
         resetCount++;
       }
     }
-    
+
     console.log(`[Sniper] ✅ Reset ${resetCount} listings to unsold in memory`);
-    
+
     return {
       databaseReset: result.rowCount || 0,
       memoryReset: resetCount
@@ -4936,7 +4938,7 @@ async function resetAllListingsToUnsold() {
 
 async function markListingAsUnlisted(nftId, listingId = null) {
   unlistedNfts.set(nftId, Date.now());
-  
+
   // Cleanup unlistedNfts if it gets too large
   if (unlistedNfts.size > MAX_SOLD_NFTS) {
     const entries = Array.from(unlistedNfts.entries())
@@ -4946,7 +4948,7 @@ async function markListingAsUnlisted(nftId, listingId = null) {
       unlistedNfts.delete(entries[i][0]);
     }
   }
-  
+
   // Mark existing listings as unlisted in memory
   // If listingId provided, only mark that specific listing; otherwise mark all for this nftId
   for (const listing of sniperListings) {
@@ -4955,11 +4957,11 @@ async function markListingAsUnlisted(nftId, listingId = null) {
         listing.isUnlisted = true;
         listing.isSold = false; // Can't be both sold and unlisted
         // Update in database
-        persistSniperListing(listing).catch(() => {});
+        persistSniperListing(listing).catch(() => { });
       }
     }
   }
-  
+
   // Also update database directly
   try {
     await pgQuery(
@@ -4977,13 +4979,13 @@ async function markListingAsUnlisted(nftId, listingId = null) {
 async function processListingEvent(event) {
   try {
     const { nftId, listingId, listingPrice, sellerAddr, timestamp, editionId: eventEditionId } = event;
-    
+
     if (!nftId || !listingPrice) return;
-    
+
     // Get edition info from our database
     let editionId = eventEditionId;
     let momentData = null;
-    
+
     if (!editionId) {
       try {
         const result = await pgQuery(
@@ -4997,31 +4999,31 @@ async function processListingEvent(event) {
         }
       } catch (e) { /* ignore */ }
     }
-    
+
     if (!editionId) return;
-    
+
     // Get the PREVIOUS floor price (before this listing)
     let previousFloor = getStoredFloor(editionId);
-    
+
     // If we don't have a cached floor, scrape it now
     if (previousFloor === null) {
       previousFloor = await getCachedFloor(editionId);
     }
-    
+
     if (!previousFloor) return;
-    
+
     // Skip non-whole-dollar listings (likely from Flowty, not official NFL All Day)
     // NFL All Day only allows whole dollar amounts ($1 minimum)
     if (listingPrice < 1 || listingPrice !== Math.floor(listingPrice)) {
       return; // Skip fractional/sub-$1 listings
     }
-    
+
     // Calculate deal percent (positive = below floor = deal!)
     let dealPercent = 0;
     if (previousFloor && previousFloor > 0) {
       dealPercent = ((previousFloor - listingPrice) / previousFloor) * 100;
     }
-    
+
     // Get moment metadata if we don't have it, or if we're missing series_name
     if (!momentData || !momentData.series_name) {
       try {
@@ -5036,11 +5038,11 @@ async function processListingEvent(event) {
         } else if (!momentData) {
           momentData = {};
         }
-      } catch (e) { 
+      } catch (e) {
         if (!momentData) momentData = {};
       }
     }
-    
+
     // Get ASP (Average Sale Price) from edition_price_scrape
     let avgSale = null;
     if (editionId) {
@@ -5052,7 +5054,7 @@ async function processListingEvent(event) {
         avgSale = priceResult.rows[0]?.avg_sale_usd ? Number(priceResult.rows[0].avg_sale_usd) : null;
       } catch (e) { /* ignore */ }
     }
-    
+
     // Get seller name
     let sellerName = sellerAddr;
     if (sellerAddr) {
@@ -5064,7 +5066,7 @@ async function processListingEvent(event) {
         sellerName = result.rows[0]?.display_name || sellerAddr;
       } catch (e) { /* ignore */ }
     }
-    
+
     // IMPORTANT: A new ListingAvailable event means this NFT is being (re)listed
     // Clear any old sold/unlisted status - this is a FRESH listing
     if (soldNfts.has(nftId)) {
@@ -5075,7 +5077,7 @@ async function processListingEvent(event) {
       console.log(`[Sniper] 🔄 NFT ${nftId} was previously unlisted, now relisted - clearing unlisted status`);
       unlistedNfts.delete(nftId);
     }
-    
+
     const listing = {
       nftId,
       listingId,
@@ -5085,7 +5087,7 @@ async function processListingEvent(event) {
       floor: previousFloor,
       avgSale,
       dealPercent: Math.round(dealPercent * 10) / 10,
-      playerName: momentData?.first_name && momentData?.last_name 
+      playerName: momentData?.first_name && momentData?.last_name
         ? `${momentData.first_name} ${momentData.last_name}` : null,
       teamName: momentData?.team_name,
       tier: momentData?.tier,
@@ -5104,14 +5106,14 @@ async function processListingEvent(event) {
       // Direct moment link for faster buying (one click to buy page)
       listingUrl: `https://nflallday.com/moments/${nftId}`
     };
-    
+
     addSniperListing(listing);
-    
+
     // Update our floor cache with new floor (this listing might be the new floor)
     if (listingPrice < (previousFloor || Infinity)) {
       updateFloorCache(editionId, listingPrice);
     }
-    
+
   } catch (err) {
     sniperError("[Sniper] Error processing listing event:", err.message);
   }
@@ -5128,9 +5130,9 @@ let isWatchingListings = false;
 async function watchForListings() {
   if (isWatchingListings) return;
   isWatchingListings = true;
-  
+
   sniperLog("[Sniper] 🔴 Starting LIVE listing watcher (using Flow REST API)...");
-  
+
   const checkForNewListings = async () => {
     try {
       // Get latest block height (try FindLab API first, fallback to Flow REST API)
@@ -5158,18 +5160,18 @@ async function watchForListings() {
           return;
         }
       }
-      
+
       if (!currentBlock || currentBlock <= 0) {
         console.error(`[Sniper] Invalid block height after all attempts: ${currentBlock}`);
         return;
       }
-      
+
       if (lastCheckedBlock === 0) {
         // Start from 100 blocks ago to catch any recent listings
         lastCheckedBlock = Math.max(0, currentBlock - 100);
         console.log(`[Sniper] 🔴 Starting watcher from block ${lastCheckedBlock} (current: ${currentBlock})`);
       }
-      
+
       if (currentBlock <= lastCheckedBlock) {
         // No new blocks, but log occasionally to show it's alive
         if (Date.now() % 30000 < 3000) { // Every ~30 seconds
@@ -5177,16 +5179,16 @@ async function watchForListings() {
         }
         return;
       }
-      
+
       // Query for ListingAvailable and ListingCompleted events in new blocks
       const startHeight = lastCheckedBlock + 1;
       const endHeight = Math.min(currentBlock, startHeight + 50); // Max 50 blocks at a time
-      
+
       // Fetch all three event types in parallel with timeouts
       const fetchOptions = { signal: AbortSignal.timeout(10000) }; // 10 second timeout per request
-      
+
       let listingRes, completedRes, removedRes;
-      
+
       // Query NFTStorefront events (V1 - NFL All Day marketplace)
       console.log(`[Sniper] 🔍 Querying ${STOREFRONT_CONTRACT} events for blocks ${startHeight}-${endHeight}`);
       try {
@@ -5195,35 +5197,35 @@ async function watchForListings() {
         console.error(`[Sniper] Error fetching ListingAvailable events:`, e.message);
         listingRes = { ok: false };
       }
-      
+
       try {
         completedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
         console.error(`[Sniper] Error fetching ListingCompleted events:`, e.message);
         completedRes = { ok: false };
       }
-      
+
       try {
         removedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingRemoved&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
         console.error(`[Sniper] Error fetching ListingRemoved events:`, e.message);
         removedRes = { ok: false };
       }
-      
+
       let newListingCount = 0;
       let alldayCount = 0;
       let soldCount = 0;
       let unlistedCount = 0;
-      
+
       // Process new listings
       if (listingRes.ok) {
         const eventData = await listingRes.json();
         console.log(`[Sniper] 📦 ListingAvailable response: ${eventData?.length || 0} blocks with events`);
-        
+
         for (const block of eventData) {
           if (!block.events) continue;
           console.log(`[Sniper] 📦 Block ${block.block_height}: ${block.events.length} ListingAvailable events`);
-          
+
           for (const event of block.events) {
             try {
               // Decode the payload
@@ -5231,9 +5233,9 @@ async function watchForListings() {
               if (typeof payload === 'string') {
                 payload = JSON.parse(Buffer.from(payload, 'base64').toString());
               }
-              
+
               if (!payload?.value?.fields) continue;
-              
+
               const fields = payload.value.fields;
               const getField = (name) => {
                 const f = fields.find(x => x.name === name);
@@ -5242,27 +5244,27 @@ async function watchForListings() {
                 if (f.value?.value) return f.value.value;
                 return f.value;
               };
-              
+
               // Check if this is an AllDay NFT
               const nftType = fields.find(f => f.name === 'nftType');
-              const typeId = nftType?.value?.staticType?.typeID || 
-                            nftType?.value?.value?.staticType?.typeID || '';
-              
+              const typeId = nftType?.value?.staticType?.typeID ||
+                nftType?.value?.value?.staticType?.typeID || '';
+
               if (!typeId.includes('AllDay')) continue;
-              
+
               const nftId = getField('nftID')?.toString();
               const priceStr = getField('price');
               const listingPrice = priceStr ? parseFloat(priceStr) : null;
               const sellerAddr = getField('storefrontAddress')?.toString()?.toLowerCase();
-              
+
               if (!nftId || !listingPrice) continue;
-              
+
               alldayCount++;
               console.log(`[Sniper] ✨ Found AllDay listing: NFT ${nftId}, price $${listingPrice}, seller ${sellerAddr}`);
-              
+
               // Get listingId if available
               const listingId = getField('listingResourceID')?.toString() || null;
-              
+
               // Process this listing
               await processListingEvent({
                 nftId,
@@ -5271,23 +5273,23 @@ async function watchForListings() {
                 sellerAddr,
                 timestamp: block.block_timestamp
               });
-              
+
               newListingCount++;
-              
+
             } catch (e) {
               // Skip malformed events
             }
           }
         }
       }
-      
+
       // Process completed listings (mark as sold)
       if (completedRes.ok) {
         const eventData = await completedRes.json();
-        
+
         for (const block of eventData) {
           if (!block.events) continue;
-          
+
           for (const event of block.events) {
             try {
               // Decode the payload
@@ -5295,9 +5297,9 @@ async function watchForListings() {
               if (typeof payload === 'string') {
                 payload = JSON.parse(Buffer.from(payload, 'base64').toString());
               }
-              
+
               if (!payload?.value?.fields) continue;
-              
+
               const fields = payload.value.fields;
               const getField = (name) => {
                 const f = fields.find(x => x.name === name);
@@ -5306,23 +5308,23 @@ async function watchForListings() {
                 if (f.value?.value) return f.value.value;
                 return f.value;
               };
-              
+
               // Check if this is an AllDay NFT
               const nftType = fields.find(f => f.name === 'nftType');
-              const typeId = nftType?.value?.staticType?.typeID || 
-                            nftType?.value?.value?.staticType?.typeID || '';
-              
+              const typeId = nftType?.value?.staticType?.typeID ||
+                nftType?.value?.value?.staticType?.typeID || '';
+
               if (!typeId.includes('AllDay')) continue;
-              
+
               const nftId = getField('nftID')?.toString();
               const listingResourceId = getField('listingResourceID')?.toString();
-              
+
               // CRITICAL: Check the 'purchased' field to distinguish SOLD vs DELISTED
               // purchased = true  → SOLD (someone bought it)
               // purchased = false → DELISTED (seller cancelled the listing)
               // If 'purchased' field is missing or undefined, treat as DELISTED (safer)
               const purchasedField = getField('purchased');
-              
+
               // Be very strict - only treat as sold if purchased is explicitly true
               let wasPurchased = false;
               if (purchasedField === true) {
@@ -5334,18 +5336,18 @@ async function watchForListings() {
                 const boolValue = purchasedField.value ?? purchasedField;
                 wasPurchased = boolValue === true || boolValue === 'true';
               }
-              
+
               console.log(`[Sniper] 📋 ListingCompleted for NFT ${nftId} (listingId: ${listingResourceId}): purchased = ${JSON.stringify(purchasedField)} → wasPurchased = ${wasPurchased}`);
-              
+
               // STRICT: Require listingResourceId to be present - this is the unique identifier for matching
               // Without it, we can't reliably match to our listings and risk false positives
               if (!listingResourceId) {
                 console.log(`[Sniper] ⚠️  ListingCompleted without listingResourceId - skipping (nftId: ${nftId || 'none'})`);
                 continue;
               }
-              
+
               if (!nftId && !listingResourceId) continue;
-              
+
               // Find the listing by listingResourceID first (most reliable), then by nftId
               let targetNftId = nftId;
               if (listingResourceId && !targetNftId) {
@@ -5370,21 +5372,21 @@ async function watchForListings() {
                   }
                 }
               }
-              
+
               if (!targetNftId) continue;
-              
+
               // CRITICAL: We MUST find a matching listing before marking as sold
               // Only mark as sold if:
               // 1. We have the listing in our system (memory or database)
               // 2. The listingResourceId matches exactly (most reliable)
               // 3. The sale event happened AFTER the listing was created
-              
+
               let existingListing = null;
-              
+
               // First, try to find by listingResourceId (most reliable)
               if (listingResourceId) {
                 existingListing = sniperListings.find(l => l.listingId === listingResourceId);
-                
+
                 // If not in memory, check database
                 if (!existingListing) {
                   try {
@@ -5410,25 +5412,25 @@ async function watchForListings() {
                   }
                 }
               }
-              
+
               // If we don't have a listingResourceId match, we CANNOT reliably mark as sold
               // (an NFT could have been sold and relisted, so matching by nftId alone is unsafe)
               if (!existingListing) {
                 console.log(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system - skipping`);
                 continue;
               }
-              
+
               // If already marked as sold, skip
               if (existingListing.isSold) {
                 continue;
               }
-              
+
               // Verify the sale happened AFTER the listing was created
               if (existingListing.listedAt) {
                 const listedAtDate = new Date(existingListing.listedAt);
                 const eventTimestamp = block.block_timestamp || event.timestamp || block.timestamp;
                 const eventDate = eventTimestamp ? new Date(eventTimestamp) : null;
-                
+
                 if (eventDate && !isNaN(eventDate.getTime()) && !isNaN(listedAtDate.getTime())) {
                   // Add a small buffer (2 minutes) to account for timing variations
                   const bufferMs = 2 * 60 * 1000;
@@ -5441,17 +5443,17 @@ async function watchForListings() {
                   console.log(`[Sniper] ⚠️  Cannot verify timing for listing ${listingResourceId}, but proceeding with exact listingId match`);
                 }
               }
-              
+
               // Extract buyer address - best method is from AllDay.Deposit event in same tx
               // The Deposit event has 'to' field = buyer address, 'id' field = NFT ID
               let buyerAddr = null;
-              
+
               // First try to get buyer from ListingCompleted event fields
-              buyerAddr = getField('purchaser')?.toString()?.toLowerCase() || 
-                         getField('buyer')?.toString()?.toLowerCase() ||
-                         getField('recipient')?.toString()?.toLowerCase() ||
-                         null;
-              
+              buyerAddr = getField('purchaser')?.toString()?.toLowerCase() ||
+                getField('buyer')?.toString()?.toLowerCase() ||
+                getField('recipient')?.toString()?.toLowerCase() ||
+                null;
+
               // If not found, query AllDay.Deposit event for this block to find buyer
               // The Deposit event fires when an NFT is transferred TO the buyer
               if (!buyerAddr && block.block_height && targetNftId) {
@@ -5460,26 +5462,26 @@ async function watchForListings() {
                     `${FLOW_REST_API}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${block.block_height}&end_height=${block.block_height}`,
                     { signal: AbortSignal.timeout(5000) }
                   );
-                  
+
                   if (depositRes.ok) {
                     const depositData = await depositRes.json();
                     console.log(`[Sniper] 🔍 Checking ${depositData?.length || 0} blocks for Deposit events for NFT ${targetNftId}`);
-                    
+
                     // Find the Deposit event for our NFT ID
                     for (const depositBlock of depositData) {
                       if (!depositBlock.events) continue;
-                      
+
                       for (const depositEvent of depositBlock.events) {
                         try {
                           let depositPayload = depositEvent.payload;
                           if (typeof depositPayload === 'string') {
                             depositPayload = JSON.parse(Buffer.from(depositPayload, 'base64').toString());
                           }
-                          
+
                           if (!depositPayload?.value?.fields) continue;
-                          
+
                           const depositFields = depositPayload.value.fields;
-                          
+
                           // Extract NFT ID - can be nested in different ways
                           const idField = depositFields.find(f => f.name === 'id');
                           let depositNftId = null;
@@ -5495,14 +5497,14 @@ async function watchForListings() {
                             };
                             depositNftId = extractId(idField);
                           }
-                          
+
                           // Extract 'to' address - Address type can be deeply nested in Cadence
                           const toField = depositFields.find(f => f.name === 'to');
                           let depositTo = null;
                           if (toField) {
                             // Debug: log the structure to understand it
                             // console.log(`[Sniper] DEBUG toField:`, JSON.stringify(toField, null, 2));
-                            
+
                             // Try to extract address from various nested structures
                             // Cadence Address can be: { value: "0x..." } or { value: { value: "0x..." } }
                             const extractAddress = (obj) => {
@@ -5518,9 +5520,9 @@ async function watchForListings() {
                               }
                               return null;
                             };
-                            
+
                             depositTo = extractAddress(toField);
-                            
+
                             // Log what we found for debugging
                             if (depositTo) {
                               console.log(`[Sniper] 📍 Extracted 'to' address: ${depositTo}`);
@@ -5528,11 +5530,11 @@ async function watchForListings() {
                               console.log(`[Sniper] ⚠️ Could not extract 'to' address from:`, JSON.stringify(toField).substring(0, 200));
                             }
                           }
-                          
+
                           // Normalize both IDs to strings for comparison
                           const targetIdStr = targetNftId?.toString();
                           const depositIdStr = depositNftId?.toString();
-                          
+
                           // Match by NFT ID - this is the buyer receiving the NFT
                           if (depositIdStr && targetIdStr && depositIdStr === targetIdStr && depositTo) {
                             // Ensure depositTo is a valid address string
@@ -5550,7 +5552,7 @@ async function watchForListings() {
                       }
                       if (buyerAddr) break;
                     }
-                    
+
                     if (!buyerAddr) {
                       console.log(`[Sniper] ⚠️ No matching Deposit event found for NFT ${targetNftId} in block ${block.block_height}`);
                     }
@@ -5561,22 +5563,22 @@ async function watchForListings() {
                   console.warn(`[Sniper] Could not fetch Deposit events for buyer lookup:`, e.message);
                 }
               }
-              
+
               // Fallback: try to get from transaction - query tx result for all events
               if (!buyerAddr) {
-                let txId = event.transaction_id || event.transactionId || 
-                          block.transaction_id || block.transactions?.[0]?.id;
-                
+                let txId = event.transaction_id || event.transactionId ||
+                  block.transaction_id || block.transactions?.[0]?.id;
+
                 if (txId) {
                   try {
                     // Query transaction result which includes ALL events from that transaction
                     // This is more reliable than querying by block since we get the exact tx
-                    const txResultRes = await fetch(`${FLOW_REST_API}/v1/transaction_results/${txId}`, 
+                    const txResultRes = await fetch(`${FLOW_REST_API}/v1/transaction_results/${txId}`,
                       { signal: AbortSignal.timeout(5000) });
-                    
+
                     if (txResultRes.ok) {
                       const txResult = await txResultRes.json();
-                      
+
                       // Look for AllDay.Deposit event in this transaction's events
                       if (txResult.events && txResult.events.length > 0) {
                         for (const txEvent of txResult.events) {
@@ -5586,15 +5588,15 @@ async function watchForListings() {
                               if (typeof eventPayload === 'string') {
                                 eventPayload = JSON.parse(Buffer.from(eventPayload, 'base64').toString());
                               }
-                              
+
                               if (eventPayload?.value?.fields) {
                                 const fields = eventPayload.value.fields;
                                 const idField = fields.find(f => f.name === 'id');
                                 const toField = fields.find(f => f.name === 'to');
-                                
+
                                 const eventNftId = idField?.value?.value?.toString() || idField?.value?.toString();
                                 const eventTo = toField?.value?.value?.toString() || toField?.value?.toString();
-                                
+
                                 if (eventNftId?.toString() === targetNftId?.toString() && eventTo) {
                                   buyerAddr = eventTo.toLowerCase();
                                   console.log(`[Sniper] 🎯 Found buyer ${buyerAddr} from tx_result Deposit event for NFT ${targetNftId}`);
@@ -5607,10 +5609,10 @@ async function watchForListings() {
                           }
                         }
                       }
-                      
+
                       // If still no buyer, try authorizer as last resort
                       if (!buyerAddr) {
-                        const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`, 
+                        const txRes = await fetch(`${FLOW_REST_API}/v1/transactions/${txId}`,
                           { signal: AbortSignal.timeout(5000) });
                         if (txRes.ok) {
                           const txData = await txRes.json();
@@ -5631,11 +5633,11 @@ async function watchForListings() {
                   console.log(`[Sniper] ⚠️ No transaction ID available for buyer lookup`);
                 }
               }
-              
+
               // We have exact listingResourceId match - this is very reliable
               // Buyer address is preferred but not required for exact listingResourceId matches
               // (listingResourceId is unique per listing, so if it matches, it's definitely sold)
-              
+
               // Use the 'purchased' field to determine if this was a sale or delisting
               if (wasPurchased) {
                 // This was a SALE - someone bought the listing
@@ -5659,21 +5661,21 @@ async function watchForListings() {
                 console.log(`[Sniper] ❌ Marked ${targetNftId} (listing ${listingResourceId}) as DELISTED (purchased=false)`);
                 unlistedCount++;
               }
-              
+
             } catch (e) {
               // Skip malformed events
             }
           }
         }
       }
-      
+
       // Process removed listings (delisted/cancelled)
       if (removedRes.ok) {
         const eventData = await removedRes.json();
-        
+
         for (const block of eventData) {
           if (!block.events) continue;
-          
+
           for (const event of block.events) {
             try {
               // Decode the payload
@@ -5681,9 +5683,9 @@ async function watchForListings() {
               if (typeof payload === 'string') {
                 payload = JSON.parse(Buffer.from(payload, 'base64').toString());
               }
-              
+
               if (!payload?.value?.fields) continue;
-              
+
               const fields = payload.value.fields;
               const getField = (name) => {
                 const f = fields.find(x => x.name === name);
@@ -5692,17 +5694,17 @@ async function watchForListings() {
                 if (f.value?.value) return f.value.value;
                 return f.value;
               };
-              
+
               // Check if this is an AllDay NFT
               const nftType = fields.find(f => f.name === 'nftType');
-              const typeId = nftType?.value?.staticType?.typeID || 
-                            nftType?.value?.value?.staticType?.typeID || '';
-              
+              const typeId = nftType?.value?.staticType?.typeID ||
+                nftType?.value?.value?.staticType?.typeID || '';
+
               if (!typeId.includes('AllDay')) continue;
-              
+
               const nftId = getField('nftID')?.toString();
               const listingResourceId = getField('listingResourceID')?.toString();
-              
+
               let targetNftId = nftId;
               if (listingResourceId && !targetNftId) {
                 const listing = sniperListings.find(l => l.listingId === listingResourceId);
@@ -5726,44 +5728,44 @@ async function watchForListings() {
                   }
                 }
               }
-              
+
               if (!targetNftId) continue;
-              
+
               await markListingAsUnlisted(targetNftId);
               console.log(`[Sniper] ✅ Marked ${targetNftId} as delisted`);
               unlistedCount++;
-              
+
             } catch (e) {
               // Skip malformed events
             }
           }
         }
       }
-      
+
       if (!listingRes.ok && !completedRes.ok && !removedRes.ok) {
         console.log(`[Sniper] ⚠️ All event fetches failed - listingRes: ${listingRes.status || 'error'}, completedRes: ${completedRes.status || 'error'}, removedRes: ${removedRes.status || 'error'}`);
         lastCheckedBlock = endHeight;
         return;
       }
-      
+
       if (alldayCount > 0 || soldCount > 0 || unlistedCount > 0) {
         console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold, ${unlistedCount} delisted (total in memory: ${sniperListings.length})`);
       }
-      
+
       // Log every 10 blocks even if no events (to show it's working)
       if ((startHeight % 10 === 0) || (alldayCount > 0 || soldCount > 0 || unlistedCount > 0)) {
         console.log(`[Sniper] Checked blocks ${startHeight}-${endHeight}, current block: ${currentBlock}, listings in memory: ${sniperListings.length}`);
       }
-      
+
       lastCheckedBlock = endHeight;
-      
+
     } catch (err) {
       console.error("[Sniper] Error checking for listings:", err.message);
       // Don't let errors stop the watcher - log and continue
       // Add exponential backoff on repeated errors
     }
   };
-  
+
   // Check every 3 seconds for real-time sniping (slightly slower to reduce load)
   // Use a more robust interval with error handling
   let consecutiveErrors = 0;
@@ -5780,7 +5782,7 @@ async function watchForListings() {
       }
     }
   };
-  
+
   setInterval(checkWithRetry, 3000); // 3 second intervals
   checkWithRetry(); // Run immediately
 }
@@ -5788,13 +5790,13 @@ async function watchForListings() {
 async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
   try {
     if (!nftId || !sellerAddr || !listedAt) return null;
-    
+
     const listedAtDate = new Date(listedAt);
     if (isNaN(listedAtDate.getTime())) {
       console.warn(`[Verify] Invalid listedAt date for ${nftId}: ${listedAt}`);
       return null;
     }
-    
+
     // Try FindLab API first for block height (faster and more reliable)
     let latestHeight = await getLatestBlockHeightFindLab();
     if (!latestHeight || latestHeight <= 0) {
@@ -5818,20 +5820,20 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
         return null;
       }
     }
-    
+
     // Estimate the block height when the listing was created
     // Flow produces ~2 blocks per second, so calculate approximate block height at listing time
     const now = Date.now();
     const secondsSinceListing = Math.max(0, (now - listedAtDate.getTime()) / 1000);
     const blocksSinceListing = Math.floor(secondsSinceListing * 2); // ~2 blocks/second
     const estimatedListedAtBlock = Math.max(0, latestHeight - blocksSinceListing);
-    
+
     // Only check events that happened AFTER the listing was created
     // Use a small buffer (50 blocks = ~25 seconds) to account for timing variations
     const startHeight = Math.max(0, estimatedListedAtBlock - 50);
-    
+
     const fetchOptions = { signal: AbortSignal.timeout(8000) };
-    
+
     const getField = (fields, name) => {
       const f = fields.find(x => x.name === name);
       if (!f) return null;
@@ -5839,37 +5841,37 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
       if (f.value?.value) return f.value.value;
       return f.value;
     };
-    
+
     // Query for ListingCompleted events only after the listing was created (use V2 contract)
     const completedRes = await fetch(
       `${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
     );
-    
+
     if (completedRes.ok) {
       const completedData = await completedRes.json();
       for (const block of completedData) {
         if (!block.events) continue;
         const blockHeight = parseInt(block.block_height || block.height || 0);
-        
+
         // CRITICAL: Only consider events that happened AFTER the listing was created
         if (blockHeight < estimatedListedAtBlock) {
           continue; // This event happened before the listing, ignore it
         }
-        
+
         for (const event of block.events) {
           try {
             let payload = event.payload;
             if (typeof payload === 'string') {
               payload = JSON.parse(Buffer.from(payload, 'base64').toString());
             }
-            
+
             if (!payload?.value?.fields) continue;
-            
+
             const fields = payload.value.fields;
             const eventListingId = getField(fields, 'listingResourceID')?.toString();
             const eventNftId = getField(fields, 'nftID')?.toString();
-            
+
             // STRICT MATCHING: 
             // 1. If we have listingId, require exact listingId match (most reliable)
             // 2. If no listingId in our data, we CANNOT safely match by nftId alone
@@ -5881,7 +5883,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
             }
             // REMOVED: else if (eventNftId === nftId) - this was causing false positives!
             // If we don't have listingId in our data, we cannot safely verify which listing was sold
-            
+
             if (matches && blockHeight >= estimatedListedAtBlock) {
               let buyerAddr = null;
               const txId = event.transaction_id || block.transactions?.[0]?.id;
@@ -5901,7 +5903,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
                 } catch (e) {
                 }
               }
-              
+
               // If we have exact listingResourceId match, it's definitely sold (even without buyer)
               // listingResourceId is unique per listing, so this is very reliable
               if (listingId && eventListingId === listingId) {
@@ -5930,44 +5932,44 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
         }
       }
     }
-    
+
     // Query for ListingRemoved events only after the listing was created
     const removedRes = await fetch(
       `${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingRemoved&start_height=${startHeight}&end_height=${latestHeight}`,
       fetchOptions
     );
-    
+
     if (removedRes.ok) {
       const removedData = await removedRes.json();
       for (const block of removedData) {
         if (!block.events) continue;
         const blockHeight = parseInt(block.block_height || block.height || 0);
-        
+
         // Only consider events that happened AFTER the listing was created
         if (blockHeight < estimatedListedAtBlock) {
           continue;
         }
-        
+
         for (const event of block.events) {
           try {
             let payload = event.payload;
             if (typeof payload === 'string') {
               payload = JSON.parse(Buffer.from(payload, 'base64').toString());
             }
-            
+
             if (!payload?.value?.fields) continue;
-            
+
             const fields = payload.value.fields;
             const eventListingId = getField(fields, 'listingResourceID')?.toString();
             const eventNftId = getField(fields, 'nftID')?.toString();
-            
+
             // STRICT MATCHING: Only match if we have exact listingId match
             let matches = false;
             if (listingId && eventListingId) {
               matches = (eventListingId === listingId) && (eventNftId === nftId);
             }
             // REMOVED: else if (eventNftId === nftId) - this causes false positives for delisted items too!
-            
+
             if (matches && blockHeight >= estimatedListedAtBlock) {
               return { isSold: false, isUnlisted: true, buyerAddr: null };
             }
@@ -5976,7 +5978,7 @@ async function verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr) {
         }
       }
     }
-    
+
     return null;
   } catch (err) {
     return null;
@@ -5988,14 +5990,14 @@ async function verifyListingStatus(nftId, listingId, listedAt) {
     if (!nftId) {
       return null;
     }
-    
+
     const listing = sniperListings.find(l => l.nftId === nftId);
     const sellerAddr = listing?.sellerAddr;
-    
+
     if (!sellerAddr) {
       return null;
     }
-    
+
     return await verifyListingStatusFast(nftId, listingId, listedAt, sellerAddr);
   } catch (err) {
     return null;
@@ -6007,7 +6009,7 @@ async function verifyExistingListingsStatus() {
   try {
     // Check both memory and database listings
     const listingsToVerify = [];
-    
+
     // Get from memory (active listings only)
     for (const listing of sniperListings) {
       if (!listing.isSold && !listing.isUnlisted && listing.nftId) {
@@ -6019,7 +6021,7 @@ async function verifyExistingListingsStatus() {
         });
       }
     }
-    
+
     // Also get from database (recent listings that might not be in memory)
     // Check last 3 days to catch older sold listings
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
@@ -6033,7 +6035,7 @@ async function verifyExistingListingsStatus() {
        LIMIT 200`,
       [threeDaysAgo]
     );
-    
+
     const memoryNftIds = new Set(listingsToVerify.map(l => l.nftId));
     for (const row of dbResult.rows) {
       if (!memoryNftIds.has(row.nft_id)) {
@@ -6045,43 +6047,43 @@ async function verifyExistingListingsStatus() {
         });
       }
     }
-    
+
     if (listingsToVerify.length === 0) {
       console.log(`[Sniper] No active listings to verify`);
       return;
     }
-    
+
     console.log(`[Sniper] Verifying status of ${listingsToVerify.length} active listings...`);
     let updated = 0;
     let checked = 0;
     let errors = 0;
-    
+
     const batchSize = 10;
     for (let i = 0; i < listingsToVerify.length; i += batchSize) {
       const batch = listingsToVerify.slice(i, i + batchSize);
-      
+
       await Promise.all(batch.map(async (item) => {
         try {
           checked++;
-          
+
           const listing = sniperListings.find(l => l.nftId === item.nftId);
           const sellerAddr = listing?.sellerAddr;
-          
+
           if (!sellerAddr) {
             return;
           }
-          
+
           const status = await verifyListingStatusFast(
             item.nftId,
             item.listingId,
             item.listedAt,
             sellerAddr
           );
-          
+
           if (!status) {
             return;
           }
-          
+
           if (status.isSold) {
             // Mark as sold - buyer address is optional if we have exact listingResourceId match
             await markListingAsSold(item.nftId, status.buyerAddr || null);
@@ -6100,12 +6102,12 @@ async function verifyExistingListingsStatus() {
           console.error(`[Sniper] Error checking ${item.nftId}:`, e.message);
         }
       }));
-      
+
       if (i + batchSize < listingsToVerify.length) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
-    
+
     if (updated > 0) {
       console.log(`[Sniper] ✅ Updated ${updated} listings (${errors} errors)`);
     }
@@ -6119,9 +6121,9 @@ async function verifyExistingListingsStatus() {
 async function loadRecentListingsFromDB() {
   try {
     await ensureSniperListingsTable();
-    
+
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-    
+
     const result = await pgQuery(
       `SELECT listing_data, is_sold, is_unlisted, buyer_address, listed_at, listing_id
        FROM sniper_listings 
@@ -6130,25 +6132,25 @@ async function loadRecentListingsFromDB() {
        LIMIT 500`,
       [threeDaysAgo]
     );
-    
+
     if (result.rows.length === 0) {
       console.log("[Sniper] No recent listings found in database, will populate from watcher");
       return;
     }
-    
+
     console.log(`[Sniper] Loading ${result.rows.length} recent listings from database...`);
-    
+
     let loaded = 0;
     let skipped = 0;
-    
+
     for (const row of result.rows) {
       try {
-        const listing = typeof row.listing_data === 'string' 
-          ? JSON.parse(row.listing_data) 
+        const listing = typeof row.listing_data === 'string'
+          ? JSON.parse(row.listing_data)
           : row.listing_data;
-        
+
         if (!listing.nftId) continue;
-        
+
         // Update status from database
         listing.isSold = row.is_sold || false;
         listing.isUnlisted = row.is_unlisted || false;
@@ -6158,7 +6160,7 @@ async function loadRecentListingsFromDB() {
         if (row.listing_id && !listing.listingId) {
           listing.listingId = row.listing_id;
         }
-        
+
         // Add to tracking maps
         if (listing.isSold) {
           soldNfts.set(listing.nftId, Date.now());
@@ -6167,7 +6169,7 @@ async function loadRecentListingsFromDB() {
           unlistedNfts.set(listing.nftId, Date.now());
         }
         seenListingNfts.set(listing.nftId, Date.now());
-        
+
         // Add to memory (avoid duplicates)
         if (!sniperListings.find(l => l.nftId === listing.nftId)) {
           sniperListings.push(listing);
@@ -6179,25 +6181,25 @@ async function loadRecentListingsFromDB() {
         console.error("[Sniper] Error parsing listing from DB:", e.message);
       }
     }
-    
+
     // Sort by listedAt (most recent first)
     sniperListings.sort((a, b) => {
       const aTime = new Date(a.listedAt || 0).getTime();
       const bTime = new Date(b.listedAt || 0).getTime();
       return bTime - aTime;
     });
-    
+
     // Keep only the most recent 500 in memory
     if (sniperListings.length > MAX_SNIPER_LISTINGS) {
       sniperListings.splice(MAX_SNIPER_LISTINGS);
     }
-    
+
     console.log(`[Sniper] Loaded ${loaded} listings from database (${skipped} duplicates skipped)`);
-    
+
     // After loading, verify status of listings that aren't marked as sold/unlisted
     // Do this in background so it doesn't block startup - wait 30 seconds
     // This will catch any listings that were sold/delisted before the watcher was running
-setTimeout(() => {
+    setTimeout(() => {
       console.log("[Sniper] 🔍 Running initial verification on loaded listings...");
       verifyExistingListingsStatus().catch(err => {
         console.error("[Sniper] Error in background status verification:", err.message);
@@ -6219,7 +6221,7 @@ function cleanupSniperMemory() {
         floorPriceCache.delete(editionId);
       }
     }
-    
+
     // If still over limit, remove oldest
     if (floorPriceCache.size > MAX_FLOOR_CACHE_SIZE) {
       const entries = Array.from(floorPriceCache.entries())
@@ -6229,7 +6231,7 @@ function cleanupSniperMemory() {
         floorPriceCache.delete(entries[i][0]);
       }
     }
-    
+
     // Clean up old seen NFTs (older than 24 hours)
     const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
     for (const [nftId, timestamp] of seenListingNfts.entries()) {
@@ -6237,7 +6239,7 @@ function cleanupSniperMemory() {
         seenListingNfts.delete(nftId);
       }
     }
-    
+
     // If still over limit, remove oldest
     if (seenListingNfts.size > MAX_SEEN_NFTS) {
       const entries = Array.from(seenListingNfts.entries())
@@ -6247,7 +6249,7 @@ function cleanupSniperMemory() {
         seenListingNfts.delete(entries[i][0]);
       }
     }
-    
+
     // Clean up old sold NFTs (older than 7 days)
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
     for (const [nftId, timestamp] of soldNfts.entries()) {
@@ -6255,7 +6257,7 @@ function cleanupSniperMemory() {
         soldNfts.delete(nftId);
       }
     }
-    
+
     // If still over limit, remove oldest
     if (soldNfts.size > MAX_SOLD_NFTS) {
       const entries = Array.from(soldNfts.entries())
@@ -6265,14 +6267,14 @@ function cleanupSniperMemory() {
         soldNfts.delete(entries[i][0]);
       }
     }
-    
+
     // Log memory usage
     const memUsage = process.memoryUsage();
     const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
     const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-    
+
     sniperLog(`[Cleanup] Memory: ${heapUsedMB}/${heapTotalMB}MB | Floor: ${floorPriceCache.size} | Seen: ${seenListingNfts.size} | Sold: ${soldNfts.size} | Listings: ${sniperListings.length}`);
-    
+
     // Force garbage collection if available (run node with --expose-gc)
     if (global.gc) {
       global.gc();
@@ -6288,13 +6290,13 @@ function globalMemoryCleanup() {
   try {
     const memUsage = process.memoryUsage();
     const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-    
+
     console.log(`[Memory] Heap used: ${heapUsedMB}MB`);
-    
+
     // If memory is getting high (>200MB), be more aggressive with cleanup
     if (heapUsedMB > 200) {
       console.log("[Memory] High memory usage detected, running aggressive cleanup...");
-      
+
       // Clear expired graphql cache entries
       const now = Date.now();
       for (const [key, entry] of graphqlCache.entries()) {
@@ -6302,12 +6304,12 @@ function globalMemoryCleanup() {
           graphqlCache.delete(key);
         }
       }
-      
+
       // Trim sniper listings more aggressively
       if (sniperListings.length > 200) {
         sniperListings.length = 200;
       }
-      
+
       // Clear old caches
       if (typeof rarityLeaderboardCache !== 'undefined') {
         rarityLeaderboardCache = null;
@@ -6315,7 +6317,7 @@ function globalMemoryCleanup() {
       if (typeof setTotalsCache !== 'undefined') {
         setTotalsCache = null;
       }
-      
+
       console.log(`[Memory] After cleanup - GraphQL cache: ${graphqlCache.size}, Listings: ${sniperListings.length}`);
     }
   } catch (err) {
@@ -6363,24 +6365,24 @@ setTimeout(() => {
 async function initializeSniper() {
   try {
     console.log("[Sniper] 🚀 Initializing sniper system...");
-    
+
     // First, ensure database table is set up correctly
     await ensureSniperListingsTable();
-    
+
     // Then, load recent listings from database
     await loadRecentListingsFromDB();
-    
+
     console.log(`[Sniper] ✅ Loaded ${sniperListings.length} listings from database`);
-    
+
     // Then start the watcher
     setTimeout(() => {
       console.log("[Sniper] 🔄 Starting blockchain watcher...");
       watchForListings();
     }, 2000);
-    
+
     // Run cleanup once on startup
     setTimeout(cleanupOldListings, 30000); // After 30 seconds
-    
+
     console.log("[Sniper] ✅ Sniper system initialized successfully");
   } catch (err) {
     console.error("[Sniper] ❌ Error initializing sniper:", err.message);
@@ -6388,8 +6390,8 @@ async function initializeSniper() {
     // Still try to start the watcher
     setTimeout(() => {
       console.log("[Sniper] 🔄 Attempting to start watcher despite errors...");
-  watchForListings();
-}, 5000);
+      watchForListings();
+    }, 5000);
   }
 }
 
@@ -6398,14 +6400,14 @@ async function initializeSniper() {
 app.get("/api/sniper/find-listing", async (req, res) => {
   try {
     const { player, serial } = req.query;
-    
+
     if (!player && !serial) {
       return res.status(400).json({
         ok: false,
         error: "Please provide player name (e.g., ?player=Tony Dorsett&serial=44)"
       });
     }
-    
+
     // Search in database
     let query = `
       SELECT sl.nft_id, sl.listing_id, sl.listed_at, sl.is_sold, sl.is_unlisted, 
@@ -6417,24 +6419,24 @@ app.get("/api/sniper/find-listing", async (req, res) => {
     `;
     const params = [];
     let paramCount = 1;
-    
+
     if (player) {
       const playerLower = player.toLowerCase();
       query += ` AND (LOWER(m.first_name || ' ' || m.last_name) LIKE $${paramCount} OR LOWER(m.last_name) LIKE $${paramCount})`;
       params.push(`%${playerLower}%`);
       paramCount++;
     }
-    
+
     if (serial) {
       query += ` AND m.serial_number = $${paramCount}`;
       params.push(parseInt(serial));
       paramCount++;
     }
-    
+
     query += ` ORDER BY sl.listed_at DESC LIMIT 10`;
-    
+
     const result = await pgQuery(query, params);
-    
+
     if (result.rows.length === 0) {
       return res.json({
         ok: true,
@@ -6442,14 +6444,14 @@ app.get("/api/sniper/find-listing", async (req, res) => {
         message: "No listings found matching criteria"
       });
     }
-    
+
     // For each found listing, get verification details
     const listings = [];
     for (const row of result.rows) {
-      const listingData = typeof row.listing_data === 'string' 
-        ? JSON.parse(row.listing_data) 
+      const listingData = typeof row.listing_data === 'string'
+        ? JSON.parse(row.listing_data)
         : row.listing_data;
-      
+
       const listing = {
         nftId: row.nft_id,
         listingId: row.listing_id,
@@ -6465,7 +6467,7 @@ app.get("/api/sniper/find-listing", async (req, res) => {
         sellerAddr: listingData?.sellerAddr || listingData?.seller_addr,
         listingPrice: listingData?.listingPrice
       };
-      
+
       // If it's marked as sold, let's verify why
       if (row.is_sold && row.listing_id) {
         try {
@@ -6480,10 +6482,10 @@ app.get("/api/sniper/find-listing", async (req, res) => {
           listing.verificationError = e.message;
         }
       }
-      
+
       listings.push(listing);
     }
-    
+
     return res.json({
       ok: true,
       found: true,
@@ -6503,14 +6505,14 @@ app.get("/api/sniper/find-listing", async (req, res) => {
 app.get("/api/sniper/verify-listing", async (req, res) => {
   try {
     const { nftId, listingId } = req.query;
-    
+
     if (!nftId && !listingId) {
       return res.status(400).json({
         ok: false,
         error: "Please provide either nftId or listingId"
       });
     }
-    
+
     // Find the listing
     let listing = null;
     if (listingId) {
@@ -6554,14 +6556,14 @@ app.get("/api/sniper/verify-listing", async (req, res) => {
         }
       }
     }
-    
+
     if (!listing) {
       return res.status(404).json({
         ok: false,
         error: "Listing not found in our system"
       });
     }
-    
+
     // Verify status
     const status = await verifyListingStatusFast(
       listing.nftId,
@@ -6569,14 +6571,14 @@ app.get("/api/sniper/verify-listing", async (req, res) => {
       listing.listedAt,
       listing.sellerAddr
     );
-    
+
     if (status && status.isSold) {
       // Mark as sold if verified
       await markListingAsSold(listing.nftId, status.buyerAddr || null);
     } else if (status && status.isUnlisted) {
       await markListingAsUnlisted(listing.nftId);
     }
-    
+
     return res.json({
       ok: true,
       listing: {
@@ -6586,7 +6588,7 @@ app.get("/api/sniper/verify-listing", async (req, res) => {
         sellerAddr: listing.sellerAddr
       },
       verification: status || { isSold: false, isUnlisted: false },
-      message: status 
+      message: status
         ? (status.isSold ? "Listing verified as SOLD" : status.isUnlisted ? "Listing verified as DELISTED" : "Listing is still ACTIVE")
         : "Could not verify listing status"
     });
@@ -6622,11 +6624,11 @@ app.get("/api/sniper-deals", async (req, res) => {
   try {
     // Get filter params
     const { team, player, tier, minDiscount, maxPrice, maxSerial, dealsOnly } = req.query;
-    
+
     const statusFilter = req.query.status || 'active';
-    
+
     let filtered = sniperListings;
-    
+
     if (statusFilter === 'active') {
       filtered = sniperListings.filter(l => !l.isSold && !l.isUnlisted);
     } else if (statusFilter === 'sold') {
@@ -6637,19 +6639,19 @@ app.get("/api/sniper-deals", async (req, res) => {
       filtered = sniperListings.filter(l => l.isSold || l.isUnlisted);
     }
     // 'all' shows everything (no filter)
-    
+
     // If we don't have many listings in memory, also check database (for fresh page loads)
     // Only query DB if we have very few listings (less than 10) to avoid slow queries on every request
     if (filtered.length < 10 && statusFilter === 'active') {
       try {
         await ensureSniperListingsTable();
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-        
+
         let dbQuery = `SELECT listing_data, is_sold, is_unlisted, buyer_address
            FROM sniper_listings 
            WHERE listed_at >= $1`;
         const dbParams = [threeDaysAgo];
-        
+
         // Apply status filter to database query if not showing all
         if (statusFilter === 'active') {
           dbQuery += ` AND is_sold = FALSE AND is_unlisted = FALSE`;
@@ -6661,28 +6663,28 @@ app.get("/api/sniper-deals", async (req, res) => {
           dbQuery += ` AND (is_sold = TRUE OR is_unlisted = TRUE)`;
         }
         // 'all' - no additional WHERE clause
-        
+
         dbQuery += ` ORDER BY listed_at DESC LIMIT 200`;
-        
+
         const dbResult = await pgQuery(dbQuery, dbParams);
-        
+
         // Merge DB results with memory (avoid duplicates)
         const memoryNftIds = new Set(filtered.map(l => l.nftId));
         for (const row of dbResult.rows) {
           try {
-            const listing = typeof row.listing_data === 'string' 
-              ? JSON.parse(row.listing_data) 
+            const listing = typeof row.listing_data === 'string'
+              ? JSON.parse(row.listing_data)
               : row.listing_data;
-            
+
             if (!listing.nftId || memoryNftIds.has(listing.nftId)) continue;
-            
+
             // Update status from database
             listing.isSold = row.is_sold || false;
             listing.isUnlisted = row.is_unlisted || false;
             if (row.buyer_address) {
               listing.buyerAddr = row.buyer_address;
             }
-            
+
             // Apply status filter when adding from database
             if (statusFilter === 'active' && (!listing.isSold && !listing.isUnlisted)) {
               filtered.push(listing);
@@ -6704,7 +6706,7 @@ app.get("/api/sniper-deals", async (req, res) => {
             // Skip malformed listings
           }
         }
-        
+
         // Sort by listedAt (most recent first)
         filtered.sort((a, b) => {
           const aTime = new Date(a.listedAt || 0).getTime();
@@ -6716,52 +6718,52 @@ app.get("/api/sniper-deals", async (req, res) => {
         console.error("[Sniper] Error fetching from database:", dbErr.message);
       }
     }
-    
+
     // Apply filters
     if (team) {
       const teamLower = team.toLowerCase();
       filtered = filtered.filter(l => l.teamName?.toLowerCase().includes(teamLower));
     }
-    
+
     if (player) {
       const playerLower = player.toLowerCase();
       filtered = filtered.filter(l => l.playerName?.toLowerCase().includes(playerLower));
     }
-    
+
     if (tier) {
       const tierUpper = tier.toUpperCase();
       filtered = filtered.filter(l => l.tier === tierUpper);
     }
-    
+
     if (minDiscount) {
       const minDisc = parseFloat(minDiscount);
       filtered = filtered.filter(l => l.dealPercent >= minDisc);
     }
-    
+
     if (maxPrice) {
       const maxP = parseFloat(maxPrice);
       filtered = filtered.filter(l => l.listingPrice <= maxP);
     }
-    
+
     if (maxSerial) {
       const maxS = parseInt(maxSerial);
       filtered = filtered.filter(l => l.serialNumber && l.serialNumber <= maxS);
     }
-    
+
     if (dealsOnly === 'true') {
       filtered = filtered.filter(l => l.dealPercent > 0);
     }
-    
+
     // Enrich listings with missing ASP and Series data (batch queries for performance)
     // Get all nftIds and editionIds that need enrichment
     const allNftIds = [...new Set(filtered.map(l => l.nftId).filter(Boolean))];
     const allEditionIds = [...new Set(filtered.map(l => l.editionId).filter(Boolean))];
-    
+
     const seriesMapByNftId = new Map();
     const seriesMapByEditionId = new Map();
     const jerseyMapByNftId = new Map();
     const aspMap = new Map();
-    
+
     // Batch fetch series names and jersey numbers by nftId
     if (allNftIds.length > 0) {
       try {
@@ -6781,7 +6783,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         console.error("[Sniper] Error fetching series names by nftId:", e.message);
       }
     }
-    
+
     // Batch fetch series names by editionId (fallback for listings without nftId)
     if (allEditionIds.length > 0) {
       try {
@@ -6798,7 +6800,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         console.error("[Sniper] Error fetching series names by editionId:", e.message);
       }
     }
-    
+
     // Batch fetch ASP for all listings
     if (allEditionIds.length > 0) {
       try {
@@ -6820,11 +6822,11 @@ app.get("/api/sniper-deals", async (req, res) => {
         //console.error("[Sniper] Error fetching ASP:", e.message);
       }
     }
-    
+
     // Enrich all listings with fetched data
     const enrichedListings = filtered.map(listing => {
       const enriched = { ...listing };
-      
+
       // Fill in seriesName if missing - try nftId first, then editionId
       if (!enriched.seriesName) {
         if (enriched.nftId && seriesMapByNftId.has(enriched.nftId)) {
@@ -6833,12 +6835,12 @@ app.get("/api/sniper-deals", async (req, res) => {
           enriched.seriesName = seriesMapByEditionId.get(enriched.editionId);
         }
       }
-      
+
       // Fill in jerseyNumber if missing
       if (!enriched.jerseyNumber && enriched.nftId && jerseyMapByNftId.has(enriched.nftId)) {
         enriched.jerseyNumber = jerseyMapByNftId.get(enriched.nftId);
       }
-      
+
       // Always try to fill in avgSale if we have an editionId (even if it was previously null)
       if (enriched.editionId) {
         if (aspMap.has(enriched.editionId)) {
@@ -6848,10 +6850,10 @@ app.get("/api/sniper-deals", async (req, res) => {
           enriched.avgSale = null;
         }
       }
-      
+
       return enriched;
     });
-    
+
     // Debug: Log enrichment stats
     //if (enrichedListings.length > 0) {
     //  const withSeries = enrichedListings.filter(l => l.seriesName).length;
@@ -6859,14 +6861,14 @@ app.get("/api/sniper-deals", async (req, res) => {
     //  const withEditionId = enrichedListings.filter(l => l.editionId).length;
     //  console.log(`[Sniper API] Enriched ${enrichedListings.length} listings: ${withSeries} with series, ${withASP} with ASP (${withEditionId} have editionId)`);
     //}
-    
+
     // Get unique teams and tiers for filter dropdowns
     const allTeams = [...new Set(sniperListings.map(l => l.teamName).filter(Boolean))].sort();
     const allTiers = [...new Set(sniperListings.map(l => l.tier).filter(Boolean))];
-    
+
     // Count deals
     const dealsCount = enrichedListings.filter(l => l.dealPercent > 0).length;
-    
+
     return res.json({
       ok: true,
       listings: enrichedListings,
@@ -6890,10 +6892,10 @@ app.get("/api/sniper-deals", async (req, res) => {
 app.get("/api/sniper-warmup", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    
+
     // Get editions with recent activity from Snowflake
     await ensureSnowflakeConnected();
-    
+
     const sql = `
       SELECT DISTINCT EVENT_DATA:nftID::STRING AS nft_id
       FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
@@ -6904,10 +6906,10 @@ app.get("/api/sniper-warmup", async (req, res) => {
         AND BLOCK_TIMESTAMP >= DATEADD(hour, -24, CURRENT_TIMESTAMP())
       LIMIT ${limit}
     `;
-    
+
     const result = await executeSql(sql);
     const nftIds = result.map(r => r.NFT_ID || r.nft_id).filter(Boolean);
-    
+
     // Get edition IDs
     let editionIds = [];
     if (nftIds.length > 0) {
@@ -6917,9 +6919,9 @@ app.get("/api/sniper-warmup", async (req, res) => {
       );
       editionIds = metaResult.rows.map(r => r.edition_id).filter(Boolean);
     }
-    
+
     console.log(`[Sniper Warmup] Scraping floors for ${editionIds.length} editions...`);
-    
+
     // Scrape floors in parallel
     let scraped = 0;
     const BATCH_SIZE = 10;
@@ -6930,16 +6932,16 @@ app.get("/api/sniper-warmup", async (req, res) => {
         if (floor) scraped++;
       }));
     }
-    
+
     console.log(`[Sniper Warmup] Cached ${scraped} floor prices`);
-    
+
     return res.json({
       ok: true,
       editionsFound: editionIds.length,
       floorsCached: scraped,
       cacheSize: floorPriceCache.size
     });
-    
+
   } catch (err) {
     console.error("[Sniper Warmup] Error:", err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -6950,7 +6952,7 @@ app.get("/api/sniper-warmup", async (req, res) => {
 app.get("/api/debug-marketplace-events", async (req, res) => {
   try {
     await ensureSnowflakeConnected();
-    
+
     // Find event types that have price data
     const sql = `
       SELECT DISTINCT
@@ -6972,9 +6974,9 @@ app.get("/api/debug-marketplace-events", async (req, res) => {
       ORDER BY event_count DESC
       LIMIT 50
     `;
-    
+
     const result = await executeSql(sql);
-    
+
     return res.json({
       ok: true,
       eventTypes: result
@@ -6992,9 +6994,9 @@ app.get("/api/debug-event-sample", async (req, res) => {
     if (!contract || !type) {
       return res.status(400).json({ ok: false, error: "Need ?contract=X&type=Y" });
     }
-    
+
     await ensureSnowflakeConnected();
-    
+
     const sql = `
       SELECT 
         EVENT_DATA,
@@ -7007,9 +7009,9 @@ app.get("/api/debug-event-sample", async (req, res) => {
       ORDER BY BLOCK_TIMESTAMP DESC
       LIMIT 5
     `;
-    
+
     const result = await executeSql(sql);
-    
+
     return res.json({
       ok: true,
       samples: result
@@ -7024,12 +7026,12 @@ app.get("/api/sniper-listings", async (req, res) => {
   try {
     const limitNum = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const hoursAgo = parseInt(req.query.hours, 10) || 1; // Last 1 hour of listings by default
-    
+
     await ensureSnowflakeConnected();
-    
+
     const cutoffTime = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
     const cutoffStr = cutoffTime.toISOString().replace('T', ' ').substring(0, 19);
-    
+
     // Query ListingAvailable events for NFL All Day NFTs
     // Filter for nftType containing AllDay contract
     // Also get ListingCompleted to filter out sold listings
@@ -7074,12 +7076,12 @@ app.get("/api/sniper-listings", async (req, res) => {
       ORDER BY l.block_timestamp DESC
       LIMIT ${limitNum}
     `;
-    
+
     console.log(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
-    
+
     const salesResult = await executeSql(eventsSql);
     console.log(`[Sniper] Found ${salesResult?.length || 0} active listings`);
-    
+
     if (!salesResult || salesResult.length === 0) {
       return res.json({
         ok: true,
@@ -7087,14 +7089,14 @@ app.get("/api/sniper-listings", async (req, res) => {
         message: "No active listings found"
       });
     }
-    
+
     // Get NFT IDs for metadata lookup
     const nftIds = salesResult.map(r => r.NFT_ID || r.nft_id).filter(Boolean);
-    
+
     // Get moment metadata by NFT ID
     let momentData = {}; // keyed by nft_id
     let editionIds = new Set();
-    
+
     if (nftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
@@ -7112,15 +7114,15 @@ app.get("/api/sniper-listings", async (req, res) => {
         console.error("[Sniper] Error fetching moment metadata:", err.message);
       }
     }
-    
+
     // Scrape REAL-TIME prices from NFL All Day website
     // This is the key to accurate sniper data!
     let scrapedData = {};
     const editionList = [...editionIds];
-    
+
     if (editionList.length > 0) {
       console.log(`[Sniper] Scraping real-time prices for ${editionList.length} editions...`);
-      
+
       // Scrape in parallel batches of 5 to avoid overwhelming the server
       const BATCH_SIZE = 5;
       for (let i = 0; i < editionList.length; i += BATCH_SIZE) {
@@ -7131,17 +7133,17 @@ app.get("/api/sniper-listings", async (req, res) => {
             return { editionId, data };
           })
         );
-        
+
         for (const { editionId, data } of results) {
           if (data) {
             scrapedData[editionId] = data;
           }
         }
       }
-      
+
       console.log(`[Sniper] Got real-time prices for ${Object.keys(scrapedData).length} editions`);
     }
-    
+
     // Get average sale prices from our database to compare with scraped low asks
     let avgSalePrices = {};
     if (editionList.length > 0) {
@@ -7159,21 +7161,21 @@ app.get("/api/sniper-listings", async (req, res) => {
         console.error("[Sniper] Error fetching avg sale prices:", err.message);
       }
     }
-    
+
     // Build floorPrices from scraped data, with avgSale for deal comparison
     const floorPrices = {};
     for (const [editionId, data] of Object.entries(scrapedData)) {
       if (data && data.lowAsk) {
-        floorPrices[editionId] = { 
+        floorPrices[editionId] = {
           floor: data.lowAsk,
           avgSale: avgSalePrices[editionId] || null
         };
       }
     }
-    
+
     // Get wallet names for sellers
     const sellerAddrs = [...new Set(salesResult.map(r => r.SELLER_ADDR || r.seller_addr).filter(Boolean))];
-    
+
     let walletNames = {};
     if (sellerAddrs.length > 0) {
       try {
@@ -7186,35 +7188,35 @@ app.get("/api/sniper-listings", async (req, res) => {
         }
       } catch (err) { /* ignore */ }
     }
-    
+
     // Build listing objects showing NEW LISTING PRICE vs CURRENT FLOOR
     const listings = [];
-    
+
     for (const row of salesResult) {
       const nftId = row.NFT_ID || row.nft_id;
       const snowflakeListingPrice = row.LISTING_PRICE || row.listing_price; // Price from Snowflake event
       const sellerAddr = row.SELLER_ADDR || row.seller_addr;
-      
+
       // Get moment data
       const moment = momentData[nftId] || {};
       const editionId = moment.edition_id;
       if (!editionId) continue;
-      
+
       const prices = floorPrices[editionId] || {};
       const currentFloor = prices.floor; // REAL-TIME scraped floor
-      
+
       if (!currentFloor || !snowflakeListingPrice) continue;
-      
+
       // Deal % = how much below CURRENT FLOOR this listing is
       // If floor is $40 and this was listed at $35, that's 12.5% below = DEAL!
       let dealPercent = null;
       if (currentFloor > 0) {
         dealPercent = Math.round(((currentFloor - snowflakeListingPrice) / currentFloor) * 1000) / 10;
       }
-      
+
       const serialNumber = moment.serial_number;
       const isLowSerial = serialNumber && serialNumber <= 100;
-      
+
       // Parse timestamp
       let timestamp = row.BLOCK_TIMESTAMP || row.block_timestamp;
       if (timestamp) {
@@ -7224,7 +7226,7 @@ app.get("/api/sniper-listings", async (req, res) => {
           timestamp = timestamp.replace(' ', 'T') + 'Z';
         }
       }
-      
+
       listings.push({
         nftId,
         editionId,
@@ -7232,26 +7234,26 @@ app.get("/api/sniper-listings", async (req, res) => {
         listingPrice: snowflakeListingPrice, // What this was listed for (from Snowflake)
         currentFloor,                         // Current floor price (scraped)
         dealPercent,                          // % below floor (positive = deal!)
-        
-        playerName: moment.first_name && moment.last_name 
-          ? `${moment.first_name} ${moment.last_name}` 
+
+        playerName: moment.first_name && moment.last_name
+          ? `${moment.first_name} ${moment.last_name}`
           : null,
         teamName: moment.team_name,
         tier: moment.tier,
         setName: moment.set_name,
         seriesName: moment.series_name,
         position: moment.position,
-        
+
         sellerName: walletNames[sellerAddr] || sellerAddr,
         sellerAddr,
         isLowSerial,
         listedAt: timestamp,
-        
+
         // Direct moment link for faster buying (one click to buy page)
         listingUrl: `https://nflallday.com/moments/${nftId}`
       });
     }
-    
+
     // Sort by deal percentage (best deals first - highest positive %)
     listings.sort((a, b) => {
       const aDeal = a.dealPercent ?? -999;
@@ -7259,10 +7261,10 @@ app.get("/api/sniper-listings", async (req, res) => {
       if (bDeal !== aDeal) return bDeal - aDeal;
       return new Date(b.listedAt) - new Date(a.listedAt);
     });
-    
+
     // Count deals (listings below floor)
     const dealsCount = listings.filter(l => l.dealPercent && l.dealPercent > 0).length;
-    
+
     return res.json({
       ok: true,
       listings,
@@ -7271,7 +7273,7 @@ app.get("/api/sniper-listings", async (req, res) => {
       hoursQueried: hoursAgo,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (err) {
     console.error("[Sniper] Error:", err);
     return res.status(500).json({
@@ -7285,33 +7287,33 @@ app.get("/api/sniper-listings", async (req, res) => {
 app.get("/api/sniper-active-listings", async (req, res) => {
   try {
     const limitNum = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-    
+
     // Get latest block height from Flow
     const latestHeight = await getLatestBlockHeight();
     const endHeight = latestHeight;
     const startHeight = latestHeight - 500; // ~6-7 minutes of blocks
-    
+
     console.log(`[Sniper Active] Querying blocks ${startHeight}-${endHeight} for listing events...`);
-    
+
     // Query NFTStorefront ListingAvailable events
     // These fire when someone creates a new marketplace listing
     const listingUrl = `${FLOW_LIGHT_NODE_URL}/v1/events?type=${STOREFRONT_CONTRACT}.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`;
-    
+
     const listingRes = await fetch(listingUrl);
     const listingData = listingRes.ok ? await listingRes.json() : [];
-    
+
     // Also query for ListingCompleted to filter out sold items
     const completedUrl = `${FLOW_LIGHT_NODE_URL}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`;
     const completedRes = await fetch(completedUrl);
     const completedData = completedRes.ok ? await completedRes.json() : [];
-    
+
     // Build set of completed listing IDs
     const completedListingIds = new Set();
     for (const block of completedData) {
       if (block.events) {
         for (const event of block.events) {
           try {
-            const payload = typeof event.payload === 'string' 
+            const payload = typeof event.payload === 'string'
               ? JSON.parse(Buffer.from(event.payload, 'base64').toString())
               : event.payload;
             if (payload?.value?.fields) {
@@ -7322,39 +7324,39 @@ app.get("/api/sniper-active-listings", async (req, res) => {
         }
       }
     }
-    
+
     // Parse listing events
     const activeListings = [];
-    
+
     for (const block of listingData) {
       if (!block.events) continue;
-      
+
       for (const event of block.events) {
         try {
           const payload = typeof event.payload === 'string'
             ? JSON.parse(Buffer.from(event.payload, 'base64').toString())
             : event.payload;
-          
+
           if (!payload?.value?.fields) continue;
-          
+
           const fields = payload.value.fields;
           const getField = (name) => {
             const f = fields.find(x => x.name === name);
             return f?.value?.value || f?.value;
           };
-          
+
           const listingId = getField('listingResourceID')?.toString();
-          
+
           // Skip if already sold
           if (listingId && completedListingIds.has(listingId)) continue;
-          
+
           // Extract listing data
           const nftId = getField('nftID')?.toString();
           const price = getField('salePrice');
           const seller = getField('storefrontAddress')?.toString()?.toLowerCase();
-          
+
           if (!nftId || !price) continue;
-          
+
           activeListings.push({
             listingId,
             nftId,
@@ -7363,18 +7365,18 @@ app.get("/api/sniper-active-listings", async (req, res) => {
             blockHeight: parseInt(block.block_height, 10),
             blockTimestamp: block.block_timestamp
           });
-          
+
         } catch (e) {
           console.error("[Sniper Active] Parse error:", e.message);
         }
       }
     }
-    
+
     // Enrich with metadata and floor prices
     const nftIds = activeListings.map(l => l.nftId).filter(Boolean);
     let momentData = {};
     let editionPrices = {};
-    
+
     if (nftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
@@ -7383,13 +7385,13 @@ app.get("/api/sniper-active-listings", async (req, res) => {
            FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
           [nftIds]
         );
-        
+
         const editionIds = [];
         for (const row of metaResult.rows) {
           momentData[row.nft_id] = row;
           if (row.edition_id) editionIds.push(row.edition_id);
         }
-        
+
         if (editionIds.length > 0) {
           const priceResult = await pgQuery(
             `SELECT edition_id, lowest_ask_usd FROM edition_price_scrape 
@@ -7404,22 +7406,22 @@ app.get("/api/sniper-active-listings", async (req, res) => {
         console.error("[Sniper Active] Metadata error:", e.message);
       }
     }
-    
+
     // Enrich listings
     const enrichedListings = activeListings.map(listing => {
       const moment = momentData[listing.nftId] || {};
       const floorPrice = editionPrices[moment.edition_id];
-      
+
       let dealPercent = null;
       if (floorPrice && listing.listingPrice && floorPrice > 0) {
         dealPercent = ((floorPrice - listing.listingPrice) / floorPrice) * 100;
       }
-      
+
       return {
         ...listing,
         editionId: moment.edition_id,
         serialNumber: moment.serial_number,
-        playerName: moment.first_name && moment.last_name 
+        playerName: moment.first_name && moment.last_name
           ? `${moment.first_name} ${moment.last_name}` : null,
         teamName: moment.team_name,
         tier: moment.tier,
@@ -7430,10 +7432,10 @@ app.get("/api/sniper-active-listings", async (req, res) => {
         listingUrl: listing.nftId ? `https://nflallday.com/moments/${listing.nftId}` : null
       };
     });
-    
+
     // Sort by deal %
     enrichedListings.sort((a, b) => (b.dealPercent ?? -999) - (a.dealPercent ?? -999));
-    
+
     return res.json({
       ok: true,
       listings: enrichedListings.slice(0, limitNum),
@@ -7441,7 +7443,7 @@ app.get("/api/sniper-active-listings", async (req, res) => {
       blocksQueried: endHeight - startHeight,
       timestamp: new Date().toISOString()
     });
-    
+
   } catch (err) {
     console.error("[Sniper Active] Error:", err);
     return res.status(500).json({
@@ -7483,10 +7485,10 @@ const port = process.env.PORT || 3000;
 async function setupInsightsRefresh() {
   try {
     await ensureInsightsSnapshotTable();
-    
+
     // Check if snapshot exists
     const check = await pool.query(`SELECT id FROM insights_snapshot WHERE id = 1;`);
-    
+
     if (!check.rows.length) {
       console.log("📊 No insights snapshot found. Refreshing on startup...");
       // Trigger refresh via internal fetch
@@ -7506,7 +7508,7 @@ async function setupInsightsRefresh() {
       const hoursOld = parseFloat(age.rows[0]?.hours_old || 0);
       console.log(`📊 Insights snapshot exists (${hoursOld.toFixed(1)} hours old). Will auto-refresh every 6 hours.`);
     }
-    
+
     // Set up periodic refresh (every 6 hours)
     setInterval(async () => {
       try {
@@ -7525,7 +7527,7 @@ async function setupInsightsRefresh() {
         console.error("❌ Error auto-refreshing insights snapshot:", err.message);
       }
     }, 6 * 60 * 60 * 1000); // 6 hours
-    
+
   } catch (err) {
     console.error("Error setting up insights refresh:", err);
   }
@@ -7574,7 +7576,7 @@ function extractQueryName(query) {
 async function nfladGraphQLQuery(query, variables = {}, userToken = null, retries = 3, useCache = true, req = null) {
   const cacheKey = createCacheKey(query, variables);
   const operationName = extractQueryName(query);
-  
+
   // Check cache first
   if (useCache) {
     const cached = graphqlCache.get(cacheKey);
@@ -7582,13 +7584,13 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
       console.log("[GraphQL Cache] Returning cached data for query:", operationName || "unknown");
       return cached.data;
     }
-    
+
     // Clean up expired cache entries
     if (cached && Date.now() >= cached.expiresAt) {
       graphqlCache.delete(cacheKey);
     }
   }
-  
+
   // Rate limiting: track requests per minute
   const now = Date.now();
   if (now - graphqlRequestWindowStart > GRAPHQL_RATE_LIMIT_WINDOW) {
@@ -7609,7 +7611,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
   }
 
   graphqlRequestCount++;
-  
+
   // Add a small delay before making request (helps avoid bot detection)
   await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay between requests
 
@@ -7628,12 +7630,12 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
       "sec-fetch-mode": "cors",
       "sec-fetch-site": "same-origin"
     };
-    
+
     // Add authentication token if provided
     if (userToken) {
       headers["X-Id-Token"] = userToken;
     }
-    
+
     // Add cookies if available from request (for browser session)
     // Note: This is a public API, but some endpoints may require cookies for bot detection
     // Forward cookies from the client if available
@@ -7641,7 +7643,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
     if (req && req.headers && req.headers.cookie) {
       cookieString = req.headers.cookie;
     }
-    
+
     // Also add nfl_session cookies if we have them stored (from token input)
     // The user might have pasted the session cookie, so try to use it
     if (userToken && userToken.length > 1000) {
@@ -7654,16 +7656,16 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
       // Don't use session cookie as X-Id-Token
       delete headers["X-Id-Token"];
     }
-    
+
     if (cookieString) {
       headers["Cookie"] = cookieString;
       console.log(`[GraphQL] Forwarding cookies from browser request (${cookieString.length} chars)`);
     }
-    
+
     // Extract query name and add as URL parameter (like browser does)
     const queryName = extractQueryName(query);
     const url = queryName ? `${NFLAD_GRAPHQL_URL}?${queryName}` : NFLAD_GRAPHQL_URL;
-    
+
     // Log for debugging
     console.log(`[GraphQL] Making request #${graphqlRequestCount} to: ${url}`);
     console.log(`[GraphQL] Query name: ${queryName || 'unknown'}`);
@@ -7671,40 +7673,40 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
     console.log(`[GraphQL] Variables:`, JSON.stringify(variables).substring(0, 200));
     console.log(`[GraphQL] Has token: ${!!userToken} (${userToken ? userToken.length : 0} chars)`);
     console.log(`[GraphQL] Has cookies: ${!!cookieString} (${cookieString ? cookieString.length : 0} chars)`);
-    
+
     // Build request body with operationName (required by NFL All Day API)
     const operationName = extractQueryName(query);
     const requestBody = {
       query,
       variables
     };
-    
+
     // Add operationName if we could extract it
     if (operationName) {
       requestBody.operationName = operationName;
     }
-    
+
     const response = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(requestBody)
     });
-    
+
     const responseText = await response.text();
     let data;
-    
+
     try {
       data = JSON.parse(responseText);
     } catch (parseErr) {
       console.error("[GraphQL] Response was not JSON:", responseText.substring(0, 500));
       throw new Error(`Invalid JSON response: ${response.status} ${response.statusText}`);
     }
-    
+
     if (!response.ok) {
       // Log full response for debugging
       console.error(`[GraphQL] HTTP ${response.status} ${response.statusText}`);
       console.error(`[GraphQL] Response body:`, responseText.substring(0, 500));
-      
+
       // Handle rate limiting and retry
       if (response.status === 403 || response.status === 429) {
         if (retries > 0) {
@@ -7714,15 +7716,15 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
           return nfladGraphQLQuery(query, variables, userToken, retries - 1, useCache, req);
         }
       }
-      
+
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}. Response: ${responseText.substring(0, 200)}`);
     }
-    
+
     if (data.errors) {
       console.error("GraphQL errors:", data.errors);
       throw new Error(data.errors[0]?.message || "GraphQL query failed");
     }
-    
+
     // Cache the successful response
     if (useCache && data.data) {
       // Cleanup if cache is too large
@@ -7735,7 +7737,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
           graphqlCache.delete(entries[i][0]);
         }
       }
-      
+
       graphqlCache.set(cacheKey, {
         data: data.data,
         timestamp: Date.now(),
@@ -7743,7 +7745,7 @@ async function nfladGraphQLQuery(query, variables = {}, userToken = null, retrie
       });
       console.log(`[GraphQL] Cached response (cache size: ${graphqlCache.size})`);
     }
-    
+
     return data.data;
   } catch (err) {
     // Retry on network errors
@@ -8207,10 +8209,10 @@ async function scrapeKickoffSlatesFromHTML() {
       'https://nflallday.com/kickoffs/',
       'https://www.nflallday.com/kickoffs/'
     ];
-    
+
     let response = null;
     let lastError = null;
-    
+
     for (const url of urls) {
       try {
         response = await fetch(url, {
@@ -8223,7 +8225,7 @@ async function scrapeKickoffSlatesFromHTML() {
           },
           redirect: 'follow'
         });
-        
+
         if (response.ok) {
           console.log(`[Scrape] Successfully fetched ${url}`);
           break;
@@ -8235,29 +8237,29 @@ async function scrapeKickoffSlatesFromHTML() {
         continue;
       }
     }
-    
+
     if (!response || !response.ok) {
       throw lastError || new Error(`Failed to fetch kickoffs page. All URLs returned errors.`);
     }
-    
+
     const html = await response.text();
-    
+
     // Try to find embedded JSON data in script tags (Next.js pattern)
     const nextDataMatch = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
     if (nextDataMatch) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
         console.log('[Scrape] Found Next.js embedded data');
-        
+
         // Navigate through Next.js data structure to find kickoff data
         // The structure is typically in props.pageProps or props.initialState
         const pageProps = nextData.props?.pageProps;
         const initialState = nextData.props?.initialState;
-        
+
         // Try to find GraphQL query result data
         // Look for searchKickoffSlates in various locations
         let slatesData = null;
-        
+
         // Check common locations for GraphQL data in Next.js apps
         if (pageProps?.data?.searchKickoffSlates) {
           slatesData = pageProps.data.searchKickoffSlates;
@@ -8281,7 +8283,7 @@ async function scrapeKickoffSlatesFromHTML() {
             console.log('[Scrape] Found Apollo cache, but needs custom extraction');
           }
         }
-        
+
         // Also try to find data in window.__APOLLO_STATE__ or similar
         const apolloStateMatch = html.match(/window\.__APOLLO_STATE__\s*=\s*({.+?});/s);
         if (apolloStateMatch && !slatesData) {
@@ -8305,7 +8307,7 @@ async function scrapeKickoffSlatesFromHTML() {
             console.log('[Scrape] Could not parse Apollo state:', e.message);
           }
         }
-        
+
         if (slatesData && slatesData.edges) {
           console.log(`[Scrape] Successfully extracted ${slatesData.edges.length} slates from HTML`);
           return {
@@ -8324,7 +8326,7 @@ async function scrapeKickoffSlatesFromHTML() {
     } else {
       console.log('[Scrape] No __NEXT_DATA__ script tag found');
     }
-    
+
     // Try regex pattern matching for slate data in HTML (less reliable but fallback)
     // Look for JSON-like structures in script tags
     const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
@@ -8352,7 +8354,7 @@ async function scrapeKickoffSlatesFromHTML() {
         }
       }
     }
-    
+
     return { ok: false, error: 'Could not extract kickoff slate data from HTML. The page structure may have changed.' };
   } catch (err) {
     console.error('[Scrape] Error scraping kickoff page:', err.message);
@@ -8364,7 +8366,7 @@ async function scrapeKickoffSlatesFromHTML() {
 app.get("/api/kickoff/slates", async (req, res) => {
   try {
     const { after = "", first = 50, statuses, useClientProxy = "false", useBrowserHeaders = "false", useScraping = "false" } = req.query;
-    
+
     // If client proxy is requested, return instructions for browser-side fetch
     if (useClientProxy === "true") {
       return res.json({
@@ -8412,7 +8414,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
         }
       });
     }
-    
+
     const query = `
       query searchKickoffSlates($input: SearchKickoffSlatesInput!) {
         searchKickoffSlates(input: $input) {
@@ -8445,7 +8447,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       input: {
         after,
@@ -8453,7 +8455,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
         ...(statuses && { filters: { byStatuses: statuses.split(",") } })
       }
     };
-    
+
     try {
       // Try GraphQL SearchKickoffSlates first
       const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
@@ -8464,7 +8466,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
       }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error for kickoff slates:", graphqlErr.message);
-      
+
       // FALLBACK: Try SearchKickoffs directly (newer endpoint that NFLAD is pushing)
       try {
         console.log("[API] Trying SearchKickoffs fallback...");
@@ -8493,7 +8495,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
             }
           }
         `;
-        
+
         const kickoffsVars = {
           input: {
             first: parseInt(first, 10),
@@ -8502,12 +8504,12 @@ app.get("/api/kickoff/slates", async (req, res) => {
             }
           }
         };
-        
+
         const kickoffsData = await nfladGraphQLQuery(kickoffsQuery, kickoffsVars, getUserToken(req), 2, true, req);
-        
+
         if (kickoffsData && kickoffsData.searchKickoffs && kickoffsData.searchKickoffs.edges) {
           console.log(`[API] SearchKickoffs fallback success! Got ${kickoffsData.searchKickoffs.edges.length} kickoffs`);
-          
+
           // Transform to match expected format (wrap in a fake slate)
           const transformedData = {
             edges: [{
@@ -8522,37 +8524,37 @@ app.get("/api/kickoff/slates", async (req, res) => {
             }],
             totalCount: kickoffsData.searchKickoffs.totalCount
           };
-          
-          return res.json({ 
-            ok: true, 
-            ...transformedData, 
+
+          return res.json({
+            ok: true,
+            ...transformedData,
             source: "SearchKickoffs",
-            cached: false 
+            cached: false
           });
         }
       } catch (fallbackErr) {
         console.error("[API] SearchKickoffs fallback also failed:", fallbackErr.message);
       }
-      
+
       // Check if we have cached data we can return even on error
       const cacheKey = createCacheKey(query, variables);
       const cached = graphqlCache.get(cacheKey);
-      
+
       if (cached && Date.now() < cached.expiresAt) {
         console.log("[API] Returning cached data despite error");
-        return res.json({ 
-          ok: true, 
-          ...cached.data.searchKickoffSlates, 
+        return res.json({
+          ok: true,
+          ...cached.data.searchKickoffSlates,
           cached: true,
           error: "Using cached data due to API error",
           errorDetails: graphqlErr.message
         });
       }
-      
+
       // Determine error status code based on error message
       let statusCode = 503;
       let errorMsg = "Unable to connect to NFL All Day API";
-      
+
       if (graphqlErr.message.includes("403") || graphqlErr.message.includes("Forbidden")) {
         statusCode = 403;
         errorMsg = "Access denied by NFL All Day API. This may be due to rate limiting, authentication requirements, or bot detection.";
@@ -8560,7 +8562,7 @@ app.get("/api/kickoff/slates", async (req, res) => {
         statusCode = 429;
         errorMsg = "Rate limited by NFL All Day API. Please try again later.";
       }
-      
+
       // If GraphQL fails with 403, automatically try HTML scraping as fallback
       if (statusCode === 403) {
         console.log("[API] GraphQL blocked (403), automatically attempting HTML scraping fallback...");
@@ -8587,10 +8589,10 @@ app.get("/api/kickoff/slates", async (req, res) => {
           console.error("[API] HTML scraping failed:", scrapeErr.message);
         }
       }
-      
+
       // Return suggestion to use scraping or client proxy on 403
-      res.status(statusCode).json({ 
-        ok: false, 
+      res.status(statusCode).json({
+        ok: false,
         error: errorMsg,
         details: graphqlErr.message,
         useClientProxy: true,
@@ -8608,12 +8610,12 @@ app.get("/api/kickoff/slates", async (req, res) => {
 app.get("/api/kickoffs", async (req, res) => {
   try {
     const { first = 20, statuses } = req.query;
-    
+
     // Default to active statuses
-    const statusFilter = statuses 
-      ? statuses.split(",") 
+    const statusFilter = statuses
+      ? statuses.split(",")
       : ["STARTED", "NOT_STARTED", "GAMES_IN_PROGRESS"];
-    
+
     const query = `
       query searchKickoffs($input: SearchKickoffsInput!) {
         searchKickoffs(input: $input) {
@@ -8639,7 +8641,7 @@ app.get("/api/kickoffs", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       input: {
         first: parseInt(first, 10),
@@ -8648,21 +8650,21 @@ app.get("/api/kickoffs", async (req, res) => {
         }
       }
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
-    
+
     if (data && data.searchKickoffs) {
       const kickoffs = data.searchKickoffs.edges.map(e => e.node);
       console.log(`[API] SearchKickoffs returned ${kickoffs.length} kickoffs`);
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         kickoffs,
         totalCount: data.searchKickoffs.totalCount,
         cached: isResponseCached(query, variables)
       });
     }
-    
+
     throw new Error('No data returned from SearchKickoffs');
   } catch (err) {
     console.error("[API] Error fetching kickoffs:", err.message);
@@ -8674,7 +8676,7 @@ app.get("/api/kickoffs", async (req, res) => {
 app.get("/api/kickoff/:kickoffId", async (req, res) => {
   try {
     const { kickoffId } = req.params;
-    
+
     const query = `
       query searchKickoffs($input: SearchKickoffsInput!) {
         searchKickoffs(input: $input) {
@@ -8722,7 +8724,7 @@ app.get("/api/kickoff/:kickoffId", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       input: {
         filters: {
@@ -8730,14 +8732,14 @@ app.get("/api/kickoff/:kickoffId", async (req, res) => {
         }
       }
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true);
     const kickoff = data.searchKickoffs.edges[0]?.node;
-    
+
     if (!kickoff) {
       return res.status(404).json({ ok: false, error: "Kickoff not found" });
     }
-    
+
     res.json({ ok: true, kickoff });
   } catch (err) {
     console.error("[API] Error fetching kickoff:", err.message);
@@ -8749,7 +8751,7 @@ app.get("/api/kickoff/:kickoffId", async (req, res) => {
 app.get("/api/kickoff/:kickoffId/eligible-players", async (req, res) => {
   try {
     const { kickoffId } = req.params;
-    
+
     const query = `
       query GetKickoffEligiblePlayers($kickoffID: ID!) {
         getKickoffEligiblePlayers(kickoffID: $kickoffID) {
@@ -8761,10 +8763,10 @@ app.get("/api/kickoff/:kickoffId/eligible-players", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = { kickoffID: kickoffId };
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true);
-    
+
     res.json({ ok: true, players: data.getKickoffEligiblePlayers || [] });
   } catch (err) {
     console.error("[API] Error fetching eligible players:", err.message);
@@ -8778,11 +8780,11 @@ app.get("/api/kickoff/:kickoffId/submissions", async (req, res) => {
     const { kickoffId } = req.params;
     const { after = "", first = 50 } = req.query;
     const userToken = getUserToken(req);
-    
+
     if (!userToken) {
       return res.status(401).json({ ok: false, error: "Authentication required" });
     }
-    
+
     const query = `
       query searchKickoffSubmissions($input: SearchKickoffSubmissionsInput!) {
         searchKickoffSubmissions(input: $input) {
@@ -8820,7 +8822,7 @@ app.get("/api/kickoff/:kickoffId/submissions", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       input: {
         after,
@@ -8830,7 +8832,7 @@ app.get("/api/kickoff/:kickoffId/submissions", async (req, res) => {
         }
       }
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, userToken, 3, true, req);
     res.json({ ok: true, ...data.searchKickoffSubmissions });
   } catch (err) {
@@ -8844,7 +8846,7 @@ app.get("/api/kickoff/:kickoffId/games", async (req, res) => {
   try {
     const { kickoffId } = req.params;
     const { after = "", first = 50 } = req.query;
-    
+
     const query = `
       query searchKickoffGames($input: SearchKickoffGamesInput!) {
         searchKickoffGames(input: $input) {
@@ -8870,7 +8872,7 @@ app.get("/api/kickoff/:kickoffId/games", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       input: {
         after,
@@ -8880,7 +8882,7 @@ app.get("/api/kickoff/:kickoffId/games", async (req, res) => {
         }
       }
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true);
     res.json({ ok: true, ...data.searchKickoffGames });
   } catch (err) {
@@ -8894,11 +8896,11 @@ app.get("/api/kickoff/:kickoffId/player-prices", async (req, res) => {
   try {
     const { kickoffId } = req.params;
     const { playerIDs } = req.query; // Comma-separated list
-    
+
     if (!playerIDs) {
       return res.status(400).json({ ok: false, error: "playerIDs query parameter required" });
     }
-    
+
     const query = `
       query GetPlayersLowestListingPrice($playerIDs: [ID!]!) {
         getPlayersLowestListingPrice(playerIDs: $playerIDs) {
@@ -8907,11 +8909,11 @@ app.get("/api/kickoff/:kickoffId/player-prices", async (req, res) => {
         }
       }
     `;
-    
+
     const variables = {
       playerIDs: playerIDs.split(",").map(id => id.trim())
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true);
     res.json({ ok: true, prices: data.getPlayersLowestListingPrice || [] });
   } catch (err) {
@@ -8925,12 +8927,12 @@ app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
   try {
     const { playerId } = req.params;
     const { stats, weeks = 5, orderBy = "DESC" } = req.query;
-    
+
     // Parse stat categories - can be comma-separated or single
-    const statCategories = stats 
+    const statCategories = stats
       ? stats.split(",").map(s => s.trim().toUpperCase())
       : ["TOUCHDOWNS", "RUSHING_YARDS", "RECEPTIONS_YARDS", "PASSES_SUCCEEDED_YARDS"];
-    
+
     // Make parallel requests for each stat category
     const statPromises = statCategories.map(async (statCategory) => {
       const query = `
@@ -8948,7 +8950,7 @@ app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
           }
         }
       `;
-      
+
       const variables = {
         input: {
           playerID: playerId,
@@ -8957,7 +8959,7 @@ app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
           orderBy: orderBy.toUpperCase()
         }
       };
-      
+
       try {
         const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 2, true, req);
         return {
@@ -8969,17 +8971,17 @@ app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
         return { stat: statCategory, weeks: [], error: err.message };
       }
     });
-    
+
     const results = await Promise.all(statPromises);
-    
+
     // Combine results into a structured response
     const statsByCategory = {};
     results.forEach(result => {
       statsByCategory[result.stat] = result.weeks;
     });
-    
-    res.json({ 
-      ok: true, 
+
+    res.json({
+      ok: true,
       playerId,
       stats: statsByCategory,
       categories: statCategories
@@ -8994,16 +8996,16 @@ app.get("/api/player/:playerId/weekly-stats", async (req, res) => {
 app.post("/api/players/weekly-stats", async (req, res) => {
   try {
     const { playerIDs, stats, weeks = 5 } = req.body;
-    
+
     if (!playerIDs || !Array.isArray(playerIDs) || playerIDs.length === 0) {
       return res.status(400).json({ ok: false, error: "playerIDs array required in request body" });
     }
-    
+
     const statCategories = stats || ["TOUCHDOWNS"];
-    
+
     // Limit to prevent abuse
     const limitedPlayerIDs = playerIDs.slice(0, 20);
-    
+
     const playerPromises = limitedPlayerIDs.map(async (playerId) => {
       const query = `
         query GetPlayersWeeklyStats($input: GetPlayersWeeklyStatsInput!) {
@@ -9020,7 +9022,7 @@ app.post("/api/players/weekly-stats", async (req, res) => {
           }
         }
       `;
-      
+
       const variables = {
         input: {
           playerID: playerId,
@@ -9029,7 +9031,7 @@ app.post("/api/players/weekly-stats", async (req, res) => {
           orderBy: "DESC"
         }
       };
-      
+
       try {
         const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 2, true, req);
         return {
@@ -9040,11 +9042,11 @@ app.post("/api/players/weekly-stats", async (req, res) => {
         return { playerId, stats: [], error: err.message };
       }
     });
-    
+
     const results = await Promise.all(playerPromises);
-    
-    res.json({ 
-      ok: true, 
+
+    res.json({
+      ok: true,
       players: results,
       requestedStats: statCategories
     });
@@ -9061,7 +9063,7 @@ app.post("/api/players/weekly-stats", async (req, res) => {
 app.get("/api/challenges", async (req, res) => {
   try {
     const { first = 20, statuses } = req.query;
-    
+
     // Use searchChallenges query (per dev recommendation)
     const query = `
       query searchChallenges($input: SearchChallengesInput!) {
@@ -9104,11 +9106,11 @@ app.get("/api/challenges", async (req, res) => {
         }
       }
     `;
-    
-    const statusFilter = statuses 
-      ? statuses.split(",") 
+
+    const statusFilter = statuses
+      ? statuses.split(",")
       : ["ACTIVE", "UPCOMING", "COMPLETED"];
-    
+
     const variables = {
       input: {
         first: parseInt(first, 10),
@@ -9117,9 +9119,9 @@ app.get("/api/challenges", async (req, res) => {
         }
       }
     };
-    
+
     const data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
-    
+
     if (data && data.searchChallenges) {
       const challenges = data.searchChallenges.edges.map(e => ({
         ...e.node,
@@ -9129,31 +9131,31 @@ app.get("/api/challenges", async (req, res) => {
           met: false // User-specific would need auth
         }))
       }));
-      
+
       console.log(`[API] searchChallenges returned ${challenges.length} challenges`);
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         challenges,
         totalCount: data.searchChallenges.totalCount,
         cached: isResponseCached(query, variables)
       });
     }
-    
+
     throw new Error('No data returned from searchChallenges');
   } catch (err) {
     console.error("[API] Error fetching challenges:", err.message);
-    
+
     // Check for auth errors
     if (err.message.includes('403') || err.message.includes('401') || err.message.includes('Unauthorized')) {
-      return res.status(401).json({ 
-        ok: false, 
+      return res.status(401).json({
+        ok: false,
         error: "Authentication may be required",
         requiresAuth: true,
         details: err.message
       });
     }
-    
+
     res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -9184,20 +9186,20 @@ app.get("/api/tradeins", async (req, res) => {
         }
       }
     `;
-    
+
     const data = await nfladGraphQLQuery(query, {}, getUserToken(req), 3, true, req);
-    
+
     if (data && data.getPublishedLeaderboards) {
       const leaderboards = data.getPublishedLeaderboards;
       console.log(`[API] getPublishedLeaderboards returned ${leaderboards.length} trade-in leaderboards`);
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         leaderboards,
         cached: isResponseCached(query, {})
       });
     }
-    
+
     throw new Error('No data returned from getPublishedLeaderboards');
   } catch (err) {
     console.error("[API] Error fetching trade-in leaderboards:", err.message);
@@ -9210,7 +9212,7 @@ app.get("/api/tradeins/:idOrSlug", async (req, res) => {
   try {
     const { idOrSlug } = req.params;
     const { first = 50, after } = req.query;
-    
+
     const query = `
       query GetLeaderboard($input: GetLeaderboardInput!) {
         getLeaderboard(input: $input) {
@@ -9265,7 +9267,7 @@ app.get("/api/tradeins/:idOrSlug", async (req, res) => {
         }
       }
     `;
-    
+
     // Try by slug first, then by ID
     const variables = {
       input: {
@@ -9274,7 +9276,7 @@ app.get("/api/tradeins/:idOrSlug", async (req, res) => {
       first: parseInt(first, 10),
       after: after || null
     };
-    
+
     let data;
     try {
       data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
@@ -9283,20 +9285,20 @@ app.get("/api/tradeins/:idOrSlug", async (req, res) => {
       variables.input = { id: idOrSlug };
       data = await nfladGraphQLQuery(query, variables, getUserToken(req), 3, true, req);
     }
-    
+
     if (data && data.getLeaderboard) {
       const leaderboard = data.getLeaderboard;
       console.log(`[API] getLeaderboard returned leaderboard: ${leaderboard.name}`);
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         leaderboard,
         entries: leaderboard.entries?.edges?.map(e => e.node) || [],
         totalEntries: leaderboard.entries?.totalCount || 0,
         cached: isResponseCached(query, variables)
       });
     }
-    
+
     throw new Error('No data returned from getLeaderboard');
   } catch (err) {
     console.error("[API] Error fetching trade-in leaderboard:", err.message);
@@ -9373,7 +9375,7 @@ app.get("/api/offers/received", async (req, res) => {
 
     try {
       const data = await nfladGraphQLQuery(query, variables, userToken, 3, true, req);
-      
+
       // Transform GraphQL response to match frontend expectations
       const offers = (data.searchOffers?.edges || []).map(edge => {
         const offer = edge.node;
@@ -9396,20 +9398,20 @@ app.get("/api/offers/received", async (req, res) => {
         };
       });
 
-      res.json({ 
-        ok: true, 
+      res.json({
+        ok: true,
         offers,
         totalCount: data.searchOffers?.totalCount || 0,
         cached: isResponseCached(query, variables)
       });
     } catch (graphqlErr) {
       console.error("[API] GraphQL error for received offers:", graphqlErr.message);
-      
+
       // Check if this is an authentication error
-      if (graphqlErr.message.includes("Authentication") || 
-          graphqlErr.message.includes("Unauthorized") ||
-          graphqlErr.message.includes("401") ||
-          graphqlErr.message.includes("403")) {
+      if (graphqlErr.message.includes("Authentication") ||
+        graphqlErr.message.includes("Unauthorized") ||
+        graphqlErr.message.includes("401") ||
+        graphqlErr.message.includes("403")) {
         return res.status(401).json({
           ok: false,
           error: "Authentication required",
@@ -9418,7 +9420,7 @@ app.get("/api/offers/received", async (req, res) => {
           details: graphqlErr.message
         });
       }
-      
+
       // If the query fails, it might be because the schema is different
       if (graphqlErr.message.includes("Cannot query field") || graphqlErr.message.includes("Unknown type")) {
         return res.status(503).json({
@@ -9428,9 +9430,9 @@ app.get("/api/offers/received", async (req, res) => {
           hint: "Check server logs for GraphQL schema details"
         });
       }
-      
-      res.status(503).json({ 
-        ok: false, 
+
+      res.status(503).json({
+        ok: false,
         error: "Unable to fetch received offers",
         details: graphqlErr.message
       });
@@ -9506,7 +9508,7 @@ app.get("/api/offers/sent", async (req, res) => {
 
     try {
       const data = await nfladGraphQLQuery(query, variables, userToken, 3, true, req);
-      
+
       // Transform GraphQL response to match frontend expectations
       const offers = (data.searchOffers?.edges || []).map(edge => {
         const offer = edge.node;
@@ -9529,20 +9531,20 @@ app.get("/api/offers/sent", async (req, res) => {
         };
       });
 
-      res.json({ 
-        ok: true, 
+      res.json({
+        ok: true,
         offers,
         totalCount: data.searchOffers?.totalCount || 0,
         cached: isResponseCached(query, variables)
       });
     } catch (graphqlErr) {
       console.error("[API] GraphQL error for sent offers:", graphqlErr.message);
-      
+
       // Check if this is an authentication error
-      if (graphqlErr.message.includes("Authentication") || 
-          graphqlErr.message.includes("Unauthorized") ||
-          graphqlErr.message.includes("401") ||
-          graphqlErr.message.includes("403")) {
+      if (graphqlErr.message.includes("Authentication") ||
+        graphqlErr.message.includes("Unauthorized") ||
+        graphqlErr.message.includes("401") ||
+        graphqlErr.message.includes("403")) {
         return res.status(401).json({
           ok: false,
           error: "Authentication required",
@@ -9551,7 +9553,7 @@ app.get("/api/offers/sent", async (req, res) => {
           details: graphqlErr.message
         });
       }
-      
+
       // If the query fails, it might be because the schema is different
       if (graphqlErr.message.includes("Cannot query field") || graphqlErr.message.includes("Unknown type")) {
         return res.status(503).json({
@@ -9561,9 +9563,9 @@ app.get("/api/offers/sent", async (req, res) => {
           hint: "Check server logs for GraphQL schema details"
         });
       }
-      
-      res.status(503).json({ 
-        ok: false, 
+
+      res.status(503).json({
+        ok: false,
         error: "Unable to fetch sent offers",
         details: graphqlErr.message
       });
@@ -9595,7 +9597,7 @@ app.post("/api/offers/:offerId/accept", async (req, res) => {
 
     try {
       const data = await nfladGraphQLQuery(mutation, variables, userToken, 3, false, req);
-      
+
       if (data.acceptOffer) {
         res.json({ ok: true, offer: data.acceptOffer });
       } else {
@@ -9603,8 +9605,8 @@ app.post("/api/offers/:offerId/accept", async (req, res) => {
       }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error accepting offer:", graphqlErr.message);
-      res.status(503).json({ 
-        ok: false, 
+      res.status(503).json({
+        ok: false,
         error: "Unable to accept offer",
         details: graphqlErr.message
       });
@@ -9636,7 +9638,7 @@ app.post("/api/offers/:offerId/reject", async (req, res) => {
 
     try {
       const data = await nfladGraphQLQuery(mutation, variables, userToken, 3, false, req);
-      
+
       if (data.rejectOffer) {
         res.json({ ok: true, offer: data.rejectOffer });
       } else {
@@ -9644,8 +9646,8 @@ app.post("/api/offers/:offerId/reject", async (req, res) => {
       }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error rejecting offer:", graphqlErr.message);
-      res.status(503).json({ 
-        ok: false, 
+      res.status(503).json({
+        ok: false,
         error: "Unable to reject offer",
         details: graphqlErr.message
       });
@@ -9677,7 +9679,7 @@ app.post("/api/offers/:offerId/cancel", async (req, res) => {
 
     try {
       const data = await nfladGraphQLQuery(mutation, variables, userToken, 3, false, req);
-      
+
       if (data.cancelOffer) {
         res.json({ ok: true, offer: data.cancelOffer });
       } else {
@@ -9685,8 +9687,8 @@ app.post("/api/offers/:offerId/cancel", async (req, res) => {
       }
     } catch (graphqlErr) {
       console.error("[API] GraphQL error canceling offer:", graphqlErr.message);
-      res.status(503).json({ 
-        ok: false, 
+      res.status(503).json({
+        ok: false,
         error: "Unable to cancel offer",
         details: graphqlErr.message
       });
@@ -9705,7 +9707,7 @@ app.post("/api/offers/:offerId/cancel", async (req, res) => {
 app.get("/api/filter-options", async (req, res) => {
   try {
     const type = (req.query.type || "").toString().toLowerCase();
-    
+
     let query = "";
     if (type === "teams") {
       query = `SELECT DISTINCT team_name as option FROM nft_core_metadata WHERE team_name IS NOT NULL AND team_name != '' ORDER BY team_name`;
@@ -9716,7 +9718,7 @@ app.get("/api/filter-options", async (req, res) => {
     } else {
       return res.status(400).json({ ok: false, error: "Invalid type. Use: teams, sets, or series" });
     }
-    
+
     const result = await pgQuery(query);
     return res.json({
       ok: true,
@@ -9738,54 +9740,54 @@ app.get("/api/search-nfts-advanced", async (req, res) => {
     const series = (req.query.series || "").toString().trim();
     const serial = parseInt(req.query.serial) || null;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    
+
     const conditions = [];
     const params = [];
     let paramIndex = 1;
-    
+
     if (player) {
       conditions.push(`CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')) ILIKE $${paramIndex}`);
       params.push(`%${player}%`);
       paramIndex++;
     }
-    
+
     if (team) {
       conditions.push(`m.team_name = $${paramIndex}`);
       params.push(team);
       paramIndex++;
     }
-    
+
     if (tier) {
       conditions.push(`UPPER(m.tier) = $${paramIndex}`);
       params.push(tier);
       paramIndex++;
     }
-    
+
     if (set) {
       conditions.push(`m.set_name = $${paramIndex}`);
       params.push(set);
       paramIndex++;
     }
-    
+
     if (series) {
       conditions.push(`m.series_name = $${paramIndex}`);
       params.push(series);
       paramIndex++;
     }
-    
+
     if (serial) {
       conditions.push(`m.serial_number = $${paramIndex}`);
       params.push(serial);
       paramIndex++;
     }
-    
+
     if (conditions.length === 0) {
       return res.status(400).json({ ok: false, error: "At least one filter is required" });
     }
-    
+
     const whereClause = conditions.join(' AND ');
     params.push(limit);
-    
+
     const result = await pgQuery(
       `SELECT 
         m.nft_id, m.edition_id, m.first_name, m.last_name, m.team_name,
@@ -9808,7 +9810,7 @@ app.get("/api/search-nfts-advanced", async (req, res) => {
       LIMIT $${paramIndex}`,
       params
     );
-    
+
     return res.json({
       ok: true,
       count: result.rowCount,
@@ -9825,13 +9827,13 @@ app.get("/api/search-nfts", async (req, res) => {
   try {
     const q = (req.query.q || "").toString().trim();
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
-    
+
     if (!q || q.length < 2) {
       return res.status(400).json({ ok: false, error: "Search query too short (min 2 chars)" });
     }
-    
+
     const pattern = `%${q}%`;
-    
+
     // Search by player name, team, set name, or series
     const result = await pgQuery(
       `SELECT 
@@ -9861,7 +9863,7 @@ app.get("/api/search-nfts", async (req, res) => {
       LIMIT $3`,
       [pattern, q, limit]
     );
-    
+
     return res.json({
       ok: true,
       count: result.rowCount,
@@ -9986,12 +9988,12 @@ app.get("/api/set-completion", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     if (!wallet) return res.status(400).json({ ok: false, error: "Missing ?wallet=" });
-    
+
     const startTime = Date.now();
-    
+
     // Get cached set totals (fast - from memory)
     const setTotals = await getSetTotals();
-    
+
     // Query only what the user owns (much faster - single pass)
     const result = await pgQuery(`
       SELECT 
@@ -10041,7 +10043,7 @@ app.get("/api/set-completion", async (req, res) => {
       GROUP BY team_name
     `);
     const teamTotals = new Map(teamTotalsRes.rows.map(r => [(r.team_name || "").toLowerCase(), parseInt(r.total_editions)]));
-    
+
     // Merge with cached totals
     const sets = result.rows.map(r => {
       const total = setTotals.get(r.set_name) || 0;
@@ -10064,7 +10066,7 @@ app.get("/api/set-completion", async (req, res) => {
         }
       };
     }).sort((a, b) => b.completion - a.completion || a.set_name.localeCompare(b.set_name));
-    
+
     // Team progress
     const teamOwnedRes = await pgQuery(
       `
@@ -10094,10 +10096,10 @@ app.get("/api/set-completion", async (req, res) => {
       in_progress: sets.filter(s => s.completion > 0 && s.completion < 100).length,
       avg_completion: sets.length > 0 ? sets.reduce((a, b) => a + b.completion, 0) / sets.length : 0
     };
-    
+
     const elapsed = Date.now() - startTime;
     console.log(`[Set Completion] Query for ${wallet.substring(0, 10)}... completed in ${elapsed}ms (${sets.length} sets)`);
-    
+
     return res.json({ ok: true, summary, sets, team_progress: teamProgress });
   } catch (err) {
     console.error("Error in /api/set-completion:", err);
@@ -10115,15 +10117,15 @@ app.get("/api/serial-finder", async (req, res) => {
     const seriesParam = (req.query.series || "").trim();
     const setParam = (req.query.set || "").trim();
     const positionParam = (req.query.position || "").trim();
-    
+
     // Parse comma-separated values for multi-select filters
     const tiers = tierParam ? tierParam.split(',').map(t => t.trim().toUpperCase()).filter(Boolean) : [];
     const seriesList = seriesParam ? seriesParam.split(',').map(s => s.trim()).filter(Boolean) : [];
     const sets = setParam ? setParam.split(',').map(s => s.trim()).filter(Boolean) : [];
     const positions = positionParam ? positionParam.split(',').map(p => p.trim().toUpperCase()).filter(Boolean) : [];
-    
+
     if (!serial || serial < 1) return res.status(400).json({ ok: false, error: "Missing ?serial=" });
-    
+
     let query = `
       SELECT 
         h.wallet_address, h.is_locked,
@@ -10137,7 +10139,7 @@ app.get("/api/serial-finder", async (req, res) => {
     `;
     const params = [serial];
     let paramIndex = 2;
-    
+
     // Tier filter (multi-select with IN clause)
     if (tiers.length > 0) {
       const placeholders = tiers.map((_, i) => `$${paramIndex + i}`).join(', ');
@@ -10145,19 +10147,19 @@ app.get("/api/serial-finder", async (req, res) => {
       params.push(...tiers);
       paramIndex += tiers.length;
     }
-    
+
     if (player) {
       query += ` AND TRIM(COALESCE(m.first_name, '') || ' ' || COALESCE(m.last_name, '')) ILIKE $${paramIndex}`;
       params.push(player);
       paramIndex++;
     }
-    
+
     if (team) {
       query += ` AND m.team_name ILIKE $${paramIndex}`;
       params.push(`%${team}%`);
       paramIndex++;
     }
-    
+
     // Series filter (multi-select)
     if (seriesList.length > 0) {
       const conditions = seriesList.map((_, i) => `m.series_name ILIKE $${paramIndex + i}`).join(' OR ');
@@ -10165,7 +10167,7 @@ app.get("/api/serial-finder", async (req, res) => {
       seriesList.forEach(s => params.push(`%${s}%`));
       paramIndex += seriesList.length;
     }
-    
+
     // Set filter (multi-select)
     if (sets.length > 0) {
       const conditions = sets.map((_, i) => `m.set_name ILIKE $${paramIndex + i}`).join(' OR ');
@@ -10173,7 +10175,7 @@ app.get("/api/serial-finder", async (req, res) => {
       sets.forEach(s => params.push(`%${s}%`));
       paramIndex += sets.length;
     }
-    
+
     // Position filter (multi-select with IN clause)
     if (positions.length > 0) {
       const placeholders = positions.map((_, i) => `$${paramIndex + i}`).join(', ');
@@ -10181,14 +10183,14 @@ app.get("/api/serial-finder", async (req, res) => {
       params.push(...positions);
       paramIndex += positions.length;
     }
-    
+
     query += ` ORDER BY m.tier DESC, m.last_name LIMIT 500`;
-    
+
     const result = await pgQuery(query, params);
-    
+
     const uniqueOwners = new Set(result.rows.map(r => r.wallet_address)).size;
     const jerseyMatches = result.rows.filter(r => r.serial_number == r.jersey_number).length;
-    
+
     return res.json({
       ok: true,
       serial,
@@ -10208,9 +10210,9 @@ app.get("/api/wallet-compare", async (req, res) => {
   try {
     const w1 = (req.query.wallet1 || "").toString().trim().toLowerCase();
     const w2 = (req.query.wallet2 || "").toString().trim().toLowerCase();
-    
+
     if (!w1 || !w2) return res.status(400).json({ ok: false, error: "Missing wallet1 or wallet2" });
-    
+
     const statsQuery = `
       SELECT 
         h.wallet_address,
@@ -10230,15 +10232,15 @@ app.get("/api/wallet-compare", async (req, res) => {
       WHERE h.wallet_address = $1
       GROUP BY h.wallet_address, p.display_name
     `;
-    
+
     const [r1, r2] = await Promise.all([
       pgQuery(statsQuery, [w1]),
       pgQuery(statsQuery, [w2])
     ]);
-    
+
     const s1 = r1.rows[0] || { total: 0, locked: 0, common: 0, uncommon: 0, rare: 0, legendary: 0, ultimate: 0, floor_value: 0 };
     const s2 = r2.rows[0] || { total: 0, locked: 0, common: 0, uncommon: 0, rare: 0, legendary: 0, ultimate: 0, floor_value: 0 };
-    
+
     // Shared editions
     const sharedResult = await pgQuery(
       `SELECT COUNT(DISTINCT m1.edition_id)::int as shared_editions,
@@ -10253,7 +10255,7 @@ app.get("/api/wallet-compare", async (req, res) => {
          )`,
       [w1, w2]
     );
-    
+
     return res.json({
       ok: true,
       wallet1: { address: w1, display_name: s1.display_name, ...s1 },
@@ -10281,38 +10283,38 @@ async function computeRarityScore(walletAddress) {
     WHERE h.wallet_address = $1`,
     [walletAddress]
   );
-  
+
   const rows = result.rows;
   let score = 0;
   let serial1Count = 0, serial10Count = 0, jerseyMatchCount = 0;
   let ultimateCount = 0, legendaryCount = 0, rareCount = 0;
-  
+
   for (const r of rows) {
     let pts = 0;
     const serial = parseInt(r.serial_number) || 9999;
     const tier = (r.tier || '').toUpperCase();
-    
+
     // Serial scoring
     if (serial === 1) { serial1Count++; pts += 1000; }
     else if (serial <= 10) { serial10Count++; pts += 200; }
     else if (serial <= 100) pts += 20;
-    
+
     // Jersey match
     if (r.jersey_number && serial == r.jersey_number) {
       jerseyMatchCount++; pts += 300;
     }
-    
+
     // Tier scoring
     if (tier === 'ULTIMATE') { ultimateCount++; pts += 500; }
     else if (tier === 'LEGENDARY') { legendaryCount++; pts += 200; }
     else if (tier === 'RARE') { rareCount++; pts += 50; }
-    
+
     score += pts;
   }
-  
+
   const uniqueEditions = new Set(rows.map(r => r.edition_id)).size;
   score += uniqueEditions * 2 + rows.length;
-  
+
   return {
     wallet: walletAddress,
     score: Math.round(score),
@@ -10337,11 +10339,11 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
   try {
     const now = Date.now();
     const forceRefresh = req.query.refresh === 'true';
-    
+
     // Return cached if available and not expired
     if (!forceRefresh && rarityLeaderboardCache && (now - rarityLeaderboardCacheTime) < RARITY_LEADERBOARD_CACHE_TTL) {
-      return res.json({ 
-        ok: true, 
+      return res.json({
+        ok: true,
         leaderboard: rarityLeaderboardCache,
         cached: true,
         cache_age_minutes: Math.round((now - rarityLeaderboardCacheTime) / 60000)
@@ -10367,10 +10369,10 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
         console.warn("[Rarity Leaderboard] Failed to read snapshot:", e.message);
       }
     }
-    
+
     console.log("[Rarity Leaderboard] Computing leaderboard (this may take a moment)...");
     const startTime = Date.now();
-    
+
     // Get all wallets with significant holdings (at least 10 moments for leaderboard)
     // Exclude known contract/holding addresses
     const walletsResult = await pgQuery(`
@@ -10382,10 +10384,10 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
       ORDER BY COUNT(*) DESC
       LIMIT 500
     `, EXCLUDED_LEADERBOARD_WALLETS);
-    
+
     // Compute scores for top wallets (batch for efficiency)
     const leaderboard = [];
-    
+
     // Process in parallel batches of 20
     const batchSize = 20;
     for (let i = 0; i < walletsResult.rows.length; i += batchSize) {
@@ -10395,15 +10397,15 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
       );
       leaderboard.push(...batchResults.filter(r => r !== null));
     }
-    
+
     // Sort by score and take top 100
     leaderboard.sort((a, b) => b.score - a.score);
     const top100 = leaderboard.slice(0, 100);
-    
+
     // Add rank and get display names from wallet_profiles
     const walletAddresses = top100.map(e => e.wallet);
     let displayNames = {};
-    
+
     try {
       // Try wallet_profiles first (primary source for display names)
       const namesResult = await pgQuery(`
@@ -10412,7 +10414,7 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
         WHERE wallet_address = ANY($1) AND display_name IS NOT NULL AND display_name != ''
       `, [walletAddresses]);
       displayNames = Object.fromEntries(namesResult.rows.map(r => [r.wallet_address, r.display_name]));
-      
+
       // Fall back to wallet_holdings for any missing names
       const missingWallets = walletAddresses.filter(w => !displayNames[w]);
       if (missingWallets.length > 0) {
@@ -10427,16 +10429,16 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
           }
         }
       }
-    } catch (e) { 
+    } catch (e) {
       console.log("[Rarity Leaderboard] Could not fetch display names:", e.message);
     }
-    
+
     const rankedLeaderboard = top100.map((entry, idx) => ({
       rank: idx + 1,
       ...entry,
       displayName: displayNames[entry.wallet] || null
     }));
-    
+
     // Cache the result
     rarityLeaderboardCache = rankedLeaderboard;
     rarityLeaderboardCacheTime = now;
@@ -10446,12 +10448,12 @@ app.get("/api/rarity-leaderboard", async (req, res) => {
     } catch (e) {
       console.warn("[Rarity Leaderboard] Failed to write snapshot:", e.message);
     }
-    
+
     const elapsed = Date.now() - startTime;
     console.log(`[Rarity Leaderboard] Computed ${rankedLeaderboard.length} entries in ${elapsed}ms`);
-    
-    return res.json({ 
-      ok: true, 
+
+    return res.json({
+      ok: true,
       leaderboard: rankedLeaderboard,
       cached: false,
       computed_in_ms: elapsed
@@ -10467,7 +10469,7 @@ app.get("/api/rarity-score", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     if (!wallet) return res.status(400).json({ ok: false, error: "Missing ?wallet=" });
-    
+
     const result = await pgQuery(
       `SELECT 
         h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
@@ -10477,7 +10479,7 @@ app.get("/api/rarity-score", async (req, res) => {
       WHERE h.wallet_address = $1`,
       [wallet]
     );
-    
+
     const rows = result.rows;
     let score = 0;
     const breakdown = {
@@ -10493,41 +10495,41 @@ app.get("/api/rarity-score", async (req, res) => {
       edition_points: 0,
       low_serial_pct: 0
     };
-    
+
     const topMoments = [];
-    
+
     for (const r of rows) {
       let pts = 0;
       const serial = parseInt(r.serial_number) || 9999;
       const tier = (r.tier || '').toUpperCase();
-      
+
       // Serial scoring
       if (serial === 1) { breakdown.serial_1_count++; pts += 1000; breakdown.serial_1_points += 1000; }
       else if (serial <= 10) { breakdown.serial_10_count++; pts += 200; breakdown.serial_10_points += 200; }
       else if (serial <= 100) pts += 20;
-      
+
       // Jersey match
       if (r.jersey_number && serial == r.jersey_number) {
         breakdown.jersey_match_count++; pts += 300; breakdown.jersey_match_points += 300;
       }
-      
+
       // Tier scoring
       if (tier === 'ULTIMATE') { breakdown.ultimate_count++; pts += 500; breakdown.ultimate_points += 500; }
       else if (tier === 'LEGENDARY') { breakdown.legendary_count++; pts += 200; breakdown.legendary_points += 200; }
       else if (tier === 'RARE') { breakdown.rare_count++; pts += 50; breakdown.rare_points += 50; }
-      
+
       score += pts;
       if (pts >= 100) topMoments.push({ ...r, points: pts });
     }
-    
+
     breakdown.edition_points = breakdown.unique_editions * 2;
     score += breakdown.edition_points + breakdown.collection_points;
-    
+
     const lowSerialCount = rows.filter(r => (parseInt(r.serial_number) || 9999) <= 100).length;
     breakdown.low_serial_pct = rows.length > 0 ? Math.round(lowSerialCount / rows.length * 100) : 0;
-    
+
     topMoments.sort((a, b) => b.points - a.points);
-    
+
     // Find rank from cached leaderboard
     let rank = null;
     let totalWallets = null;
@@ -10538,7 +10540,7 @@ app.get("/api/rarity-score", async (req, res) => {
       }
       totalWallets = rarityLeaderboardCache.length;
     }
-    
+
     return res.json({
       ok: true,
       score: Math.round(score),
@@ -10553,14 +10555,938 @@ app.get("/api/rarity-score", async (req, res) => {
   }
 });
 
+// ================== P2P TRADING API ==================
+
+// Initialize trades table
+async function initTradesTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS trades (
+        id SERIAL PRIMARY KEY,
+        initiator_wallet TEXT NOT NULL,
+        initiator_child_wallet TEXT,
+        target_wallet TEXT NOT NULL,
+        target_child_wallet TEXT,
+        initiator_nft_ids JSONB NOT NULL DEFAULT '[]',
+        target_nft_ids JSONB NOT NULL DEFAULT '[]',
+        status TEXT DEFAULT 'pending',
+        initiator_signed BOOLEAN DEFAULT FALSE,
+        target_signed BOOLEAN DEFAULT FALSE,
+        tx_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_trades_initiator ON trades(initiator_wallet)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_trades_target ON trades(target_wallet)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status)`);
+
+    console.log("✅ Trades table initialized");
+  } catch (err) {
+    console.error("Failed to initialize trades table:", err.message);
+  }
+}
+
+// Initialize analytics tables
+async function initAnalyticsTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_page_views (
+        id SERIAL PRIMARY KEY,
+        page_path TEXT NOT NULL,
+        wallet_address TEXT,
+        session_id TEXT,
+        ip_hash TEXT,
+        user_agent TEXT,
+        referrer TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_sessions (
+        id SERIAL PRIMARY KEY,
+        session_id TEXT UNIQUE NOT NULL,
+        wallet_address TEXT,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        last_activity TIMESTAMPTZ DEFAULT NOW(),
+        page_count INTEGER DEFAULT 1
+      )
+    `);
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_page_views_created ON analytics_page_views(created_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_page_views_path ON analytics_page_views(page_path)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_last_activity ON analytics_sessions(last_activity)`);
+
+    console.log("✅ Analytics tables initialized");
+  } catch (err) {
+    console.error("Failed to initialize analytics tables:", err.message);
+  }
+}
+
+// POST /api/trades - Create a new trade offer
+app.post("/api/trades", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const initiatorWallet = user.default_wallet_address;
+    if (!initiatorWallet) {
+      return res.status(400).json({ ok: false, error: "No wallet connected" });
+    }
+
+    const {
+      targetWallet,
+      initiatorNftIds = [],
+      targetNftIds = [],
+      initiatorChildWallet,
+      targetChildWallet
+    } = req.body;
+
+    if (!targetWallet) {
+      return res.status(400).json({ ok: false, error: "Target wallet required" });
+    }
+
+    if (initiatorNftIds.length === 0 && targetNftIds.length === 0) {
+      return res.status(400).json({ ok: false, error: "At least one NFT must be included" });
+    }
+
+    const { rows } = await pool.query(`
+      INSERT INTO trades (
+        initiator_wallet, initiator_child_wallet, 
+        target_wallet, target_child_wallet,
+        initiator_nft_ids, target_nft_ids,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      RETURNING *
+    `, [
+      initiatorWallet.toLowerCase(),
+      initiatorChildWallet?.toLowerCase() || null,
+      targetWallet.toLowerCase(),
+      targetChildWallet?.toLowerCase() || null,
+      JSON.stringify(initiatorNftIds),
+      JSON.stringify(targetNftIds)
+    ]);
+
+    console.log(`[Trade] Created trade #${rows[0].id} from ${initiatorWallet.substring(0, 8)}... to ${targetWallet.substring(0, 8)}...`);
+
+    return res.json({ ok: true, trade: rows[0] });
+  } catch (err) {
+    console.error("POST /api/trades error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/trades - List trades for current user
+app.get("/api/trades", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    if (!wallet) {
+      return res.json({ ok: true, trades: [] });
+    }
+
+    const { rows } = await pool.query(`
+      SELECT * FROM trades 
+      WHERE initiator_wallet = $1 OR target_wallet = $1
+      ORDER BY created_at DESC
+      LIMIT 100
+    `, [wallet]);
+
+    return res.json({ ok: true, trades: rows });
+  } catch (err) {
+    console.error("GET /api/trades error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/trades/:id - Get single trade details
+app.get("/api/trades/:id", async (req, res) => {
+  try {
+    const tradeId = parseInt(req.params.id);
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    const { rows } = await pool.query(`SELECT * FROM trades WHERE id = $1`, [tradeId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found" });
+    }
+
+    return res.json({ ok: true, trade: rows[0] });
+  } catch (err) {
+    console.error("GET /api/trades/:id error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/trades/:id/accept - Accept a trade offer
+app.post("/api/trades/:id/accept", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const tradeId = parseInt(req.params.id);
+
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    const { rows } = await pool.query(`
+      UPDATE trades 
+      SET status = 'accepted', updated_at = NOW()
+      WHERE id = $1 AND target_wallet = $2 AND status = 'pending'
+      RETURNING *
+    `, [tradeId, wallet]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found or not authorized" });
+    }
+
+    console.log(`[Trade] Trade #${tradeId} accepted by ${wallet?.substring(0, 8)}...`);
+
+    return res.json({ ok: true, trade: rows[0] });
+  } catch (err) {
+    console.error("POST /api/trades/:id/accept error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/trades/:id/reject - Reject a trade offer
+app.post("/api/trades/:id/reject", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const tradeId = parseInt(req.params.id);
+
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    const { rows } = await pool.query(`
+      UPDATE trades 
+      SET status = 'rejected', updated_at = NOW()
+      WHERE id = $1 AND (target_wallet = $2 OR initiator_wallet = $2) AND status IN ('pending', 'accepted')
+      RETURNING *
+    `, [tradeId, wallet]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found or not authorized" });
+    }
+
+    console.log(`[Trade] Trade #${tradeId} rejected by ${wallet?.substring(0, 8)}...`);
+
+    return res.json({ ok: true, trade: rows[0] });
+  } catch (err) {
+    console.error("POST /api/trades/:id/reject error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/trades/:id/sign - Record signature for multi-party swap
+app.post("/api/trades/:id/sign", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const tradeId = parseInt(req.params.id);
+
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    // Get current trade
+    const { rows: trades } = await pool.query(`SELECT * FROM trades WHERE id = $1`, [tradeId]);
+
+    if (trades.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found" });
+    }
+
+    const trade = trades[0];
+
+    if (trade.status !== 'accepted') {
+      return res.status(400).json({ ok: false, error: "Trade must be accepted before signing" });
+    }
+
+    // Determine which party is signing
+    let updateField = null;
+    if (wallet === trade.initiator_wallet) {
+      updateField = 'initiator_signed';
+    } else if (wallet === trade.target_wallet) {
+      updateField = 'target_signed';
+    } else {
+      return res.status(403).json({ ok: false, error: "Not authorized to sign this trade" });
+    }
+
+    // Update signature status
+    const { rows: updated } = await pool.query(`
+      UPDATE trades 
+      SET ${updateField} = TRUE, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [tradeId]);
+
+    const updatedTrade = updated[0];
+
+    // Check if both parties have signed
+    if (updatedTrade.initiator_signed && updatedTrade.target_signed) {
+      // Both signed - trade is ready for execution
+      console.log(`[Trade] Trade #${tradeId} fully signed - ready for execution`);
+
+      await pool.query(`
+        UPDATE trades SET status = 'ready', updated_at = NOW() WHERE id = $1
+      `, [tradeId]);
+
+      updatedTrade.status = 'ready';
+    }
+
+    console.log(`[Trade] Trade #${tradeId} signed by ${wallet?.substring(0, 8)}... (${updateField})`);
+
+    return res.json({ ok: true, trade: updatedTrade });
+  } catch (err) {
+    console.error("POST /api/trades/:id/sign error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/trades/:id/complete - Mark trade as completed with tx_id
+app.post("/api/trades/:id/complete", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const tradeId = parseInt(req.params.id);
+    const { txId } = req.body;
+
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    const { rows } = await pool.query(`
+      UPDATE trades 
+      SET status = 'completed', tx_id = $2, updated_at = NOW()
+      WHERE id = $1 AND (initiator_wallet = $3 OR target_wallet = $3)
+      RETURNING *
+    `, [tradeId, txId || null, wallet]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found or not authorized" });
+    }
+
+    console.log(`[Trade] Trade #${tradeId} completed with tx_id: ${txId || 'none'}`);
+
+    return res.json({ ok: true, trade: rows[0] });
+  } catch (err) {
+    console.error("POST /api/trades/:id/complete error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ================== ADMIN ANALYTICS API ==================
+
+// POST /api/trades/:id/execute - Mark trade as executing (on-chain in progress)
+app.post("/api/trades/:id/execute", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const tradeId = parseInt(req.params.id);
+    const { flowWallet, childWallet } = req.body;
+
+    if (!tradeId) {
+      return res.status(400).json({ ok: false, error: "Invalid trade ID" });
+    }
+
+    // Get trade to verify both parties are ready
+    const { rows: trades } = await pool.query(`SELECT * FROM trades WHERE id = $1`, [tradeId]);
+
+    if (trades.length === 0) {
+      return res.status(404).json({ ok: false, error: "Trade not found" });
+    }
+
+    const trade = trades[0];
+
+    // Verify user is party to this trade
+    const isInitiator = trade.initiator_wallet === wallet;
+    const isTarget = trade.target_wallet === wallet;
+
+    if (!isInitiator && !isTarget) {
+      return res.status(403).json({ ok: false, error: "Not authorized for this trade" });
+    }
+
+    // Trade must be accepted before execution
+    if (trade.status !== 'accepted' && trade.status !== 'ready') {
+      return res.status(400).json({ ok: false, error: "Trade must be accepted before execution" });
+    }
+
+    // Update trade with Flow wallet info and mark as executing
+    const updateField = isInitiator ? 'initiator_child_wallet' : 'target_child_wallet';
+
+    await pool.query(`
+      UPDATE trades 
+      SET ${updateField} = $2, updated_at = NOW()
+      WHERE id = $1
+    `, [tradeId, childWallet || null]);
+
+    // Mark as executing if both parties have provided child wallets
+    const { rows: updated } = await pool.query(`
+      UPDATE trades 
+      SET status = CASE 
+        WHEN initiator_child_wallet IS NOT NULL AND target_child_wallet IS NOT NULL THEN 'executing'
+        ELSE status 
+      END,
+      updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [tradeId]);
+
+    console.log(`[Trade] Trade #${tradeId} execute initiated by ${wallet?.substring(0, 8)}...`);
+
+    return res.json({
+      ok: true,
+      trade: updated[0],
+      readyForSwap: updated[0].status === 'executing'
+    });
+  } catch (err) {
+    console.error("POST /api/trades/:id/execute error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Initialize listings and bundles tables
+async function initListingsTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS listings (
+        id SERIAL PRIMARY KEY,
+        seller_wallet TEXT NOT NULL,
+        nft_id TEXT NOT NULL UNIQUE,
+        price_usd DECIMAL(10, 2) NOT NULL,
+        status TEXT DEFAULT 'active',
+        buyer_wallet TEXT,
+        tx_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_listings_seller ON listings(seller_wallet)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status)`);
+
+    console.log("✅ Listings table initialized");
+  } catch (err) {
+    console.error("Failed to initialize listings table:", err.message);
+  }
+}
+
+async function initBundlesTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bundles (
+        id SERIAL PRIMARY KEY,
+        seller_wallet TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        nft_ids JSONB NOT NULL DEFAULT '[]',
+        price_usd DECIMAL(10, 2) NOT NULL,
+        status TEXT DEFAULT 'active',
+        buyer_wallet TEXT,
+        tx_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bundles_seller ON bundles(seller_wallet)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bundles_status ON bundles(status)`);
+
+    console.log("✅ Bundles table initialized");
+  } catch (err) {
+    console.error("Failed to initialize bundles table:", err.message);
+  }
+}
+
+// ================== MARKETPLACE LISTINGS API ==================
+
+// GET /api/listings - Get all active listings
+app.get("/api/listings", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size,
+             p.display_name as seller_name
+      FROM listings l
+      LEFT JOIN nft_core_metadata m ON m.nft_id = l.nft_id
+      LEFT JOIN wallet_profiles p ON p.wallet_address = l.seller_wallet
+      WHERE l.status = 'active'
+      ORDER BY l.created_at DESC
+      LIMIT 200
+    `);
+
+    return res.json({ ok: true, listings: rows });
+  } catch (err) {
+    console.error("GET /api/listings error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/my-listings - Get current user's listings
+app.get("/api/my-listings", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    if (!wallet) {
+      return res.json({ ok: true, listings: [] });
+    }
+
+    const { rows } = await pool.query(`
+      SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size
+      FROM listings l
+      LEFT JOIN nft_core_metadata m ON m.nft_id = l.nft_id
+      WHERE l.seller_wallet = $1 AND l.status = 'active'
+      ORDER BY l.created_at DESC
+    `, [wallet]);
+
+    return res.json({ ok: true, listings: rows });
+  } catch (err) {
+    console.error("GET /api/my-listings error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/listings - Create new listing(s)
+app.post("/api/listings", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "No wallet connected" });
+    }
+
+    const { items } = req.body; // Array of { nft_id, price_usd }
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ ok: false, error: "No items to list" });
+    }
+
+    const created = [];
+    for (const item of items) {
+      if (!item.nft_id || !item.price_usd || item.price_usd <= 0) {
+        continue;
+      }
+
+      try {
+        const { rows } = await pool.query(`
+          INSERT INTO listings (seller_wallet, nft_id, price_usd, status)
+          VALUES ($1, $2, $3, 'active')
+          ON CONFLICT (nft_id) DO UPDATE SET 
+            price_usd = EXCLUDED.price_usd,
+            status = 'active',
+            updated_at = NOW()
+          RETURNING *
+        `, [wallet, item.nft_id, item.price_usd]);
+
+        if (rows.length > 0) {
+          created.push(rows[0]);
+        }
+      } catch (itemErr) {
+        console.warn(`Failed to create listing for ${item.nft_id}:`, itemErr.message);
+      }
+    }
+
+    console.log(`[Listings] Created ${created.length} listings for ${wallet.substring(0, 8)}...`);
+
+    return res.json({ ok: true, listings: created });
+  } catch (err) {
+    console.error("POST /api/listings error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/listings/:id - Cancel a listing
+app.delete("/api/listings/:id", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const listingId = parseInt(req.params.id);
+
+    const { rows } = await pool.query(`
+      UPDATE listings SET status = 'cancelled', updated_at = NOW()
+      WHERE id = $1 AND seller_wallet = $2 AND status = 'active'
+      RETURNING *
+    `, [listingId, wallet]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Listing not found or not authorized" });
+    }
+
+    return res.json({ ok: true, listing: rows[0] });
+  } catch (err) {
+    console.error("DELETE /api/listings/:id error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ================== BUNDLES API ==================
+
+// POST /api/listings/:id/buy - Purchase a listing (marks as pending purchase)
+app.post("/api/listings/:id/buy", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const buyerWallet = user.default_wallet_address?.toLowerCase();
+    if (!buyerWallet) {
+      return res.status(400).json({ ok: false, error: "No wallet connected" });
+    }
+
+    const listingId = parseInt(req.params.id);
+
+    // Get the listing first
+    const { rows: listings } = await pool.query(`
+      SELECT * FROM listings WHERE id = $1 AND status = 'active'
+    `, [listingId]);
+
+    if (listings.length === 0) {
+      return res.status(404).json({ ok: false, error: "Listing not found or no longer available" });
+    }
+
+    const listing = listings[0];
+
+    if (listing.seller_wallet === buyerWallet) {
+      return res.status(400).json({ ok: false, error: "Cannot buy your own listing" });
+    }
+
+    // Mark as sold with buyer info
+    const { rows } = await pool.query(`
+      UPDATE listings 
+      SET status = 'sold', buyer_wallet = $2, updated_at = NOW()
+      WHERE id = $1 AND status = 'active'
+      RETURNING *
+    `, [listingId, buyerWallet]);
+
+    if (rows.length === 0) {
+      return res.status(400).json({ ok: false, error: "Listing already sold" });
+    }
+
+    console.log(`[Listings] Listing #${listingId} purchased by ${buyerWallet.substring(0, 8)}...`);
+
+    return res.json({
+      ok: true,
+      listing: rows[0],
+      message: "Purchase recorded! Contact seller to complete the transfer."
+    });
+  } catch (err) {
+    console.error("POST /api/listings/:id/buy error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/bundles/:id/buy - Purchase a bundle
+app.post("/api/bundles/:id/buy", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const buyerWallet = user.default_wallet_address?.toLowerCase();
+    if (!buyerWallet) {
+      return res.status(400).json({ ok: false, error: "No wallet connected" });
+    }
+
+    const bundleId = parseInt(req.params.id);
+
+    // Get the bundle
+    const { rows: bundles } = await pool.query(`
+      SELECT * FROM bundles WHERE id = $1 AND status = 'active'
+    `, [bundleId]);
+
+    if (bundles.length === 0) {
+      return res.status(404).json({ ok: false, error: "Bundle not found or no longer available" });
+    }
+
+    const bundle = bundles[0];
+
+    if (bundle.seller_wallet === buyerWallet) {
+      return res.status(400).json({ ok: false, error: "Cannot buy your own bundle" });
+    }
+
+    // Mark as sold
+    const { rows } = await pool.query(`
+      UPDATE bundles 
+      SET status = 'sold', buyer_wallet = $2, updated_at = NOW()
+      WHERE id = $1 AND status = 'active'
+      RETURNING *
+    `, [bundleId, buyerWallet]);
+
+    if (rows.length === 0) {
+      return res.status(400).json({ ok: false, error: "Bundle already sold" });
+    }
+
+    console.log(`[Bundles] Bundle #${bundleId} purchased by ${buyerWallet.substring(0, 8)}...`);
+
+    return res.json({
+      ok: true,
+      bundle: rows[0],
+      message: "Purchase recorded! Contact seller to complete the transfer."
+    });
+  } catch (err) {
+    console.error("POST /api/bundles/:id/buy error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/bundles - Get all active bundles
+app.get("/api/bundles", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT b.*, p.display_name as seller_name
+      FROM bundles b
+      LEFT JOIN wallet_profiles p ON p.wallet_address = b.seller_wallet
+      WHERE b.status = 'active'
+      ORDER BY b.created_at DESC
+      LIMIT 100
+    `);
+
+    return res.json({ ok: true, bundles: rows });
+  } catch (err) {
+    console.error("GET /api/bundles error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/my-bundles - Get current user's bundles
+app.get("/api/my-bundles", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    if (!wallet) {
+      return res.json({ ok: true, bundles: [] });
+    }
+
+    const { rows } = await pool.query(`
+      SELECT * FROM bundles
+      WHERE seller_wallet = $1 AND status = 'active'
+      ORDER BY created_at DESC
+    `, [wallet]);
+
+    return res.json({ ok: true, bundles: rows });
+  } catch (err) {
+    console.error("GET /api/my-bundles error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/bundles - Create a new bundle
+app.post("/api/bundles", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    if (!wallet) {
+      return res.status(400).json({ ok: false, error: "No wallet connected" });
+    }
+
+    const { title, description, nft_ids, price_usd } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ ok: false, error: "Bundle title required" });
+    }
+
+    if (!nft_ids || nft_ids.length === 0) {
+      return res.status(400).json({ ok: false, error: "At least one NFT required" });
+    }
+
+    if (!price_usd || price_usd <= 0) {
+      return res.status(400).json({ ok: false, error: "Valid price required" });
+    }
+
+    const { rows } = await pool.query(`
+      INSERT INTO bundles (seller_wallet, title, description, nft_ids, price_usd, status)
+      VALUES ($1, $2, $3, $4, $5, 'active')
+      RETURNING *
+    `, [wallet, title, description || '', JSON.stringify(nft_ids), price_usd]);
+
+    console.log(`[Bundles] Created bundle "${title}" with ${nft_ids.length} NFTs for ${wallet.substring(0, 8)}...`);
+
+    return res.json({ ok: true, bundle: rows[0] });
+  } catch (err) {
+    console.error("POST /api/bundles error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// DELETE /api/bundles/:id - Cancel a bundle
+app.delete("/api/bundles/:id", async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) {
+      return res.status(401).json({ ok: false, error: "Not logged in" });
+    }
+
+    const wallet = user.default_wallet_address?.toLowerCase();
+    const bundleId = parseInt(req.params.id);
+
+    const { rows } = await pool.query(`
+      UPDATE bundles SET status = 'cancelled', updated_at = NOW()
+      WHERE id = $1 AND seller_wallet = $2 AND status = 'active'
+      RETURNING *
+    `, [bundleId, wallet]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Bundle not found or not authorized" });
+    }
+
+    return res.json({ ok: true, bundle: rows[0] });
+  } catch (err) {
+    console.error("DELETE /api/bundles/:id error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+function isAdmin(wallet) {
+  if (!wallet) return false;
+  return ADMIN_WALLETS.includes(wallet.toLowerCase());
+}
+
+function requireAdmin(req, res) {
+  const user = req.session?.user;
+  if (!user) {
+    res.status(401).json({ ok: false, error: "Not logged in" });
+    return null;
+  }
+  const wallet = user.default_wallet_address;
+  if (!isAdmin(wallet)) {
+    res.status(403).json({ ok: false, error: "Admin access required" });
+    return null;
+  }
+  return user;
+}
+
+app.get("/api/admin/analytics/overview", async (req, res) => {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const pageViewsResult = await pool.query(`
+      SELECT 
+        COUNT(*) as total_views,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') as views_24h,
+        COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as views_7d,
+        COUNT(DISTINCT session_id) as unique_sessions
+      FROM analytics_page_views
+    `);
+
+    return res.json({ ok: true, overview: pageViewsResult.rows[0] });
+  } catch (err) {
+    console.error("GET /api/admin/analytics/overview error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/admin/analytics/pages", async (req, res) => {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT page_path, COUNT(*) as views, COUNT(DISTINCT session_id) as unique_visitors
+      FROM analytics_page_views
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY page_path
+      ORDER BY views DESC
+      LIMIT 50
+    `);
+
+    return res.json({ ok: true, pages: rows });
+  } catch (err) {
+    console.error("GET /api/admin/analytics/pages error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/admin/analytics/sessions", async (req, res) => {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT session_id, wallet_address, started_at, last_activity, page_count
+      FROM analytics_sessions
+      WHERE last_activity > NOW() - INTERVAL '7 days'
+      ORDER BY last_activity DESC
+      LIMIT 100
+    `);
+
+    return res.json({ ok: true, sessions: rows });
+  } catch (err) {
+    console.error("GET /api/admin/analytics/sessions error:", err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ================== SERVER START ==================
+
 app.listen(port, async () => {
   console.log(`NFL ALL DAY collection viewer running on http://localhost:${port}`);
-  
+
+  // Initialize database tables
+  await initTradesTable();
+  await initListingsTable();
+  await initBundlesTable();
+  await initAnalyticsTables();
+
   // Set up insights refresh after server starts
   setTimeout(() => {
     setupInsightsRefresh();
   }, 2000); // Wait 2 seconds for server to be fully ready
-  
+
   // Initialize sniper system (loads from DB and starts watcher)
   initializeSniper();
 });

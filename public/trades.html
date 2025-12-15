@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trading | NFL All Day</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="header.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <script src="/js/fcl-loader.js"></script>
+    <script src="/js/hybrid-custody.js"></script>
+    <style>
+        :root {
+            --bg: #050815;
+            --card: #0b1020;
+            --border: #1b2236;
+            --text: #f8f9ff;
+            --text-muted: #8c95b8;
+            --accent1: #22c55e;
+            --accent2: #3b82f6;
+            --accent3: #a855f7;
+            --red: #ef4444;
+            --yellow: #fbbf24;
+        }
+
+        body {
+            background: radial-gradient(circle at top, #101526 0, #050815 55%);
+            min-height: 100vh;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text);
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--accent1), var(--accent2));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .page-subtitle {
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* Login Required */
+        .login-required {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            max-width: 500px;
+            margin: 3rem auto;
+        }
+
+        .login-required h2 {
+            margin-top: 0;
+        }
+
+        .btn-login {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, var(--accent1), var(--accent2));
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab.active {
+            color: white;
+            background: var(--accent2);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Trade Builder */
+        .trade-builder {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1.5rem;
+        }
+
+        .trade-side {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .trade-side.giving {
+            border-color: var(--accent1);
+        }
+
+        .trade-side.getting {
+            border-color: var(--accent2);
+        }
+
+        .trade-side h4 {
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .trade-side.giving h4 {
+            color: var(--accent1);
+        }
+
+        .trade-side.getting h4 {
+            color: var(--accent2);
+        }
+
+        .search-input,
+        .wallet-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus,
+        .wallet-input:focus {
+            outline: none;
+            border-color: var(--accent2);
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .filter-row select {
+            flex: 1;
+            padding: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .search-item {
+            padding: 0.6rem 0.75rem;
+            cursor: pointer;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .search-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .selected-items {
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .selected-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .selected-item .remove {
+            cursor: pointer;
+            color: var(--red);
+            font-size: 1.2rem;
+            opacity: 0.7;
+        }
+
+        .selected-item .remove:hover {
+            opacity: 1;
+        }
+
+        .side-total {
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .side-total .amount {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .side-total .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .vs-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .vs-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Chips */
+        .chip {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            margin-left: 0.25rem;
+        }
+
+        .chip-common {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
+        .chip-uncommon {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .chip-rare {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .chip-legendary {
+            background: rgba(168, 85, 247, 0.2);
+            color: #a855f7;
+        }
+
+        .chip-ultimate {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent1), var(--accent2));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-danger {
+            background: var(--red);
+            color: white;
+        }
+
+        /* Trades List */
+        .trades-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .trade-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .trade-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .trade-partner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .trade-partner-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--accent2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .trade-partner-info h4 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .trade-partner-info .wallet {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .trade-status {
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .trade-status.pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--yellow);
+        }
+
+        .trade-status.accepted {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent1);
+        }
+
+        .trade-status.rejected {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red);
+        }
+
+        .trade-status.completed {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent2);
+        }
+
+        .trade-status.ready {
+            background: rgba(168, 85, 247, 0.2);
+            color: var(--accent3);
+        }
+
+        .trade-items-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .trade-items-col h5 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .trade-item {
+            font-size: 0.85rem;
+            padding: 0.4rem 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .trade-total {
+            font-weight: 700;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .arrow-col {
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+
+        .trade-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        /* Marketplace */
+        .marketplace-filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .marketplace-filters input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .marketplace-section {
+            margin-bottom: 2rem;
+        }
+
+        .marketplace-section h3 {
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .listings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .listing-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .listing-card:hover {
+            border-color: var(--accent2);
+        }
+
+        .listing-player {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .listing-details {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .listing-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent1);
+            margin-bottom: 0.5rem;
+        }
+
+        .listing-seller {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* My Listings */
+        .listing-mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.25rem;
+            border-radius: 8px;
+        }
+
+        .listing-mode-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .listing-mode-btn.active {
+            background: var(--accent2);
+            color: white;
+        }
+
+        .moment-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+        }
+
+        .moment-checkbox:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .moment-checkbox input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .moment-checkbox .info {
+            flex: 1;
+        }
+
+        .moment-checkbox .price-input {
+            width: 80px;
+            padding: 0.4rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            text-align: right;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state h3 {
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .trade-builder {
+                grid-template-columns: 1fr;
+            }
+
+            .vs-section {
+                flex-direction: row;
+                padding: 1rem 0;
+            }
+
+            .vs-icon {
+                margin: 0 1rem 0 0;
+            }
+
+            .trade-items-row {
+                grid-template-columns: 1fr;
+            }
+
+            .arrow-col {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app-header"></div>
+    <script src="/layout.js"></script>
+
+    <main class="app-main">
+        <div class="container">
+            <!-- Login Required View -->
+            <div id="login-required" class="login-required" style="display: none;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
+                <h2>Sign In Required</h2>
+                <p>You need to be logged in with a linked wallet to access trading features.</p>
+                <a href="/login.html" class="btn-login">Sign In</a>
+            </div>
+
+            <!-- Main Trading View -->
+            <div id="trading-view" style="display: none;">
+                <div class="page-header">
+                    <h1 class="page-title">🔄 Trading</h1>
+                    <p class="page-subtitle">Trade moments with other collectors</p>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="my-trades">My Trades</button>
+                    <button class="tab" data-tab="new-trade">New Trade</button>
+                    <button class="tab" data-tab="marketplace">Marketplace</button>
+                    <button class="tab" data-tab="my-listings">My Listings</button>
+                </div>
+
+                <!-- My Trades Tab -->
+                <div id="tab-my-trades" class="tab-content active">
+                    <div id="trades-loading" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        Loading trades...</div>
+                    <div id="trades-list" class="trades-grid" style="display: none;"></div>
+                    <div id="trades-empty" class="empty-state" style="display: none;">
+                        <h3>No trades yet</h3>
+                        <p>Start a new trade to swap moments with other collectors!</p>
+                    </div>
+                </div>
+
+                <!-- New Trade Tab -->
+                <div id="tab-new-trade" class="tab-content">
+                    <div class="trade-builder">
+                        <div class="trade-side giving">
+                            <h4>📤 You Offer</h4>
+                            <div id="your-wallet-display"
+                                style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                            </div>
+                            <input type="text" class="search-input" id="your-search"
+                                placeholder="Search your moments..." oninput="searchYourMoments()">
+                            <div class="filter-row">
+                                <select id="your-tier-filter" onchange="searchYourMoments()">
+                                    <option value="">All tiers</option>
+                                </select>
+                                <select id="your-series-filter" onchange="searchYourMoments()">
+                                    <option value="">All series</option>
+                                </select>
+                            </div>
+                            <div class="search-results" id="your-search-results"></div>
+                            <div class="selected-items" id="your-selected-items">
+                                <div style="text-align: center; color: var(--text-muted); padding: 1rem;">Search and add
+                                    moments to offer</div>
+                            </div>
+                            <div class="side-total">
+                                <div class="amount" style="color: var(--accent1);" id="your-total">$0.00</div>
+                                <div class="label">Total Value</div>
+                            </div>
+                        </div>
+
+                        <div class="vs-section">
+                            <div class="vs-icon">⚖️</div>
+                            <button class="btn btn-primary" onclick="submitTrade()">Send Offer</button>
+                        </div>
+
+                        <div class="trade-side getting">
+                            <h4>📥 You Request</h4>
+                            <input type="text" class="wallet-input" id="target-wallet"
+                                placeholder="Search by collector name or wallet...">
+                            <input type="text" class="search-input" id="their-search"
+                                placeholder="Search their moments..." oninput="searchTheirMoments()" disabled>
+                            <div class="filter-row">
+                                <select id="their-tier-filter" onchange="searchTheirMoments()" disabled>
+                                    <option value="">All tiers</option>
+                                </select>
+                                <select id="their-series-filter" onchange="searchTheirMoments()" disabled>
+                                    <option value="">All series</option>
+                                </select>
+                            </div>
+                            <div class="search-results" id="their-search-results"></div>
+                            <div class="selected-items" id="their-selected-items">
+                                <div style="text-align: center; color: var(--text-muted); padding: 1rem;">Enter a wallet
+                                    to select moments</div>
+                            </div>
+                            <div class="side-total">
+                                <div class="amount" style="color: var(--accent2);" id="their-total">$0.00</div>
+                                <div class="label">Total Value</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marketplace Tab -->
+                <div id="tab-marketplace" class="tab-content">
+                    <div class="marketplace-filters">
+                        <input type="text" class="search-input" id="marketplace-search" placeholder="Search listings..."
+                            oninput="filterMarketplace()">
+                        <input type="number" class="search-input" id="marketplace-max-price" placeholder="Max price ($)"
+                            oninput="filterMarketplace()" style="max-width: 150px;">
+                    </div>
+
+                    <div class="marketplace-section">
+                        <h3>📦 Individual Listings</h3>
+                        <div id="listings-loading" style="color: var(--text-muted);">Loading listings...</div>
+                        <div id="listings-grid" class="listings-grid" style="display: none;"></div>
+                        <div id="listings-empty" class="empty-state" style="display: none;">No listings found</div>
+                    </div>
+
+                    <div class="marketplace-section">
+                        <h3>🎁 Bundles</h3>
+                        <div id="bundles-loading" style="color: var(--text-muted);">Loading bundles...</div>
+                        <div id="bundles-grid" class="listings-grid" style="display: none;"></div>
+                        <div id="bundles-empty" class="empty-state" style="display: none;">No bundles found</div>
+                    </div>
+                </div>
+
+                <!-- My Listings Tab -->
+                <div id="tab-my-listings" class="tab-content">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0;">📋 List Moments for Sale</h3>
+                        <div class="listing-mode-toggle">
+                            <button class="listing-mode-btn active" id="mode-individual"
+                                onclick="setListingMode('individual')">Individual</button>
+                            <button class="listing-mode-btn" id="mode-bundle" onclick="setListingMode('bundle')">🎁
+                                Bundle</button>
+                        </div>
+                    </div>
+
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;" id="listing-instructions">Select moments
+                        from your collection to list for sale.</p>
+
+                    <input type="text" class="search-input" id="listing-search"
+                        placeholder="Search your moments to list..." oninput="searchListingMoments()">
+                    <div class="search-results" id="listing-search-results" style="max-height: 300px;"></div>
+
+                    <!-- Bundle fields -->
+                    <div id="bundle-fields" style="display: none; margin-top: 1rem;">
+                        <input type="text" class="wallet-input" id="bundle-title"
+                            placeholder="Bundle Title (e.g., 'Chiefs Legendary Collection')">
+                        <textarea class="wallet-input" id="bundle-description" rows="2"
+                            placeholder="Bundle description (optional)..." style="resize: none;"></textarea>
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem;">
+                            <span>Bundle Price: $</span>
+                            <input type="number" id="bundle-price" min="0.01" step="0.01" value="10.00"
+                                style="width: 100px; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+                        </div>
+                    </div>
+
+                    <div id="listing-selected" style="margin-top: 1rem;"></div>
+
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-primary" id="create-listings-btn" onclick="createListings()"
+                            style="width: 100%;">Create Listings</button>
+                        <button class="btn btn-primary" id="create-bundle-btn" onclick="createBundle()"
+                            style="display: none; width: 100%;">📦 Create Bundle</button>
+                    </div>
+
+                    <h4 style="margin: 2rem 0 1rem 0;">Your Active Listings</h4>
+                    <div id="my-listings-loading" style="color: var(--text-muted);">Loading your listings...</div>
+                    <div id="my-listings-list"></div>
+
+                    <h4 style="margin: 2rem 0 1rem 0;">Your Bundles</h4>
+                    <div id="my-bundles-loading" style="color: var(--text-muted);">Loading your bundles...</div>
+                    <div id="my-bundles-list"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/wallet-search.js"></script>
+    <script>
+        // State
+        let currentUser = null;
+        let userWallet = null;
+        let yourMoments = [];
+        let theirMoments = [];
+        let yourSelectedItems = [];
+        let theirSelectedItems = [];
+        let listingSelectedItems = [];
+        let listingMode = 'individual';
+        let priceCache = {};
+        let allListings = [];
+        let allBundles = [];
+
+        // Check authentication on load
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/me', { credentials: 'include' });
+                const data = await res.json();
+
+                if (data.ok && data.user) {
+                    currentUser = data.user;
+                    userWallet = data.user.default_wallet_address;
+
+                    if (!userWallet) {
+                        document.getElementById('login-required').style.display = 'block';
+                        document.getElementById('login-required').querySelector('p').textContent =
+                            'You need to set a default wallet in your account settings to trade.';
+                        return;
+                    }
+
+                    document.getElementById('trading-view').style.display = 'block';
+                    document.getElementById('your-wallet-display').textContent =
+                        `Your wallet: ${userWallet.substring(0, 10)}...${userWallet.slice(-6)}`;
+
+                    // Load data
+                    loadYourMoments();
+                    loadTrades();
+                    loadMarketplace();
+                    loadMyListings();
+                    loadMyBundles();
+                } else {
+                    document.getElementById('login-required').style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                document.getElementById('login-required').style.display = 'block';
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        // Load your moments
+        async function loadYourMoments() {
+            if (!userWallet) return;
+            try {
+                let res = await fetch(`/api/query?wallet=${userWallet}&source=blockchain`);
+                let data = await res.json();
+                if (!data.ok || (data.rows && data.rows.length === 0)) {
+                    res = await fetch(`/api/query?wallet=${userWallet}&refresh=1`);
+                    data = await res.json();
+                }
+                if (data.ok) {
+                    yourMoments = data.rows || [];
+                    setFilters('your', yourMoments);
+                }
+            } catch (err) { console.error('Failed to load your moments:', err); }
+        }
+
+        // Load target wallet
+        async function loadTargetWallet(wallet) {
+            if (!wallet || !wallet.startsWith('0x')) return;
+            if (wallet === userWallet) { alert('Cannot trade with yourself'); return; }
+
+            try {
+                document.getElementById('their-search').disabled = true;
+                document.getElementById('their-search').placeholder = 'Loading wallet...';
+
+                let res = await fetch(`/api/query?wallet=${wallet}&source=blockchain`);
+                let data = await res.json();
+                if (!data.ok || (data.rows && data.rows.length === 0)) {
+                    res = await fetch(`/api/query?wallet=${wallet}&refresh=1`);
+                    data = await res.json();
+                }
+
+                if (data.ok) {
+                    theirMoments = data.rows || [];
+                    setFilters('their', theirMoments);
+                    document.getElementById('their-search').disabled = false;
+                    document.getElementById('their-tier-filter').disabled = false;
+                    document.getElementById('their-series-filter').disabled = false;
+                    document.getElementById('their-search').placeholder = `Search ${theirMoments.length} moments...`;
+                }
+            } catch (err) {
+                console.error('Failed to load wallet:', err);
+                document.getElementById('their-search').placeholder = 'Error loading wallet';
+            }
+        }
+
+        // Initialize wallet search with autocomplete
+        if (typeof initWalletSearch === 'function') {
+            initWalletSearch('target-wallet', (wallet) => {
+                loadTargetWallet(wallet);
+            });
+        }
+
+        // Set filter options
+        function setFilters(prefix, moments) {
+            const tierSelect = document.getElementById(`${prefix}-tier-filter`);
+            const seriesSelect = document.getElementById(`${prefix}-series-filter`);
+
+            const tiers = [...new Set(moments.map(m => (m.tier || '').trim()).filter(Boolean))].sort();
+            const series = [...new Set(moments.map(m => (m.series_name || '').trim()).filter(Boolean))].sort();
+
+            tierSelect.innerHTML = '<option value="">All tiers</option>' + tiers.map(t => `<option value="${t}">${t}</option>`).join('');
+            seriesSelect.innerHTML = '<option value="">All series</option>' + series.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+
+        // Search functions
+        function searchYourMoments() {
+            const query = document.getElementById('your-search').value.toLowerCase();
+            const tier = document.getElementById('your-tier-filter').value;
+            const series = document.getElementById('your-series-filter').value;
+            searchMoments('your', yourMoments, yourSelectedItems, query, tier, series);
+        }
+
+        function searchTheirMoments() {
+            const query = document.getElementById('their-search').value.toLowerCase();
+            const tier = document.getElementById('their-tier-filter').value;
+            const series = document.getElementById('their-series-filter').value;
+            searchMoments('their', theirMoments, theirSelectedItems, query, tier, series);
+        }
+
+        function searchMoments(prefix, moments, selected, query, tier, series) {
+            const resultsDiv = document.getElementById(`${prefix}-search-results`);
+            if (!query || query.length < 2) { resultsDiv.innerHTML = ''; return; }
+
+            const selectedIds = new Set(selected.map(i => i.nft_id));
+            const matches = moments.filter(m => {
+                if (selectedIds.has(m.nft_id)) return false;
+                if (tier && (m.tier || '').toLowerCase() !== tier.toLowerCase()) return false;
+                if (series && (m.series_name || '').toLowerCase() !== series.toLowerCase()) return false;
+                const name = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
+                const team = (m.team_name || '').toLowerCase();
+                return name.includes(query) || team.includes(query);
+            }).slice(0, 30);
+
+            resultsDiv.innerHTML = matches.map(m => `
+                <div class="search-item" onclick="addItem('${prefix}', '${m.nft_id}')">
+                    <span><strong>${m.first_name || ''} ${m.last_name || 'Unknown'}</strong>
+                    <span style="color: var(--accent1); font-weight: 700;">#${m.serial_number || '?'}</span>
+                    <span class="chip chip-${(m.tier || 'common').toLowerCase()}">${m.tier || ''}</span></span>
+                    <span style="color: var(--text-muted);">${m.team_name || ''}</span>
+                </div>
+            `).join('');
+        }
+
+        // Add/remove items
+        function addItem(prefix, nftId) {
+            const moments = prefix === 'your' ? yourMoments : theirMoments;
+            const selected = prefix === 'your' ? yourSelectedItems : theirSelectedItems;
+            const moment = moments.find(m => m.nft_id === nftId);
+            if (moment && !selected.find(s => s.nft_id === nftId)) {
+                selected.push(moment);
+                renderSelectedItems(prefix);
+                updateTotals(prefix);
+            }
+            document.getElementById(`${prefix}-search`).value = '';
+            document.getElementById(`${prefix}-search-results`).innerHTML = '';
+        }
+
+        function removeItem(prefix, nftId) {
+            if (prefix === 'your') {
+                yourSelectedItems = yourSelectedItems.filter(i => i.nft_id !== nftId);
+            } else {
+                theirSelectedItems = theirSelectedItems.filter(i => i.nft_id !== nftId);
+            }
+            renderSelectedItems(prefix);
+            updateTotals(prefix);
+        }
+
+        async function renderSelectedItems(prefix) {
+            const selected = prefix === 'your' ? yourSelectedItems : theirSelectedItems;
+            const container = document.getElementById(`${prefix}-selected-items`);
+
+            if (selected.length === 0) {
+                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1rem;">${prefix === 'your' ? 'Search and add moments to offer' : 'Enter a wallet to select moments'}</div>`;
+                return;
+            }
+
+            const editionIds = [...new Set(selected.map(m => m.edition_id).filter(Boolean))];
+            if (editionIds.length > 0) {
+                try {
+                    const res = await fetch(`/api/prices?editions=${editionIds.join(',')}`);
+                    const data = await res.json();
+                    if (data.ok && data.lowAsk) Object.assign(priceCache, data.lowAsk);
+                } catch (err) { console.error('Price fetch error:', err); }
+            }
+
+            container.innerHTML = selected.map(m => {
+                const price = priceCache[m.edition_id] ? parseFloat(priceCache[m.edition_id]).toFixed(2) : '?';
+                return `
+                    <div class="selected-item">
+                        <span><strong>${m.first_name || ''} ${m.last_name || 'Unknown'}</strong>
+                        <span style="color: var(--accent1); font-weight: 700;">#${m.serial_number || '?'}</span>
+                        <span class="chip chip-${(m.tier || 'common').toLowerCase()}">${m.tier || ''}</span></span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="color: var(--accent1);">$${price}</span>
+                            <span class="remove" onclick="removeItem('${prefix}', '${m.nft_id}')">×</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateTotals(prefix) {
+            const selected = prefix === 'your' ? yourSelectedItems : theirSelectedItems;
+            let total = 0;
+            for (const m of selected) {
+                if (m.edition_id && priceCache[m.edition_id]) {
+                    total += parseFloat(priceCache[m.edition_id]) || 0;
+                }
+            }
+            document.getElementById(`${prefix}-total`).textContent = `$${total.toFixed(2)}`;
+        }
+
+        // Submit trade
+        async function submitTrade() {
+            const targetWallet = document.getElementById('target-wallet').dataset?.walletAddress ||
+                document.getElementById('target-wallet').value.trim().toLowerCase();
+
+            if (!targetWallet || !targetWallet.startsWith('0x')) {
+                alert('Please enter a valid target wallet'); return;
+            }
+            if (yourSelectedItems.length === 0 && theirSelectedItems.length === 0) {
+                alert('Add at least one moment to the trade'); return;
+            }
+
+            try {
+                const res = await fetch('/api/trades', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        targetWallet,
+                        initiatorNftIds: yourSelectedItems.map(i => i.nft_id),
+                        targetNftIds: theirSelectedItems.map(i => i.nft_id)
+                    })
+                });
+
+                const data = await res.json();
+                if (data.ok) {
+                    alert('Trade offer sent successfully!');
+                    yourSelectedItems = [];
+                    theirSelectedItems = [];
+                    document.getElementById('target-wallet').value = '';
+                    renderSelectedItems('your');
+                    renderSelectedItems('their');
+                    updateTotals('your');
+                    updateTotals('their');
+                    document.querySelector('.tab[data-tab="my-trades"]').click();
+                    loadTrades();
+                } else {
+                    alert(data.error || 'Failed to create trade');
+                }
+            } catch (err) {
+                console.error('Trade creation error:', err);
+                alert('Failed to create trade');
+            }
+        }
+
+        // Load trades
+        async function loadTrades() {
+            try {
+                const res = await fetch('/api/trades', { credentials: 'include' });
+                const data = await res.json();
+
+                document.getElementById('trades-loading').style.display = 'none';
+
+                if (data.ok && data.trades && data.trades.length > 0) {
+                    document.getElementById('trades-list').style.display = 'block';
+                    renderTrades(data.trades);
+                } else {
+                    document.getElementById('trades-empty').style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Failed to load trades:', err);
+                document.getElementById('trades-loading').style.display = 'none';
+                document.getElementById('trades-empty').style.display = 'block';
+            }
+        }
+
+        function renderTrades(trades) {
+            const container = document.getElementById('trades-list');
+            container.innerHTML = trades.map(trade => {
+                const isInitiator = trade.initiator_wallet === userWallet.toLowerCase();
+                const partnerWallet = isInitiator ? trade.target_wallet : trade.initiator_wallet;
+                const give = isInitiator ? (trade.initiator_nft_ids || []) : (trade.target_nft_ids || []);
+                const get = isInitiator ? (trade.target_nft_ids || []) : (trade.initiator_nft_ids || []);
+
+                let actions = '';
+                if (trade.status === 'pending' && !isInitiator) {
+                    actions = `
+                        <button class="btn btn-primary" onclick="acceptTrade(${trade.id})">Accept</button>
+                        <button class="btn btn-danger" onclick="rejectTrade(${trade.id})">Reject</button>
+                    `;
+                } else if (trade.status === 'pending' && isInitiator) {
+                    actions = `<button class="btn btn-secondary" onclick="rejectTrade(${trade.id})">Cancel</button>`;
+                } else if (trade.status === 'accepted') {
+                    actions = `<button class="btn btn-primary" onclick="signTrade(${trade.id})">🔐 Sign</button>`;
+                }
+
+                return `
+                    <div class="trade-card">
+                        <div class="trade-card-header">
+                            <div class="trade-partner">
+                                <div class="trade-partner-avatar">${isInitiator ? '📤' : '📥'}</div>
+                                <div class="trade-partner-info">
+                                    <h4>${isInitiator ? 'To' : 'From'}: Collector</h4>
+                                    <div class="wallet">${partnerWallet.substring(0, 10)}...${partnerWallet.slice(-4)}</div>
+                                </div>
+                            </div>
+                            <span class="trade-status ${trade.status}">${trade.status.toUpperCase()}</span>
+                        </div>
+                        <div class="trade-items-row">
+                            <div class="trade-items-col">
+                                <h5 style="color: var(--red);">You Give (${give.length})</h5>
+                                ${give.length === 0 ? '<div style="color: var(--text-muted);">None</div>' : ''}
+                            </div>
+                            <div class="arrow-col">⟷</div>
+                            <div class="trade-items-col">
+                                <h5 style="color: var(--accent1);">You Get (${get.length})</h5>
+                                ${get.length === 0 ? '<div style="color: var(--text-muted);">None</div>' : ''}
+                            </div>
+                        </div>
+                        <div class="trade-actions">${actions}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function acceptTrade(tradeId) {
+            if (!confirm('Accept this trade?')) return;
+            try {
+                const res = await fetch(`/api/trades/${tradeId}/accept`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) { alert('Trade accepted!'); loadTrades(); }
+                else alert(data.error || 'Failed to accept trade');
+            } catch (err) { alert('Failed to accept trade'); }
+        }
+
+        async function rejectTrade(tradeId) {
+            if (!confirm('Cancel/reject this trade?')) return;
+            try {
+                const res = await fetch(`/api/trades/${tradeId}/reject`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) { loadTrades(); }
+                else alert(data.error || 'Failed');
+            } catch (err) { alert('Failed'); }
+        }
+
+        async function signTrade(tradeId) {
+            try {
+                const res = await fetch(`/api/trades/${tradeId}/sign`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) { alert('Signed!'); loadTrades(); }
+                else alert(data.error || 'Failed to sign');
+            } catch (err) { alert('Failed to sign'); }
+        }
+
+        // Marketplace
+        async function loadMarketplace() {
+            try {
+                const [listingsRes, bundlesRes] = await Promise.all([
+                    fetch('/api/listings'),
+                    fetch('/api/bundles')
+                ]);
+
+                const listingsData = await listingsRes.json();
+                const bundlesData = await bundlesRes.json();
+
+                document.getElementById('listings-loading').style.display = 'none';
+                document.getElementById('bundles-loading').style.display = 'none';
+
+                if (listingsData.ok) {
+                    allListings = listingsData.listings || [];
+                    renderListings(allListings);
+                }
+
+                if (bundlesData.ok) {
+                    allBundles = bundlesData.bundles || [];
+                    renderBundles(allBundles);
+                }
+            } catch (err) {
+                console.error('Failed to load marketplace:', err);
+                document.getElementById('listings-loading').textContent = 'Failed to load marketplace';
+            }
+        }
+
+        function filterMarketplace() {
+            const query = document.getElementById('marketplace-search').value.toLowerCase();
+            const maxPrice = parseFloat(document.getElementById('marketplace-max-price').value) || Infinity;
+
+            const filteredListings = allListings.filter(l => {
+                const name = `${l.first_name || ''} ${l.last_name || ''}`.toLowerCase();
+                if (query && !name.includes(query)) return false;
+                if (l.price_usd > maxPrice) return false;
+                return true;
+            });
+
+            const filteredBundles = allBundles.filter(b => {
+                if (query && !b.title.toLowerCase().includes(query)) return false;
+                if (b.price_usd > maxPrice) return false;
+                return true;
+            });
+
+            renderListings(filteredListings);
+            renderBundles(filteredBundles);
+        }
+
+        function renderListings(listings) {
+            const grid = document.getElementById('listings-grid');
+            const empty = document.getElementById('listings-empty');
+
+            if (listings.length === 0) {
+                grid.style.display = 'none';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+            grid.style.display = 'grid';
+            grid.innerHTML = listings.map(l => {
+                const isOwner = userWallet && l.seller_wallet === userWallet.toLowerCase();
+                return `
+                <div class="listing-card">
+                    <div class="listing-player">${l.first_name || ''} ${l.last_name || 'Unknown'}</div>
+                    <div class="listing-details">
+                        #${l.serial_number || '?'} / ${l.max_mint_size || '?'}
+                        <span class="chip chip-${(l.tier || 'common').toLowerCase()}">${l.tier || ''}</span>
+                    </div>
+                    <div class="listing-price">$${parseFloat(l.price_usd).toFixed(2)}</div>
+                    <div class="listing-seller">Seller: ${l.seller_name || l.seller_wallet.substring(0, 10) + '...'}</div>
+                    ${!isOwner ? `<button class="btn btn-primary" onclick="buyListing(${l.id})" style="margin-top: 0.5rem; width: 100%;">Buy Now</button>` : `<span style="color: var(--text-muted); font-size: 0.75rem;">Your listing</span>`}
+                </div>
+            `;
+            }).join('');
+        }
+
+        function renderBundles(bundles) {
+            const grid = document.getElementById('bundles-grid');
+            const empty = document.getElementById('bundles-empty');
+
+            if (bundles.length === 0) {
+                grid.style.display = 'none';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+            grid.style.display = 'grid';
+            grid.innerHTML = bundles.map(b => {
+                const nftCount = Array.isArray(b.nft_ids) ? b.nft_ids.length : 0;
+                const isOwner = userWallet && b.seller_wallet === userWallet.toLowerCase();
+                return `
+                    <div class="listing-card">
+                        <div class="listing-player">📦 ${b.title}</div>
+                        <div class="listing-details">${nftCount} moments${b.description ? ' · ' + b.description.substring(0, 50) : ''}</div>
+                        <div class="listing-price">$${parseFloat(b.price_usd).toFixed(2)}</div>
+                        <div class="listing-seller">Seller: ${b.seller_name || b.seller_wallet.substring(0, 10) + '...'}</div>
+                        ${!isOwner ? `<button class="btn btn-primary" onclick="buyBundle(${b.id})" style="margin-top: 0.5rem; width: 100%;">Buy Bundle</button>` : `<span style="color: var(--text-muted); font-size: 0.75rem;">Your bundle</span>`}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // My Listings
+        function setListingMode(mode) {
+            listingMode = mode;
+            document.getElementById('mode-individual').classList.toggle('active', mode === 'individual');
+            document.getElementById('mode-bundle').classList.toggle('active', mode === 'bundle');
+            document.getElementById('bundle-fields').style.display = mode === 'bundle' ? 'block' : 'none';
+            document.getElementById('create-listings-btn').style.display = mode === 'individual' ? 'block' : 'none';
+            document.getElementById('create-bundle-btn').style.display = mode === 'bundle' ? 'block' : 'none';
+            document.getElementById('listing-instructions').textContent = mode === 'individual'
+                ? 'Select moments from your collection to list for sale.'
+                : 'Select moments to include in your bundle.';
+            renderListingSelected();
+        }
+
+        function searchListingMoments() {
+            const query = document.getElementById('listing-search').value.toLowerCase();
+            const resultsDiv = document.getElementById('listing-search-results');
+
+            if (!query || query.length < 2) { resultsDiv.innerHTML = ''; return; }
+
+            const selectedIds = new Set(listingSelectedItems.map(i => i.nft_id));
+            const matches = yourMoments.filter(m => {
+                if (selectedIds.has(m.nft_id)) return false;
+                const name = `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase();
+                const team = (m.team_name || '').toLowerCase();
+                return name.includes(query) || team.includes(query);
+            }).slice(0, 50);
+
+            resultsDiv.innerHTML = matches.map(m => `
+                <div class="search-item" onclick="addListingItem('${m.nft_id}')">
+                    <span><strong>${m.first_name || ''} ${m.last_name || 'Unknown'}</strong>
+                    <span style="color: var(--accent1); font-weight: 700;">#${m.serial_number || '?'}</span>
+                    <span class="chip chip-${(m.tier || 'common').toLowerCase()}">${m.tier || ''}</span></span>
+                </div>
+            `).join('');
+        }
+
+        function addListingItem(nftId) {
+            const moment = yourMoments.find(m => m.nft_id === nftId);
+            if (moment && !listingSelectedItems.find(i => i.nft_id === nftId)) {
+                moment.listing_price = priceCache[moment.edition_id] || 5.00;
+                listingSelectedItems.push(moment);
+                renderListingSelected();
+            }
+            document.getElementById('listing-search').value = '';
+            document.getElementById('listing-search-results').innerHTML = '';
+        }
+
+        function removeListingItem(nftId) {
+            listingSelectedItems = listingSelectedItems.filter(i => i.nft_id !== nftId);
+            renderListingSelected();
+        }
+
+        function updateListingPrice(nftId, price) {
+            const item = listingSelectedItems.find(i => i.nft_id === nftId);
+            if (item) item.listing_price = parseFloat(price) || 0;
+        }
+
+        function renderListingSelected() {
+            const container = document.getElementById('listing-selected');
+            if (listingSelectedItems.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No moments selected</div>';
+                return;
+            }
+
+            container.innerHTML = listingSelectedItems.map(m => `
+                <div class="moment-checkbox">
+                    <div class="info">
+                        <strong>${m.first_name || ''} ${m.last_name || 'Unknown'}</strong>
+                        <span style="color: var(--accent1); font-weight: 700;">#${m.serial_number || '?'}</span>
+                        <span class="chip chip-${(m.tier || 'common').toLowerCase()}">${m.tier || ''}</span>
+                    </div>
+                    ${listingMode === 'individual' ? `<input type="number" class="price-input" value="${m.listing_price || 5}" min="0.01" step="0.01" onchange="updateListingPrice('${m.nft_id}', this.value)">` : ''}
+                    <span class="remove" onclick="removeListingItem('${m.nft_id}')" style="cursor: pointer; color: var(--red);">×</span>
+                </div>
+            `).join('');
+        }
+
+        async function createListings() {
+            if (listingSelectedItems.length === 0) { alert('Select at least one moment'); return; }
+
+            const items = listingSelectedItems.map(m => ({
+                nft_id: m.nft_id,
+                price_usd: parseFloat(m.listing_price) || 5.00
+            }));
+
+            try {
+                const res = await fetch('/api/listings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ items })
+                });
+
+                const data = await res.json();
+                if (data.ok) {
+                    alert(`Created ${data.listings.length} listing(s)!`);
+                    listingSelectedItems = [];
+                    renderListingSelected();
+                    loadMyListings();
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to create listings');
+                }
+            } catch (err) { alert('Failed to create listings'); }
+        }
+
+        async function createBundle() {
+            if (listingSelectedItems.length === 0) { alert('Select at least one moment'); return; }
+
+            const title = document.getElementById('bundle-title').value.trim();
+            const description = document.getElementById('bundle-description').value.trim();
+            const price = parseFloat(document.getElementById('bundle-price').value);
+
+            if (!title) { alert('Enter a bundle title'); return; }
+            if (!price || price <= 0) { alert('Enter a valid price'); return; }
+
+            try {
+                const res = await fetch('/api/bundles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        title,
+                        description,
+                        nft_ids: listingSelectedItems.map(m => m.nft_id),
+                        price_usd: price
+                    })
+                });
+
+                const data = await res.json();
+                if (data.ok) {
+                    alert('Bundle created!');
+                    listingSelectedItems = [];
+                    document.getElementById('bundle-title').value = '';
+                    document.getElementById('bundle-description').value = '';
+                    renderListingSelected();
+                    loadMyBundles();
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to create bundle');
+                }
+            } catch (err) { alert('Failed to create bundle'); }
+        }
+
+        async function loadMyListings() {
+            try {
+                const res = await fetch('/api/my-listings', { credentials: 'include' });
+                const data = await res.json();
+
+                document.getElementById('my-listings-loading').style.display = 'none';
+
+                if (data.ok && data.listings && data.listings.length > 0) {
+                    document.getElementById('my-listings-list').innerHTML = data.listings.map(l => `
+                        <div class="moment-checkbox">
+                            <div class="info">
+                                <strong>${l.first_name || ''} ${l.last_name || 'Unknown'}</strong>
+                                <span style="color: var(--accent1);">#${l.serial_number || '?'}</span>
+                                <span class="chip chip-${(l.tier || 'common').toLowerCase()}">${l.tier || ''}</span>
+                            </div>
+                            <span style="color: var(--accent1); font-weight: 700;">$${parseFloat(l.price_usd).toFixed(2)}</span>
+                            <button class="btn btn-secondary" onclick="cancelListing(${l.id})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Cancel</button>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('my-listings-list').innerHTML = '<div style="color: var(--text-muted);">No active listings</div>';
+                }
+            } catch (err) {
+                console.error('Failed to load my listings:', err);
+                document.getElementById('my-listings-loading').textContent = 'Failed to load';
+            }
+        }
+
+        async function loadMyBundles() {
+            try {
+                const res = await fetch('/api/my-bundles', { credentials: 'include' });
+                const data = await res.json();
+
+                document.getElementById('my-bundles-loading').style.display = 'none';
+
+                if (data.ok && data.bundles && data.bundles.length > 0) {
+                    document.getElementById('my-bundles-list').innerHTML = data.bundles.map(b => {
+                        const nftCount = Array.isArray(b.nft_ids) ? b.nft_ids.length : 0;
+                        return `
+                            <div class="moment-checkbox">
+                                <div class="info">
+                                    <strong>📦 ${b.title}</strong>
+                                    <span style="color: var(--text-muted);">${nftCount} moments</span>
+                                </div>
+                                <span style="color: var(--accent1); font-weight: 700;">$${parseFloat(b.price_usd).toFixed(2)}</span>
+                                <button class="btn btn-secondary" onclick="cancelBundle(${b.id})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Cancel</button>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    document.getElementById('my-bundles-list').innerHTML = '<div style="color: var(--text-muted);">No active bundles</div>';
+                }
+            } catch (err) {
+                console.error('Failed to load my bundles:', err);
+                document.getElementById('my-bundles-loading').textContent = 'Failed to load';
+            }
+        }
+
+        async function cancelListing(id) {
+            if (!confirm('Cancel this listing?')) return;
+            try {
+                const res = await fetch(`/api/listings/${id}`, { method: 'DELETE', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) {
+                    loadMyListings();
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to cancel listing');
+                }
+            } catch (err) {
+                console.error('Cancel listing error:', err);
+                alert('Failed to cancel');
+            }
+        }
+
+        async function cancelBundle(id) {
+            if (!confirm('Cancel this bundle?')) return;
+            try {
+                const res = await fetch(`/api/bundles/${id}`, { method: 'DELETE', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) {
+                    loadMyBundles();
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to cancel bundle');
+                }
+            } catch (err) {
+                console.error('Cancel bundle error:', err);
+                alert('Failed to cancel');
+            }
+        }
+
+        async function buyListing(id) {
+            if (!confirm('Buy this listing?')) return;
+            try {
+                const res = await fetch(`/api/listings/${id}/buy`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    alert(data.message || 'Purchase recorded!');
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to purchase');
+                }
+            } catch (err) {
+                console.error('Buy listing error:', err);
+                alert('Failed to purchase');
+            }
+        }
+
+        async function buyBundle(id) {
+            if (!confirm('Buy this bundle?')) return;
+            try {
+                const res = await fetch(`/api/bundles/${id}/buy`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    alert(data.message || 'Purchase recorded!');
+                    loadMarketplace();
+                } else {
+                    alert(data.error || 'Failed to purchase');
+                }
+            } catch (err) {
+                console.error('Buy bundle error:', err);
+                alert('Failed to purchase');
+            }
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+
+</html>
