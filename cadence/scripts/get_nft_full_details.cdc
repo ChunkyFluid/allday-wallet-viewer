@@ -53,12 +53,21 @@ access(all) fun main(address: Address, nftId: UInt64): NFTDetails? {
     let account = getAccount(address)
     
     // In Cadence 1.0+, use capabilities.get<Type>(path)
-    let collectionRef = account.capabilities.get<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(AllDay.CollectionPublicPath)
-        .borrow()
-        ?? return nil
+    let collectionCap = account.capabilities.get<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(AllDay.CollectionPublicPath)
     
-    let nft = collectionRef.borrowNFT(id: nftId)
-        ?? return nil
+    if !collectionCap.check() {
+        return nil
+    }
+    
+    let collectionRef = collectionCap.borrow()!
+    
+    // Check if the NFT exists in the collection
+    let nftIdList = collectionRef.getIDs()
+    if !nftIdList.contains(nftId) {
+        return nil
+    }
+    
+    let nft = collectionRef.borrowNFT(nftId)
     
     let resolver = nft as! &{MetadataViews.Resolver}
     
