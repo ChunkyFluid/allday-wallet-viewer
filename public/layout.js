@@ -29,7 +29,8 @@
           <a href="/serial-finder.html" class="${path === '/serial-finder.html' ? 'active' : ''}">🏆 Serials</a>
           <a href="/wallet-compare.html" class="${path === '/wallet-compare.html' ? 'active' : ''}">⚖️ Compare</a>
           <a href="/rarity-score.html" class="${path === '/rarity-score.html' ? 'active' : ''}">📈 Rarity</a>
-          <a href="/trades.html" class="${path === '/trades.html' ? 'active nav-hot' : 'nav-hot'}">🔄 Trading</a>
+          <!-- Trading hidden for now - access directly at /trades.html -->
+          <!-- <a href="/trades.html" class="${path === '/trades.html' ? 'active nav-hot' : 'nav-hot'}">🔄 Trading</a> -->
           <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
           <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>
@@ -58,30 +59,30 @@
 
             if (data && data.ok && data.user && data.user.default_wallet_address) {
                 link.href = "/login.html";
-                
+
                 // Fetch display name from wallet_profiles (same way wallet page does it)
                 const wallet = data.user.default_wallet_address.toLowerCase();
                 try {
                     const profileRes = await fetch(`/api/wallet-profile?wallet=${encodeURIComponent(wallet)}`);
                     const profileData = await profileRes.json();
-                    
+
                     if (profileData && profileData.ok && profileData.profile && profileData.profile.display_name) {
                         link.textContent = profileData.profile.display_name;
                     } else {
                         // Fallback to shortened wallet address
                         const walletAddr = wallet.replace(/^(flow|dapper):/, "");
-                        link.textContent = walletAddr.length > 10 
+                        link.textContent = walletAddr.length > 10
                             ? walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4)
                             : walletAddr;
                     }
                 } catch (profileErr) {
                     // Fallback to shortened wallet address if profile fetch fails
                     const walletAddr = wallet.replace(/^(flow|dapper):/, "");
-                    link.textContent = walletAddr.length > 10 
+                    link.textContent = walletAddr.length > 10
                         ? walletAddr.slice(0, 6) + "..." + walletAddr.slice(-4)
                         : walletAddr;
                 }
-                
+
                 link.title = `Logged in · Wallet: ${wallet}`;
             } else {
                 link.href = "/login.html";
@@ -97,14 +98,14 @@
     function initMobileMenu() {
         const toggle = document.getElementById("menu-toggle");
         const nav = document.getElementById("main-nav");
-        
+
         if (!toggle || !nav) return;
 
         toggle.addEventListener("click", () => {
             const isOpen = nav.classList.toggle("open");
             toggle.textContent = isOpen ? "✕" : "☰";
             toggle.setAttribute("aria-expanded", isOpen);
-            
+
             // Prevent body scroll when menu is open
             document.body.style.overflow = isOpen ? "hidden" : "";
         });

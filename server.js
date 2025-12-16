@@ -11064,7 +11064,7 @@ app.post("/api/trades/:id/complete", async (req, res) => {
 
 // ================== ADMIN ANALYTICS API ==================
 
-// POST /api/trades/:id/execute - Complete a trade (mark as executed)
+// POST /api/trades/:id/execute - Execute trade (transfer NFTs on-chain)
 app.post("/api/trades/:id/execute", async (req, res) => {
   try {
     const user = req.session?.user;
@@ -11074,6 +11074,7 @@ app.post("/api/trades/:id/execute", async (req, res) => {
 
     const wallet = user.default_wallet_address?.toLowerCase();
     const tradeId = parseInt(req.params.id);
+    const { txIds } = req.body; // Array of transaction IDs from on-chain transfers
 
     if (!tradeId) {
       return res.status(400).json({ ok: false, error: "Invalid trade ID" });
@@ -11096,25 +11097,56 @@ app.post("/api/trades/:id/execute", async (req, res) => {
       return res.status(403).json({ ok: false, error: "Not authorized for this trade" });
     }
 
-    // Trade must be in 'ready' status to execute
-    if (trade.status !== 'ready') {
+    // Trade must be in 'ready' or 'executing' status
+    if (trade.status !== 'ready' && trade.status !== 'executing') {
       return res.status(400).json({ ok: false, error: `Trade must be ready to execute (current status: ${trade.status})` });
     }
 
-    // Mark trade as completed
-    const { rows: updated } = await pool.query(`
-      UPDATE trades 
-      SET status = 'completed', updated_at = NOW()
-      WHERE id = $1
-      RETURNING *
-    `, [tradeId]);
+    // Update the appropriate party's execution status
+    const txIdStr = Array.isArray(txIds) ? txIds.join(',') : (txIds || null);
 
-    console.log(`[Trade] Trade #${tradeId} executed/completed by ${wallet?.substring(0, 8)}...`);
+    let updateQuery;
+    if (isInitiator) {
+      updateQuery = `
+        UPDATE trades 
+        SET initiator_executed = TRUE, 
+            initiator_tx_id = $2,
+            status = CASE WHEN target_executed = TRUE THEN 'completed' ELSE 'executing' END,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+    } else {
+      updateQuery = `
+        UPDATE trades 
+        SET target_executed = TRUE, 
+            target_tx_id = $2,
+            status = CASE WHEN initiator_executed = TRUE THEN 'completed' ELSE 'executing' END,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `;
+    }
+
+    const { rows: updated } = await pool.query(updateQuery, [tradeId, txIdStr]);
+    const updatedTrade = updated[0];
+
+    const partyLabel = isInitiator ? 'initiator' : 'target';
+    console.log(`[Trade] Trade #${tradeId} ${partyLabel} executed by ${wallet?.substring(0, 8)}... (txIds: ${txIdStr || 'none'})`);
+
+    // Get partner info for response
+    const partnerWallet = isInitiator ? trade.target_wallet : trade.initiator_wallet;
+    const partnerExecuted = isInitiator ? updatedTrade.target_executed : updatedTrade.initiator_executed;
 
     return res.json({
       ok: true,
-      trade: updated[0],
-      message: "Trade executed successfully! Both parties should now transfer their moments."
+      trade: updatedTrade,
+      yourExecuted: true,
+      partnerExecuted,
+      completed: updatedTrade.status === 'completed',
+      message: updatedTrade.status === 'completed'
+        ? "🎉 Trade completed! Both parties have executed their transfers."
+        : `Your transfers complete! Waiting for ${partnerWallet?.substring(0, 10)}... to execute their side.`
     });
   } catch (err) {
     console.error("POST /api/trades/:id/execute error:", err);

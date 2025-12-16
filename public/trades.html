@@ -9,7 +9,24 @@
     <link rel="stylesheet" href="header.css" />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet" />
-    <script src="/js/fcl-loader.js"></script>
+    <!-- FCL Bundle (same as login page) -->
+    <script src="/js/fcl-bundle.js"></script>
+    <script>
+        // Configure FCL after bundle loads
+        (function () {
+            const checkFCL = setInterval(() => {
+                if (window.fcl && typeof window.fcl.config === 'function') {
+                    clearInterval(checkFCL);
+                    window.fcl.config()
+                        .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                        .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                        .put("app.detail.title", "Chunky's NFLAD Viewer");
+                    console.log('✅ FCL configured for trades page');
+                }
+            }, 100);
+            setTimeout(() => clearInterval(checkFCL), 5000);
+        })();
+    </script>
     <script src="/js/hybrid-custody.js"></script>
     <style>
         :root {
@@ -1155,6 +1172,16 @@
                 } else if (trade.status === 'ready') {
                     // Both parties signed - ready to execute
                     actions = `<button class="btn btn-primary" onclick="executeTrade(${trade.id})" style="background: linear-gradient(135deg, #a855f7, #3b82f6);">⚡ Execute Trade</button>`;
+                } else if (trade.status === 'executing') {
+                    // One party has executed, waiting for the other
+                    const myExecuted = isInitiator ? trade.initiator_executed : trade.target_executed;
+                    if (myExecuted) {
+                        actions = `<span style="color: var(--accent1);">✅ You executed - waiting for partner</span>`;
+                    } else {
+                        actions = `<button class="btn btn-primary" onclick="executeTrade(${trade.id})" style="background: linear-gradient(135deg, #a855f7, #3b82f6);">⚡ Execute Your Side</button>`;
+                    }
+                } else if (trade.status === 'completed') {
+                    actions = `<span style="color: var(--accent1);">🎉 Completed</span>`;
                 }
 
                 return `
@@ -1215,20 +1242,277 @@
             } catch (err) { alert('Failed to sign'); }
         }
 
-        async function executeTrade(tradeId) {
-            if (!confirm('Execute this trade? This action cannot be undone.')) return;
+        // Performs the actual on-chain transfer after wallet is connected
+        async function performTradeTransfer(tradeId, trade, isInitiator, myNftIds, partnerChildWallet, fcl) {
+            // Determine recipient address
+            const recipientAddress = partnerChildWallet || (isInitiator ? trade.target_wallet : trade.initiator_wallet);
+
+            if (!confirm(`You are about to transfer ${myNftIds.length} NFT(s) on-chain to ${recipientAddress.substring(0, 10)}... This cannot be undone. Continue?`)) {
+                return;
+            }
+
+            // Show status modal
+            const statusModal = document.createElement('div');
+            statusModal.id = 'trade-status-modal';
+            statusModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            statusModal.innerHTML = `
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:400px;text-align:center;">
+                    <div style="font-size:2rem;margin-bottom:1rem;">⏳</div>
+                    <h3 style="margin:0 0 1rem 0;">Executing Trade</h3>
+                    <p id="trade-status-text" style="color:var(--text-muted);margin:0;">Preparing transfer...</p>
+                </div>
+            `;
+            document.body.appendChild(statusModal);
+
+            const updateStatus = (text) => {
+                const el = document.getElementById('trade-status-text');
+                if (el) el.textContent = text;
+            };
+
             try {
-                const res = await fetch(`/api/trades/${tradeId}/execute`, { method: 'POST', credentials: 'include' });
-                const data = await res.json();
-                if (data.ok) {
-                    alert('🎉 Trade executed successfully!');
+                // Execute on-chain transfers using HybridCustody
+                const result = await HybridCustody.executeTradeSwap({
+                    nftIds: myNftIds,
+                    recipientAddress
+                }, updateStatus);
+
+                if (!result.success) {
+                    throw new Error(result.message || 'Transfer failed');
+                }
+
+                updateStatus('Recording to server...');
+
+                // Report to server
+                const serverRes = await fetch(`/api/trades/${tradeId}/execute`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ txIds: result.txIds })
+                });
+                const serverData = await serverRes.json();
+
+                statusModal.remove();
+
+                if (serverData.ok) {
+                    alert(serverData.message || '🎉 Your side executed successfully!');
                     loadTrades();
                 } else {
-                    alert(data.error || 'Failed to execute trade');
+                    alert('Transfers succeeded but failed to update server: ' + serverData.error);
                 }
             } catch (err) {
+                statusModal.remove();
                 console.error('Execute trade error:', err);
-                alert('Failed to execute trade');
+                alert('Trade execution failed: ' + err.message);
+            }
+        }
+
+        async function executeTrade(tradeId) {
+            // First, get trade details
+            let trade;
+            try {
+                const res = await fetch(`/api/trades/${tradeId}`, { credentials: 'include' });
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error);
+                trade = data.trade;
+            } catch (err) {
+                alert('Failed to get trade details: ' + err.message);
+                return;
+            }
+
+            // Determine what NFTs this user needs to transfer
+            const isInitiator = trade.initiator_wallet === userWallet.toLowerCase();
+            const myNftIds = isInitiator ? (trade.initiator_nft_ids || []) : (trade.target_nft_ids || []);
+            const partnerChildWallet = isInitiator ? trade.target_child_wallet : trade.initiator_child_wallet;
+
+            // If user has NFTs to transfer, we need their Flow wallet
+            if (myNftIds.length > 0) {
+                // Wait for FCL to load
+                if (typeof window.fcl === 'undefined') {
+                    const loadingEl = document.createElement('div');
+                    loadingEl.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+                    loadingEl.innerHTML = '<div style="color:white;text-align:center;"><div style="font-size:2rem;">⏳</div><div>Loading wallet integration...</div></div>';
+                    document.body.appendChild(loadingEl);
+                    for (let i = 0; i < 50 && typeof window.fcl === 'undefined'; i++) {
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                    loadingEl.remove();
+                    if (typeof window.fcl === 'undefined') {
+                        alert('Flow wallet integration failed to load.');
+                        return;
+                    }
+                }
+
+                // Extract FCL from ES module wrapper
+                let fclModule = window.fcl;
+                let fcl = fclModule;
+                if (fclModule && fclModule.__esModule) {
+                    fcl = fclModule.fcl || fclModule.default || fclModule;
+                } else if (fclModule && (fclModule.fcl || fclModule.default)) {
+                    fcl = fclModule.fcl || fclModule.default;
+                }
+
+                if (!fcl || typeof fcl.config !== 'function') {
+                    alert('FCL not properly loaded. Please refresh.');
+                    return;
+                }
+
+                // Configure FCL
+                fcl.config()
+                    .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                    .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                    .put("discovery.authn.endpoint", "https://fcl-discovery.onflow.org/api/authn")
+                    .put("app.detail.title", "Chunky's NFLAD Viewer");
+
+                // For Hybrid Custody trades, we ALWAYS need the user to connect with their
+                // parent wallet (not Dapper). Even if they have a cached session, it might
+                // be with the wrong wallet. Always prompt fresh.
+
+                // First, log out any existing FCL session
+                try {
+                    await fcl.unauthenticate();
+                    console.log('Cleared previous FCL session');
+                } catch (e) {
+                    console.log('No previous session to clear');
+                }
+
+                // Always show connect dialog to ensure user connects with parent wallet
+
+                // Show connect dialog - will authenticate via FCL
+                const connectDialog = document.createElement('div');
+                connectDialog.id = 'fcl-connect-dialog';
+                connectDialog.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+                connectDialog.innerHTML = `
+                    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:450px;text-align:center;">
+                        <div style="font-size:2rem;margin-bottom:1rem;">🔗</div>
+                        <h3 style="margin:0 0 1rem 0;">Connect Parent Wallet</h3>
+                        <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:1rem;margin-bottom:1rem;text-align:left;">
+                            <p style="color:var(--text);margin:0 0 0.5rem 0;font-size:0.85rem;"><strong>⚠️ Important:</strong> In Flow Wallet, select the account that has Dapper <em>linked below it</em> (shows 🔗 icon).</p>
+                            <p style="color:var(--text-muted);margin:0;font-size:0.8rem;">Example: Select "Lemon" (your parent), NOT "Dapper Wallet"</p>
+                        </div>
+                        <button id="btn-fcl-connect" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;padding:0.75rem 1.5rem;border-radius:8px;font-weight:600;cursor:pointer;width:100%;margin-bottom:0.5rem;">Connect Flow Wallet</button>
+                        <button id="btn-fcl-cancel" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:0.5rem 1rem;border-radius:8px;cursor:pointer;width:100%;">Cancel</button>
+                        <p id="fcl-connect-status" style="color:var(--text-muted);margin-top:1rem;font-size:0.85rem;"></p>
+                    </div>
+                `;
+                document.body.appendChild(connectDialog);
+
+                // Handle connect button
+                document.getElementById('btn-fcl-connect').addEventListener('click', async () => {
+                    const statusEl = document.getElementById('fcl-connect-status');
+                    statusEl.textContent = 'Opening wallet...';
+                    try {
+                        // Extract actual FCL from ES module wrapper (same as login page)
+                        let fclModule = window.fcl;
+                        let fcl = fclModule;
+                        if (fclModule && fclModule.__esModule) {
+                            fcl = fclModule.fcl || fclModule.default || fclModule;
+                        } else if (fclModule && (fclModule.fcl || fclModule.default)) {
+                            fcl = fclModule.fcl || fclModule.default;
+                        }
+
+                        if (!fcl || typeof fcl.config !== 'function') {
+                            statusEl.textContent = 'FCL not properly loaded';
+                            console.error('FCL config not found. window.fcl:', window.fcl);
+                            return;
+                        }
+
+                        // Configure FCL for parent Flow wallet (NOT Dapper)
+                        // For Hybrid Custody, we need to auth with the PARENT wallet
+                        // that has Dapper linked as a child account
+                        fcl.config()
+                            .put("accessNode.api", "https://rest-mainnet.onflow.org")
+                            .put("discovery.wallet", "https://fcl-discovery.onflow.org/authn")
+                            .put("discovery.authn.endpoint", "https://fcl-discovery.onflow.org/api/authn")
+                            .put("discovery.authn.exclude", ["dapper-wallet"])
+                            .put("app.detail.title", "Chunky's NFLAD Viewer");
+
+                        // IMPORTANT: Clear any cached FCL session first
+                        // This ensures user is prompted to connect fresh with parent wallet
+                        statusEl.textContent = 'Clearing previous session...';
+                        try {
+                            await fcl.unauthenticate();
+                        } catch (e) {
+                            console.log('No previous session to clear');
+                        }
+
+                        statusEl.textContent = 'Opening wallet picker...';
+
+                        // Authenticate fresh - user should select parent wallet
+                        let user;
+                        try {
+                            const services = await fcl.discovery.authn.snapshot();
+                            console.log('Discovery services:', services);
+
+                            const serviceList = Array.isArray(services) ? services : (services?.results || services?.services || []);
+
+                            // Find a non-Dapper wallet (Lilico, Flow Wallet, etc.)
+                            const parentWalletService = serviceList.find(s => {
+                                const p = s.provider || s;
+                                const uid = p?.uid || '';
+                                // Exclude Dapper - we want parent wallets only
+                                return uid !== 'dapper-wallet' &&
+                                    p?.address !== '0xead892083b3e2c6c' &&
+                                    (uid.includes('lilico') || uid.includes('flow') || uid.includes('blocto') || serviceList.length <= 2);
+                            });
+
+                            if (parentWalletService) {
+                                statusEl.textContent = 'Opening Flow wallet...';
+                                user = await fcl.authenticate({ service: parentWalletService });
+                            } else {
+                                statusEl.textContent = 'Opening wallet picker...';
+                                user = await fcl.authenticate();
+                            }
+                        } catch (discErr) {
+                            console.warn('Discovery error, trying direct auth:', discErr);
+                            statusEl.textContent = 'Opening wallet...';
+                            user = await fcl.authenticate();
+                        }
+                        console.log('FCL auth result:', user);
+
+                        if (user && user.addr) {
+                            connectDialog.remove();
+                            // Initialize HybridCustody with the extracted fcl
+                            if (typeof HybridCustody !== 'undefined') {
+                                HybridCustody.init(fcl);
+                            }
+
+                            // Proceed directly to transfer (don't re-call executeTrade or we loop!)
+                            await performTradeTransfer(tradeId, trade, isInitiator, myNftIds, partnerChildWallet, fcl);
+                        } else {
+                            statusEl.textContent = 'Connection cancelled';
+                        }
+                    } catch (err) {
+                        console.error('FCL auth error:', err);
+                        statusEl.textContent = 'Failed: ' + err.message;
+                    }
+                });
+
+                document.getElementById('btn-fcl-cancel').addEventListener('click', () => {
+                    connectDialog.remove();
+                });
+
+                return; // Wait for user to connect via dialog
+            } else {
+                // No NFTs to transfer, just mark as executed
+                if (!confirm('You have no NFTs to send in this trade. Mark your side as complete?')) return;
+
+                try {
+                    const res = await fetch(`/api/trades/${tradeId}/execute`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ txIds: [] })
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        alert(data.message || 'Marked as complete!');
+                        loadTrades();
+                    } else {
+                        alert(data.error || 'Failed');
+                    }
+                } catch (err) {
+                    alert('Failed to execute');
+                }
             }
         }
 
