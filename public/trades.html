@@ -864,43 +864,76 @@
         // Load your moments
         async function loadYourMoments() {
             if (!userWallet) return;
+            console.log('[Trade] Loading moments for wallet:', userWallet);
             try {
-                let res = await fetch(`/api/query?wallet=${userWallet}&source=blockchain`);
+                // First try without refresh
+                let res = await fetch(`/api/query?wallet=${userWallet}`);
                 let data = await res.json();
-                if (!data.ok || (data.rows && data.rows.length === 0)) {
+                console.log('[Trade] Initial load result:', data.ok, 'rows:', data.rows?.length || 0);
+
+                // If no results, try with refresh
+                if (!data.ok || !data.rows || data.rows.length === 0) {
+                    console.log('[Trade] No results, trying refresh...');
                     res = await fetch(`/api/query?wallet=${userWallet}&refresh=1`);
                     data = await res.json();
+                    console.log('[Trade] Refresh result:', data.ok, 'rows:', data.rows?.length || 0);
                 }
-                if (data.ok) {
-                    yourMoments = data.rows || [];
+
+                if (data.ok && data.rows) {
+                    yourMoments = data.rows;
+                    console.log('[Trade] Loaded', yourMoments.length, 'moments for your wallet');
                     setFilters('your', yourMoments);
+
+                    // Show moment count in UI
+                    const searchInput = document.getElementById('your-search');
+                    if (searchInput) {
+                        searchInput.placeholder = `Search ${yourMoments.length} moments...`;
+                    }
+                } else {
+                    console.warn('[Trade] Failed to load moments:', data.error);
                 }
-            } catch (err) { console.error('Failed to load your moments:', err); }
+            } catch (err) {
+                console.error('Failed to load your moments:', err);
+            }
         }
 
         // Load target wallet
         async function loadTargetWallet(wallet) {
             if (!wallet || !wallet.startsWith('0x')) return;
-            if (wallet === userWallet) { alert('Cannot trade with yourself'); return; }
+            if (wallet.toLowerCase() === userWallet?.toLowerCase()) {
+                alert('Cannot trade with yourself');
+                return;
+            }
 
+            console.log('[Trade] Loading target wallet:', wallet);
             try {
                 document.getElementById('their-search').disabled = true;
                 document.getElementById('their-search').placeholder = 'Loading wallet...';
 
-                let res = await fetch(`/api/query?wallet=${wallet}&source=blockchain`);
+                // First try without refresh
+                let res = await fetch(`/api/query?wallet=${wallet}`);
                 let data = await res.json();
-                if (!data.ok || (data.rows && data.rows.length === 0)) {
+                console.log('[Trade] Target wallet initial result:', data.ok, 'rows:', data.rows?.length || 0);
+
+                // If no results, try with refresh
+                if (!data.ok || !data.rows || data.rows.length === 0) {
+                    console.log('[Trade] No results for target, trying refresh...');
                     res = await fetch(`/api/query?wallet=${wallet}&refresh=1`);
                     data = await res.json();
+                    console.log('[Trade] Target refresh result:', data.ok, 'rows:', data.rows?.length || 0);
                 }
 
-                if (data.ok) {
-                    theirMoments = data.rows || [];
+                if (data.ok && data.rows) {
+                    theirMoments = data.rows;
+                    console.log('[Trade] Loaded', theirMoments.length, 'moments for target wallet');
                     setFilters('their', theirMoments);
                     document.getElementById('their-search').disabled = false;
                     document.getElementById('their-tier-filter').disabled = false;
                     document.getElementById('their-series-filter').disabled = false;
                     document.getElementById('their-search').placeholder = `Search ${theirMoments.length} moments...`;
+                } else {
+                    console.warn('[Trade] Failed to load target wallet:', data.error);
+                    document.getElementById('their-search').placeholder = 'No moments found';
                 }
             } catch (err) {
                 console.error('Failed to load wallet:', err);
@@ -1119,6 +1152,9 @@
                     actions = `<button class="btn btn-secondary" onclick="rejectTrade(${trade.id})">Cancel</button>`;
                 } else if (trade.status === 'accepted') {
                     actions = `<button class="btn btn-primary" onclick="signTrade(${trade.id})">🔐 Sign</button>`;
+                } else if (trade.status === 'ready') {
+                    // Both parties signed - ready to execute
+                    actions = `<button class="btn btn-primary" onclick="executeTrade(${trade.id})" style="background: linear-gradient(135deg, #a855f7, #3b82f6);">⚡ Execute Trade</button>`;
                 }
 
                 return `
@@ -1177,6 +1213,23 @@
                 if (data.ok) { alert('Signed!'); loadTrades(); }
                 else alert(data.error || 'Failed to sign');
             } catch (err) { alert('Failed to sign'); }
+        }
+
+        async function executeTrade(tradeId) {
+            if (!confirm('Execute this trade? This action cannot be undone.')) return;
+            try {
+                const res = await fetch(`/api/trades/${tradeId}/execute`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (data.ok) {
+                    alert('🎉 Trade executed successfully!');
+                    loadTrades();
+                } else {
+                    alert(data.error || 'Failed to execute trade');
+                }
+            } catch (err) {
+                console.error('Execute trade error:', err);
+                alert('Failed to execute trade');
+            }
         }
 
         // Marketplace

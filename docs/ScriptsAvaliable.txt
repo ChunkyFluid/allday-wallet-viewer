@@ -1,0 +1,41 @@
+### master_sync.js --Master orchestrator that runs all data syncs in optimal order
+
+| Flag | Description |
+|------|-------------|
+| `--full` | Force full refresh (ignores incremental sync) |
+| `--metadata-only` | Only sync NFT metadata |
+| `--holdings-only` | Only sync wallet holdings (cheaper) |
+| `--prices-only` | Only sync prices |
+| `--wallet=ADDRESS` | Sync a single wallet from blockchain |
+| `--refresh-usernames` | Re-fetch usernames for wallets with NULL names |
+
+
+node scripts/master_sync.js
+node scripts/master_sync.js --holdings-only
+node scripts/master_sync.js --wallet=0x07943321994c72c6
+
+run_master_sync.ps1 --- PowerShell wrapper for master_sync.js with logging. Creates timestamped logs in `logs/` directory.
+setup_scheduled_task.ps1 --- Creates Windows Task Scheduler entry for automated sync.
+sync_nft_core_metadata_from_snowflake.js --- Syncs NFT metadata (player name, tier, serial number, team, etc.) from Snowflake to PostgreSQL.
+sync_wallet_holdings_from_snowflake.js --- Syncs which wallets hold which NFTs from Snowflake.
+sync_wallet_profiles_from_dapper.js --- Fetches usernames/display names from Dapper API for wallet addresses.
+sync_wallets_from_blockchain.js --- Gets wallet data directly from Flow blockchain using Cadence scripts.
+sync_wallets_from_blockchain_only.js --- Blockchain-only version of wallet sync.
+sync_prices_from_scrape.js --- Old Playwright-based price scraper. **Deprecated** - use master_sync.js --prices-only instead.
+sync_leaderboards.js --- Syncs leaderboard/challenge data.
+setup-database.js --- Creates all required PostgreSQL tables and indexes.
+snowflake-utils.js --- Shared utilities for Snowflake connection, retries, and rate limiting. Not run directly.
+debug_wallet.js --- Debug a specific wallet's data in the database.
+background_wallet_sync.js --- Background sync for newly discovered wallets.
+build_editions_snapshot.js --- Builds edition data snapshot for caching.
+build_explorer_filters_snapshot.js --- Builds filter options for the explorer page.
+build_set_editions_snapshot.js --- Builds set/edition mapping snapshot.
+build_set_totals_snapshot.js --- Builds set completion totals snapshot.
+create_set_completion_indexes.js --- Creates database indexes for set completion queries.
+snowflake_backfill_metadata.sql --- SQL to rebuild the ALLDAY_CORE_NFT_METADATA table in Snowflake.
+snowflake_backfill_holdings.sql --- SQL to rebuild the ALLDAY_WALLET_HOLDINGS_CURRENT table in Snowflake.
+snowflake_diagnose_holdings.sql --- Diagnostic queries to troubleshoot holdings sync issues.
+fetch_unknown_nft_metadata.js --- Fetches metadata for NFTs not in the database.
+discover_findlabs_nft.js --- Discovers FindLabs NFTs on the blockchain.
+refresh-kickoffs.js --- Refreshes kickoff challenges data.
+

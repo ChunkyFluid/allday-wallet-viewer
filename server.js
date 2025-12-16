@@ -540,12 +540,124 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
     );
 
     console.log(`[Wallet Sync] ✅ Added NFT ${nftId} to wallet ${walletAddr.substring(0, 8)}...`);
+
+    // NEW: Fetch metadata for this NFT if not already in database
+    await fetchAndCacheNFTMetadata(nftId.toString());
+
   } catch (err) {
     // Don't spam logs for expected errors (e.g., duplicate key during race conditions)
     if (!err.message.includes('duplicate') && !err.message.includes('already exists')) {
       console.error(`[Wallet Sync] Error updating wallet holding for Deposit:`, err.message);
     }
   }
+}
+
+// Fetch NFT metadata on-demand and cache in nft_core_metadata table
+// Uses Snowflake for metadata lookup (most reliable source)
+async function fetchAndCacheNFTMetadata(nftId) {
+  try {
+    // Check if metadata already exists
+    const existing = await pgQuery(
+      `SELECT 1 FROM nft_core_metadata WHERE nft_id = $1`,
+      [nftId]
+    );
+
+    if (existing.rowCount > 0) {
+      return; // Already have metadata
+    }
+
+    console.log(`[Metadata Sync] Fetching metadata for new NFT ${nftId}...`);
+
+    // Try Snowflake first (most complete data)
+    try {
+      await ensureSnowflakeConnected();
+
+      const sql = `
+        SELECT
+          m.NFT_ID AS nft_id,
+          m.EDITION_ID AS edition_id,
+          m.PLAY_ID AS play_id,
+          m.SERIES_ID AS series_id,
+          m.SET_ID AS set_id,
+          m.TIER AS tier,
+          TRY_TO_NUMBER(m.SERIAL_NUMBER) AS serial_number,
+          TRY_TO_NUMBER(m.MAX_MINT_SIZE) AS max_mint_size,
+          m.FIRST_NAME AS first_name,
+          m.LAST_NAME AS last_name,
+          m.TEAM_NAME AS team_name,
+          m.POSITION AS position,
+          TRY_TO_NUMBER(m.JERSEY_NUMBER) AS jersey_number,
+          m.SERIES_NAME AS series_name,
+          m.SET_NAME AS set_name
+        FROM ALLDAY_CORE_NFT_METADATA m
+        WHERE m.NFT_ID = '${nftId}'
+        LIMIT 1
+      `;
+
+      const rows = await executeSnowflakeQuery(sql);
+
+      if (rows && rows.length > 0) {
+        const row = rows[0];
+        await pgQuery(`
+          INSERT INTO nft_core_metadata (
+            nft_id, edition_id, play_id, series_id, set_id, tier,
+            serial_number, max_mint_size, first_name, last_name,
+            team_name, position, jersey_number, series_name, set_name
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          ON CONFLICT (nft_id) DO UPDATE SET
+            edition_id = EXCLUDED.edition_id,
+            tier = EXCLUDED.tier,
+            serial_number = EXCLUDED.serial_number,
+            max_mint_size = EXCLUDED.max_mint_size,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            team_name = EXCLUDED.team_name,
+            series_name = EXCLUDED.series_name,
+            set_name = EXCLUDED.set_name
+        `, [
+          nftId,
+          row.EDITION_ID || row.edition_id,
+          row.PLAY_ID || row.play_id,
+          row.SERIES_ID || row.series_id,
+          row.SET_ID || row.set_id,
+          row.TIER || row.tier,
+          row.SERIAL_NUMBER || row.serial_number,
+          row.MAX_MINT_SIZE || row.max_mint_size,
+          row.FIRST_NAME || row.first_name,
+          row.LAST_NAME || row.last_name,
+          row.TEAM_NAME || row.team_name,
+          row.POSITION || row.position,
+          row.JERSEY_NUMBER || row.jersey_number,
+          row.SERIES_NAME || row.series_name,
+          row.SET_NAME || row.set_name
+        ]);
+
+        console.log(`[Metadata Sync] ✅ Cached metadata for NFT ${nftId} (${row.FIRST_NAME || row.first_name} ${row.LAST_NAME || row.last_name})`);
+      } else {
+        console.log(`[Metadata Sync] ⚠️ No metadata found for NFT ${nftId} in Snowflake (may be very new)`);
+      }
+    } catch (sfErr) {
+      console.warn(`[Metadata Sync] Snowflake query failed for NFT ${nftId}:`, sfErr.message);
+    }
+  } catch (err) {
+    console.error(`[Metadata Sync] Error fetching metadata for NFT ${nftId}:`, err.message);
+  }
+}
+
+// Helper to execute Snowflake queries (used for on-demand metadata fetch)
+async function executeSnowflakeQuery(sql) {
+  return new Promise((resolve, reject) => {
+    connection.execute({
+      sqlText: sql,
+      complete: (err, stmt, rows) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(rows || []);
+        }
+      }
+    });
+  });
 }
 
 // Remove wallet holding when we see Withdraw events
@@ -691,6 +803,30 @@ app.post("/api/wallet/refresh", async (req, res) => {
 
     console.log(`[Wallet Refresh] ✅ Updated wallet ${walletAddr.substring(0, 8)}... - Added: ${added}, Removed: ${removed}, Total: ${newNftIds.size}`);
 
+    // NEW: Fetch missing metadata for all NFTs in wallet
+    const nftIdsArray = Array.from(newNftIds);
+    let metadataFetched = 0;
+
+    // Check which NFTs are missing metadata
+    const metadataCheck = await pgQuery(
+      `SELECT nft_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+      [nftIdsArray]
+    );
+    const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
+    const missingMetadata = nftIdsArray.filter(id => !existingMetadata.has(id));
+
+    if (missingMetadata.length > 0) {
+      console.log(`[Wallet Refresh] Fetching metadata for ${missingMetadata.length} NFTs missing metadata...`);
+
+      // Fetch in parallel but limit concurrency
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < missingMetadata.length; i += BATCH_SIZE) {
+        const batch = missingMetadata.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(nftId => fetchAndCacheNFTMetadata(nftId)));
+        metadataFetched += batch.length;
+      }
+    }
+
     return res.json({
       ok: true,
       wallet: walletAddr,
@@ -698,6 +834,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
       added,
       removed,
       current: newNftIds.size,
+      metadataFetched,
       details: {
         addedNftIds: toAdd,
         removedNftIds: toRemove
@@ -2283,6 +2420,27 @@ app.get("/api/query", async (req, res) => {
 
           if (toAdd.length > 0 || toRemove.length > 0) {
             console.log(`[Wallet Query] ✅ Refreshed wallet ${wallet.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length}`);
+          }
+
+          // NEW: Fetch missing metadata for NFTs we just added
+          if (nftIds.length > 0) {
+            const nftIdStrings = nftIds.map(id => id.toString());
+            const metadataCheck = await pgQuery(
+              `SELECT nft_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+              [nftIdStrings]
+            );
+            const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
+            const missingMetadata = nftIdStrings.filter(id => !existingMetadata.has(id));
+
+            if (missingMetadata.length > 0) {
+              console.log(`[Wallet Query] Fetching metadata for ${missingMetadata.length} NFTs...`);
+              // Fetch in parallel but limit concurrency
+              const BATCH_SIZE = 5;
+              for (let i = 0; i < missingMetadata.length; i += BATCH_SIZE) {
+                const batch = missingMetadata.slice(i, i + BATCH_SIZE);
+                await Promise.all(batch.map(nftId => fetchAndCacheNFTMetadata(nftId)));
+              }
+            }
           }
         }
       } catch (refreshErr) {
@@ -4725,7 +4883,7 @@ async function ensureSniperListingsTable() {
       } catch (err) {
         // Ignore "column already exists" errors
         if (!err.message.includes('already exists') && !err.message.includes('duplicate')) {
-          console.error(`[Sniper] Error adding column:`, err.message);
+          sniperError(`[Sniper] Error adding column:`, err.message);
         }
       }
     }
@@ -4752,9 +4910,9 @@ async function ensureSniperListingsTable() {
       WHERE listed_at IS NULL
     `).catch(() => { }); // Ignore errors
 
-    console.log("[Sniper] Database table and columns verified");
+    sniperLog("[Sniper] Database table and columns verified");
   } catch (err) {
-    console.error("[Sniper] Error ensuring sniper_listings table:", err.message);
+    sniperError("[Sniper] Error ensuring sniper_listings table:", err.message);
   }
 }
 
@@ -4790,7 +4948,7 @@ async function persistSniperListing(listing) {
   } catch (err) {
     // Don't spam logs for persistence errors - it's not critical for functionality
     if (err.message && !err.message.includes('duplicate') && !err.message.includes('already exists')) {
-      console.error("[Sniper] Error persisting listing:", err.message);
+      sniperError("[Sniper] Error persisting listing:", err.message);
     }
   }
 }
@@ -4835,8 +4993,8 @@ async function addSniperListing(listing) {
   // Persist to database (fire and forget)
   persistSniperListing(listing).catch(() => { }); // Ignore errors
 
-  // Log deals (below floor)
-  if (listing.dealPercent > 0 && !listing.isSold && !listing.isUnlisted) {
+  // Log deals (below floor) - only if sniper logging enabled
+  if (SNIPER_LOGGING_ENABLED && listing.dealPercent > 0 && !listing.isSold && !listing.isUnlisted) {
     console.log(`[SNIPER] 🎯 DEAL: ${listing.playerName} #${listing.serialNumber || '?'} - $${listing.listingPrice} (floor $${listing.floor}) - ${listing.dealPercent.toFixed(1)}% off!`);
   }
 }
@@ -4907,7 +5065,7 @@ async function resetAllListingsToUnsold() {
        WHERE is_sold = TRUE`
     );
 
-    console.log(`[Sniper] ✅ Reset ${result.rowCount || 0} listings to unsold in database`);
+    sniperLog(`[Sniper] ✅ Reset ${result.rowCount || 0} listings to unsold in database`);
 
     // Clear in-memory soldNfts
     soldNfts.clear();
@@ -4924,7 +5082,7 @@ async function resetAllListingsToUnsold() {
       }
     }
 
-    console.log(`[Sniper] ✅ Reset ${resetCount} listings to unsold in memory`);
+    sniperLog(`[Sniper] ✅ Reset ${resetCount} listings to unsold in memory`);
 
     return {
       databaseReset: result.rowCount || 0,
@@ -5070,11 +5228,11 @@ async function processListingEvent(event) {
     // IMPORTANT: A new ListingAvailable event means this NFT is being (re)listed
     // Clear any old sold/unlisted status - this is a FRESH listing
     if (soldNfts.has(nftId)) {
-      console.log(`[Sniper] 🔄 NFT ${nftId} was previously sold, now relisted - clearing sold status`);
+      sniperLog(`[Sniper] 🔄 NFT ${nftId} was previously sold, now relisted - clearing sold status`);
       soldNfts.delete(nftId);
     }
     if (unlistedNfts.has(nftId)) {
-      console.log(`[Sniper] 🔄 NFT ${nftId} was previously unlisted, now relisted - clearing unlisted status`);
+      sniperLog(`[Sniper] 🔄 NFT ${nftId} was previously unlisted, now relisted - clearing unlisted status`);
       unlistedNfts.delete(nftId);
     }
 
@@ -5146,7 +5304,7 @@ async function watchForListings() {
             signal: AbortSignal.timeout(5000) // 5 second timeout
           });
           if (!heightRes.ok) {
-            console.error(`[Sniper] Failed to get block height from Flow REST API: ${heightRes.status} ${heightRes.statusText}`);
+            sniperError(`[Sniper] Failed to get block height from Flow REST API: ${heightRes.status} ${heightRes.statusText}`);
             return;
           }
           const heightData = await heightRes.json();
@@ -5156,26 +5314,26 @@ async function watchForListings() {
             // Successfully got from Flow REST API fallback
           }
         } catch (err) {
-          console.error(`[Sniper] Error fetching block height from Flow REST API:`, err.message);
+          sniperError(`[Sniper] Error fetching block height from Flow REST API:`, err.message);
           return;
         }
       }
 
       if (!currentBlock || currentBlock <= 0) {
-        console.error(`[Sniper] Invalid block height after all attempts: ${currentBlock}`);
+        sniperError(`[Sniper] Invalid block height after all attempts: ${currentBlock}`);
         return;
       }
 
       if (lastCheckedBlock === 0) {
         // Start from 100 blocks ago to catch any recent listings
         lastCheckedBlock = Math.max(0, currentBlock - 100);
-        console.log(`[Sniper] 🔴 Starting watcher from block ${lastCheckedBlock} (current: ${currentBlock})`);
+        sniperLog(`[Sniper] 🔴 Starting watcher from block ${lastCheckedBlock} (current: ${currentBlock})`);
       }
 
       if (currentBlock <= lastCheckedBlock) {
         // No new blocks, but log occasionally to show it's alive
         if (Date.now() % 30000 < 3000) { // Every ~30 seconds
-          console.log(`[Sniper] ⏳ Waiting for new blocks... (checked: ${lastCheckedBlock}, latest: ${currentBlock})`);
+          sniperLog(`[Sniper] ⏳ Waiting for new blocks... (checked: ${lastCheckedBlock}, latest: ${currentBlock})`);
         }
         return;
       }
@@ -5190,25 +5348,25 @@ async function watchForListings() {
       let listingRes, completedRes, removedRes;
 
       // Query NFTStorefront events (V1 - NFL All Day marketplace)
-      console.log(`[Sniper] 🔍 Querying ${STOREFRONT_CONTRACT} events for blocks ${startHeight}-${endHeight}`);
+      sniperLog(`[Sniper] 🔍 Querying ${STOREFRONT_CONTRACT} events for blocks ${startHeight}-${endHeight}`);
       try {
         listingRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingAvailable&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
-        console.error(`[Sniper] Error fetching ListingAvailable events:`, e.message);
+        sniperError(`[Sniper] Error fetching ListingAvailable events:`, e.message);
         listingRes = { ok: false };
       }
 
       try {
         completedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingCompleted&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
-        console.error(`[Sniper] Error fetching ListingCompleted events:`, e.message);
+        sniperError(`[Sniper] Error fetching ListingCompleted events:`, e.message);
         completedRes = { ok: false };
       }
 
       try {
         removedRes = await fetch(`${FLOW_REST_API}/v1/events?type=${STOREFRONT_CONTRACT}.ListingRemoved&start_height=${startHeight}&end_height=${endHeight}`, fetchOptions);
       } catch (e) {
-        console.error(`[Sniper] Error fetching ListingRemoved events:`, e.message);
+        sniperError(`[Sniper] Error fetching ListingRemoved events:`, e.message);
         removedRes = { ok: false };
       }
 
@@ -5220,11 +5378,11 @@ async function watchForListings() {
       // Process new listings
       if (listingRes.ok) {
         const eventData = await listingRes.json();
-        console.log(`[Sniper] 📦 ListingAvailable response: ${eventData?.length || 0} blocks with events`);
+        sniperLog(`[Sniper] 📦 ListingAvailable response: ${eventData?.length || 0} blocks with events`);
 
         for (const block of eventData) {
           if (!block.events) continue;
-          console.log(`[Sniper] 📦 Block ${block.block_height}: ${block.events.length} ListingAvailable events`);
+          sniperLog(`[Sniper] 📦 Block ${block.block_height}: ${block.events.length} ListingAvailable events`);
 
           for (const event of block.events) {
             try {
@@ -5260,7 +5418,7 @@ async function watchForListings() {
               if (!nftId || !listingPrice) continue;
 
               alldayCount++;
-              console.log(`[Sniper] ✨ Found AllDay listing: NFT ${nftId}, price $${listingPrice}, seller ${sellerAddr}`);
+              sniperLog(`[Sniper] ✨ Found AllDay listing: NFT ${nftId}, price $${listingPrice}, seller ${sellerAddr}`);
 
               // Get listingId if available
               const listingId = getField('listingResourceID')?.toString() || null;
@@ -5337,12 +5495,12 @@ async function watchForListings() {
                 wasPurchased = boolValue === true || boolValue === 'true';
               }
 
-              console.log(`[Sniper] 📋 ListingCompleted for NFT ${nftId} (listingId: ${listingResourceId}): purchased = ${JSON.stringify(purchasedField)} → wasPurchased = ${wasPurchased}`);
+              sniperLog(`[Sniper] 📋 ListingCompleted for NFT ${nftId} (listingId: ${listingResourceId}): purchased = ${JSON.stringify(purchasedField)} → wasPurchased = ${wasPurchased}`);
 
               // STRICT: Require listingResourceId to be present - this is the unique identifier for matching
               // Without it, we can't reliably match to our listings and risk false positives
               if (!listingResourceId) {
-                console.log(`[Sniper] ⚠️  ListingCompleted without listingResourceId - skipping (nftId: ${nftId || 'none'})`);
+                sniperLog(`[Sniper] ⚠️  ListingCompleted without listingResourceId - skipping (nftId: ${nftId || 'none'})`);
                 continue;
               }
 
@@ -5416,7 +5574,7 @@ async function watchForListings() {
               // If we don't have a listingResourceId match, we CANNOT reliably mark as sold
               // (an NFT could have been sold and relisted, so matching by nftId alone is unsafe)
               if (!existingListing) {
-                console.log(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system - skipping`);
+                sniperLog(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system - skipping`);
                 continue;
               }
 
@@ -5435,12 +5593,12 @@ async function watchForListings() {
                   // Add a small buffer (2 minutes) to account for timing variations
                   const bufferMs = 2 * 60 * 1000;
                   if (eventDate.getTime() < (listedAtDate.getTime() - bufferMs)) {
-                    console.log(`[Sniper] ⏭️  Skipping old ListingCompleted for listing ${listingResourceId} - event was ${Math.round((listedAtDate.getTime() - eventDate.getTime()) / 1000 / 60)} minutes before listing`);
+                    sniperLog(`[Sniper] ⏭️  Skipping old ListingCompleted for listing ${listingResourceId} - event was ${Math.round((listedAtDate.getTime() - eventDate.getTime()) / 1000 / 60)} minutes before listing`);
                     continue;
                   }
                 } else {
                   // Can't verify timing - be very cautious, but if we have exact listingId match, it's probably valid
-                  console.log(`[Sniper] ⚠️  Cannot verify timing for listing ${listingResourceId}, but proceeding with exact listingId match`);
+                  sniperLog(`[Sniper] ⚠️  Cannot verify timing for listing ${listingResourceId}, but proceeding with exact listingId match`);
                 }
               }
 
@@ -5465,7 +5623,7 @@ async function watchForListings() {
 
                   if (depositRes.ok) {
                     const depositData = await depositRes.json();
-                    console.log(`[Sniper] 🔍 Checking ${depositData?.length || 0} blocks for Deposit events for NFT ${targetNftId}`);
+                    sniperLog(`[Sniper] 🔍 Checking ${depositData?.length || 0} blocks for Deposit events for NFT ${targetNftId}`);
 
                     // Find the Deposit event for our NFT ID
                     for (const depositBlock of depositData) {
@@ -5503,7 +5661,7 @@ async function watchForListings() {
                           let depositTo = null;
                           if (toField) {
                             // Debug: log the structure to understand it
-                            // console.log(`[Sniper] DEBUG toField:`, JSON.stringify(toField, null, 2));
+                            // sniperLog(`[Sniper] DEBUG toField:`, JSON.stringify(toField, null, 2));
 
                             // Try to extract address from various nested structures
                             // Cadence Address can be: { value: "0x..." } or { value: { value: "0x..." } }
@@ -5525,9 +5683,9 @@ async function watchForListings() {
 
                             // Log what we found for debugging
                             if (depositTo) {
-                              console.log(`[Sniper] 📍 Extracted 'to' address: ${depositTo}`);
+                              sniperLog(`[Sniper] 📍 Extracted 'to' address: ${depositTo}`);
                             } else {
-                              console.log(`[Sniper] ⚠️ Could not extract 'to' address from:`, JSON.stringify(toField).substring(0, 200));
+                              sniperLog(`[Sniper] ⚠️ Could not extract 'to' address from:`, JSON.stringify(toField).substring(0, 200));
                             }
                           }
 
@@ -5540,27 +5698,27 @@ async function watchForListings() {
                             // Ensure depositTo is a valid address string
                             if (typeof depositTo === 'string' && depositTo.startsWith('0x')) {
                               buyerAddr = depositTo.toLowerCase();
-                              console.log(`[Sniper] 🎯 Found buyer ${buyerAddr} from AllDay.Deposit event for NFT ${targetNftId}`);
+                              sniperLog(`[Sniper] 🎯 Found buyer ${buyerAddr} from AllDay.Deposit event for NFT ${targetNftId}`);
                               break;
                             } else {
-                              console.log(`[Sniper] ⚠️ depositTo is not a valid address: ${typeof depositTo} - ${JSON.stringify(depositTo).substring(0, 100)}`);
+                              sniperLog(`[Sniper] ⚠️ depositTo is not a valid address: ${typeof depositTo} - ${JSON.stringify(depositTo).substring(0, 100)}`);
                             }
                           }
                         } catch (e) {
-                          console.warn(`[Sniper] Error parsing Deposit event:`, e.message);
+                          sniperWarn(`[Sniper] Error parsing Deposit event:`, e.message);
                         }
                       }
                       if (buyerAddr) break;
                     }
 
                     if (!buyerAddr) {
-                      console.log(`[Sniper] ⚠️ No matching Deposit event found for NFT ${targetNftId} in block ${block.block_height}`);
+                      sniperLog(`[Sniper] ⚠️ No matching Deposit event found for NFT ${targetNftId} in block ${block.block_height}`);
                     }
                   } else {
-                    console.warn(`[Sniper] Deposit events fetch failed: ${depositRes.status}`);
+                    sniperWarn(`[Sniper] Deposit events fetch failed: ${depositRes.status}`);
                   }
                 } catch (e) {
-                  console.warn(`[Sniper] Could not fetch Deposit events for buyer lookup:`, e.message);
+                  sniperWarn(`[Sniper] Could not fetch Deposit events for buyer lookup:`, e.message);
                 }
               }
 
@@ -5599,7 +5757,7 @@ async function watchForListings() {
 
                                 if (eventNftId?.toString() === targetNftId?.toString() && eventTo) {
                                   buyerAddr = eventTo.toLowerCase();
-                                  console.log(`[Sniper] 🎯 Found buyer ${buyerAddr} from tx_result Deposit event for NFT ${targetNftId}`);
+                                  sniperLog(`[Sniper] 🎯 Found buyer ${buyerAddr} from tx_result Deposit event for NFT ${targetNftId}`);
                                   break;
                                 }
                               }
@@ -5618,19 +5776,19 @@ async function watchForListings() {
                           const txData = await txRes.json();
                           if (txData?.payload?.authorizers && txData.payload.authorizers.length > 0) {
                             buyerAddr = txData.payload.authorizers[0]?.toLowerCase();
-                            console.log(`[Sniper] 📝 Using tx authorizer as buyer: ${buyerAddr}`);
+                            sniperLog(`[Sniper] 📝 Using tx authorizer as buyer: ${buyerAddr}`);
                           } else if (txData?.payload?.payer) {
                             buyerAddr = txData.payload.payer?.toLowerCase();
-                            console.log(`[Sniper] 📝 Using tx payer as buyer: ${buyerAddr}`);
+                            sniperLog(`[Sniper] 📝 Using tx payer as buyer: ${buyerAddr}`);
                           }
                         }
                       }
                     }
                   } catch (e) {
-                    console.warn(`[Sniper] Error fetching transaction ${txId}:`, e.message);
+                    sniperWarn(`[Sniper] Error fetching transaction ${txId}:`, e.message);
                   }
                 } else {
-                  console.log(`[Sniper] ⚠️ No transaction ID available for buyer lookup`);
+                  sniperLog(`[Sniper] ⚠️ No transaction ID available for buyer lookup`);
                 }
               }
 
@@ -5644,21 +5802,21 @@ async function watchForListings() {
                 if (buyerAddr && buyerAddr.trim() !== '' && buyerAddr.match(/^0x[a-f0-9]{4,64}$/i)) {
                   // We have a valid buyer address
                   await markListingAsSold(targetNftId, buyerAddr);
-                  console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD to ${buyerAddr}`);
+                  sniperLog(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD to ${buyerAddr}`);
                 } else if (listingResourceId && existingListing && existingListing.listingId === listingResourceId) {
                   // Exact listingResourceId match but no buyer - still mark as sold (listingResourceId is unique)
                   await markListingAsSold(targetNftId, null);
-                  console.log(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD (buyer unknown, but exact listingId match)`);
+                  sniperLog(`[Sniper] ✅ Marked ${targetNftId} (listing ${listingResourceId}) as SOLD (buyer unknown, but exact listingId match)`);
                 } else {
                   // No buyer and no exact listingResourceId match - skip to avoid false positive
-                  console.log(`[Sniper] ⚠️  ListingCompleted (purchased=true) for ${targetNftId} but no buyer and no exact listingId match - skipping`);
+                  sniperLog(`[Sniper] ⚠️  ListingCompleted (purchased=true) for ${targetNftId} but no buyer and no exact listingId match - skipping`);
                   continue;
                 }
                 soldCount++;
               } else {
                 // This was a DELISTING - seller cancelled the listing (purchased = false)
                 await markListingAsUnlisted(targetNftId, listingResourceId);
-                console.log(`[Sniper] ❌ Marked ${targetNftId} (listing ${listingResourceId}) as DELISTED (purchased=false)`);
+                sniperLog(`[Sniper] ❌ Marked ${targetNftId} (listing ${listingResourceId}) as DELISTED (purchased=false)`);
                 unlistedCount++;
               }
 
@@ -5732,7 +5890,7 @@ async function watchForListings() {
               if (!targetNftId) continue;
 
               await markListingAsUnlisted(targetNftId);
-              console.log(`[Sniper] ✅ Marked ${targetNftId} as delisted`);
+              sniperLog(`[Sniper] ✅ Marked ${targetNftId} as delisted`);
               unlistedCount++;
 
             } catch (e) {
@@ -5743,24 +5901,24 @@ async function watchForListings() {
       }
 
       if (!listingRes.ok && !completedRes.ok && !removedRes.ok) {
-        console.log(`[Sniper] ⚠️ All event fetches failed - listingRes: ${listingRes.status || 'error'}, completedRes: ${completedRes.status || 'error'}, removedRes: ${removedRes.status || 'error'}`);
+        sniperLog(`[Sniper] ⚠️ All event fetches failed - listingRes: ${listingRes.status || 'error'}, completedRes: ${completedRes.status || 'error'}, removedRes: ${removedRes.status || 'error'}`);
         lastCheckedBlock = endHeight;
         return;
       }
 
       if (alldayCount > 0 || soldCount > 0 || unlistedCount > 0) {
-        console.log(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold, ${unlistedCount} delisted (total in memory: ${sniperListings.length})`);
+        sniperLog(`[Sniper] Block ${startHeight}-${endHeight}: ${alldayCount} new listings, ${soldCount} sold, ${unlistedCount} delisted (total in memory: ${sniperListings.length})`);
       }
 
       // Log every 10 blocks even if no events (to show it's working)
       if ((startHeight % 10 === 0) || (alldayCount > 0 || soldCount > 0 || unlistedCount > 0)) {
-        console.log(`[Sniper] Checked blocks ${startHeight}-${endHeight}, current block: ${currentBlock}, listings in memory: ${sniperListings.length}`);
+        sniperLog(`[Sniper] Checked blocks ${startHeight}-${endHeight}, current block: ${currentBlock}, listings in memory: ${sniperListings.length}`);
       }
 
       lastCheckedBlock = endHeight;
 
     } catch (err) {
-      console.error("[Sniper] Error checking for listings:", err.message);
+      sniperError("[Sniper] Error checking for listings:", err.message);
       // Don't let errors stop the watcher - log and continue
       // Add exponential backoff on repeated errors
     }
@@ -5776,7 +5934,7 @@ async function watchForListings() {
     } catch (err) {
       consecutiveErrors++;
       if (consecutiveErrors > 5) {
-        console.error(`[Sniper] Too many consecutive errors (${consecutiveErrors}), backing off...`);
+        sniperError(`[Sniper] Too many consecutive errors (${consecutiveErrors}), backing off...`);
         // Exponential backoff: wait longer after multiple errors
         await new Promise(resolve => setTimeout(resolve, Math.min(60000, 1000 * Math.pow(2, consecutiveErrors - 5))));
       }
@@ -6049,11 +6207,11 @@ async function verifyExistingListingsStatus() {
     }
 
     if (listingsToVerify.length === 0) {
-      console.log(`[Sniper] No active listings to verify`);
+      sniperLog(`[Sniper] No active listings to verify`);
       return;
     }
 
-    console.log(`[Sniper] Verifying status of ${listingsToVerify.length} active listings...`);
+    sniperLog(`[Sniper] Verifying status of ${listingsToVerify.length} active listings...`);
     let updated = 0;
     let checked = 0;
     let errors = 0;
@@ -6099,7 +6257,7 @@ async function verifyExistingListingsStatus() {
           }
         } catch (e) {
           errors++;
-          console.error(`[Sniper] Error checking ${item.nftId}:`, e.message);
+          sniperError(`[Sniper] Error checking ${item.nftId}:`, e.message);
         }
       }));
 
@@ -6109,11 +6267,11 @@ async function verifyExistingListingsStatus() {
     }
 
     if (updated > 0) {
-      console.log(`[Sniper] ✅ Updated ${updated} listings (${errors} errors)`);
+      sniperLog(`[Sniper] ✅ Updated ${updated} listings (${errors} errors)`);
     }
   } catch (err) {
-    console.error("[Sniper] Error verifying listing status:", err.message);
-    console.error("[Sniper] Stack:", err.stack);
+    sniperError("[Sniper] Error verifying listing status:", err.message);
+    sniperError("[Sniper] Stack:", err.stack);
   }
 }
 
@@ -6134,11 +6292,11 @@ async function loadRecentListingsFromDB() {
     );
 
     if (result.rows.length === 0) {
-      console.log("[Sniper] No recent listings found in database, will populate from watcher");
+      sniperLog("[Sniper] No recent listings found in database, will populate from watcher");
       return;
     }
 
-    console.log(`[Sniper] Loading ${result.rows.length} recent listings from database...`);
+    sniperLog(`[Sniper] Loading ${result.rows.length} recent listings from database...`);
 
     let loaded = 0;
     let skipped = 0;
@@ -6178,7 +6336,7 @@ async function loadRecentListingsFromDB() {
           skipped++;
         }
       } catch (e) {
-        console.error("[Sniper] Error parsing listing from DB:", e.message);
+        sniperError("[Sniper] Error parsing listing from DB:", e.message);
       }
     }
 
@@ -6194,19 +6352,19 @@ async function loadRecentListingsFromDB() {
       sniperListings.splice(MAX_SNIPER_LISTINGS);
     }
 
-    console.log(`[Sniper] Loaded ${loaded} listings from database (${skipped} duplicates skipped)`);
+    sniperLog(`[Sniper] Loaded ${loaded} listings from database (${skipped} duplicates skipped)`);
 
     // After loading, verify status of listings that aren't marked as sold/unlisted
     // Do this in background so it doesn't block startup - wait 30 seconds
     // This will catch any listings that were sold/delisted before the watcher was running
     setTimeout(() => {
-      console.log("[Sniper] 🔍 Running initial verification on loaded listings...");
+      sniperLog("[Sniper] 🔍 Running initial verification on loaded listings...");
       verifyExistingListingsStatus().catch(err => {
-        console.error("[Sniper] Error in background status verification:", err.message);
+        sniperError("[Sniper] Error in background status verification:", err.message);
       });
     }, 30000); // Wait 30 seconds after startup to let everything settle
   } catch (err) {
-    console.error("[Sniper] Error loading recent listings from database:", err.message);
+    sniperError("[Sniper] Error loading recent listings from database:", err.message);
     // Don't throw - continue with empty array, watcher will populate it
   }
 }
@@ -6334,10 +6492,10 @@ async function cleanupOldListings() {
       [threeDaysAgo]
     );
     if (result.rowCount > 0) {
-      console.log(`[Sniper] Cleaned up ${result.rowCount} old listings (>3 days)`);
+      sniperLog(`[Sniper] Cleaned up ${result.rowCount} old listings (>3 days)`);
     }
   } catch (err) {
-    console.error("[Sniper] Error cleaning up old listings:", err.message);
+    sniperError("[Sniper] Error cleaning up old listings:", err.message);
   }
 }
 
@@ -6349,22 +6507,22 @@ setInterval(globalMemoryCleanup, 2 * 60 * 1000); // Every 2 minutes for memory c
 // Verify listing status periodically (every 5 minutes)
 setInterval(() => {
   verifyExistingListingsStatus().catch(err => {
-    console.error("[Sniper] Error in periodic status verification:", err.message);
+    sniperError("[Sniper] Error in periodic status verification:", err.message);
   });
 }, 5 * 60 * 1000); // Every 5 minutes
 
 // Also run verification once immediately after startup (after 30 seconds to let things settle)
 setTimeout(() => {
-  console.log("[Sniper] Running initial status verification on all active listings...");
+  sniperLog("[Sniper] Running initial status verification on all active listings...");
   verifyExistingListingsStatus().catch(err => {
-    console.error("[Sniper] Error in initial status verification:", err.message);
+    sniperError("[Sniper] Error in initial status verification:", err.message);
   });
 }, 30000); // After 30 seconds
 
 // Initialize sniper on server start
 async function initializeSniper() {
   try {
-    console.log("[Sniper] 🚀 Initializing sniper system...");
+    sniperLog("[Sniper] 🚀 Initializing sniper system...");
 
     // First, ensure database table is set up correctly
     await ensureSniperListingsTable();
@@ -6372,24 +6530,24 @@ async function initializeSniper() {
     // Then, load recent listings from database
     await loadRecentListingsFromDB();
 
-    console.log(`[Sniper] ✅ Loaded ${sniperListings.length} listings from database`);
+    sniperLog(`[Sniper] ✅ Loaded ${sniperListings.length} listings from database`);
 
     // Then start the watcher
     setTimeout(() => {
-      console.log("[Sniper] 🔄 Starting blockchain watcher...");
+      sniperLog("[Sniper] 🔄 Starting blockchain watcher...");
       watchForListings();
     }, 2000);
 
     // Run cleanup once on startup
     setTimeout(cleanupOldListings, 30000); // After 30 seconds
 
-    console.log("[Sniper] ✅ Sniper system initialized successfully");
+    sniperLog("[Sniper] ✅ Sniper system initialized successfully");
   } catch (err) {
-    console.error("[Sniper] ❌ Error initializing sniper:", err.message);
-    console.error("[Sniper] Stack:", err.stack);
+    sniperError("[Sniper] ❌ Error initializing sniper:", err.message);
+    sniperError("[Sniper] Stack:", err.stack);
     // Still try to start the watcher
     setTimeout(() => {
-      console.log("[Sniper] 🔄 Attempting to start watcher despite errors...");
+      sniperLog("[Sniper] 🔄 Attempting to start watcher despite errors...");
       watchForListings();
     }, 5000);
   }
@@ -6715,7 +6873,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         });
       } catch (dbErr) {
         // If DB query fails, just use memory listings
-        console.error("[Sniper] Error fetching from database:", dbErr.message);
+        sniperError("[Sniper] Error fetching from database:", dbErr.message);
       }
     }
 
@@ -6780,7 +6938,7 @@ app.get("/api/sniper-deals", async (req, res) => {
           }
         });
       } catch (e) {
-        console.error("[Sniper] Error fetching series names by nftId:", e.message);
+        sniperError("[Sniper] Error fetching series names by nftId:", e.message);
       }
     }
 
@@ -6797,7 +6955,7 @@ app.get("/api/sniper-deals", async (req, res) => {
           }
         });
       } catch (e) {
-        console.error("[Sniper] Error fetching series names by editionId:", e.message);
+        sniperError("[Sniper] Error fetching series names by editionId:", e.message);
       }
     }
 
@@ -6819,7 +6977,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         });
         //console.log(`[Sniper API] Fetched ASP for ${aspMap.size} editions out of ${allEditionIds.length} requested`);
       } catch (e) {
-        //console.error("[Sniper] Error fetching ASP:", e.message);
+        //sniperError("[Sniper] Error fetching ASP:", e.message);
       }
     }
 
@@ -6883,7 +7041,7 @@ app.get("/api/sniper-deals", async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    console.error("[Sniper] Error getting listings:", err);
+    sniperError("[Sniper] Error getting listings:", err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
@@ -7077,10 +7235,10 @@ app.get("/api/sniper-listings", async (req, res) => {
       LIMIT ${limitNum}
     `;
 
-    console.log(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
+    sniperLog(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
 
     const salesResult = await executeSql(eventsSql);
-    console.log(`[Sniper] Found ${salesResult?.length || 0} active listings`);
+    sniperLog(`[Sniper] Found ${salesResult?.length || 0} active listings`);
 
     if (!salesResult || salesResult.length === 0) {
       return res.json({
@@ -7111,7 +7269,7 @@ app.get("/api/sniper-listings", async (req, res) => {
           if (row.edition_id) editionIds.add(row.edition_id);
         }
       } catch (err) {
-        console.error("[Sniper] Error fetching moment metadata:", err.message);
+        sniperError("[Sniper] Error fetching moment metadata:", err.message);
       }
     }
 
@@ -7121,7 +7279,7 @@ app.get("/api/sniper-listings", async (req, res) => {
     const editionList = [...editionIds];
 
     if (editionList.length > 0) {
-      console.log(`[Sniper] Scraping real-time prices for ${editionList.length} editions...`);
+      sniperLog(`[Sniper] Scraping real-time prices for ${editionList.length} editions...`);
 
       // Scrape in parallel batches of 5 to avoid overwhelming the server
       const BATCH_SIZE = 5;
@@ -7141,7 +7299,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         }
       }
 
-      console.log(`[Sniper] Got real-time prices for ${Object.keys(scrapedData).length} editions`);
+      sniperLog(`[Sniper] Got real-time prices for ${Object.keys(scrapedData).length} editions`);
     }
 
     // Get average sale prices from our database to compare with scraped low asks
@@ -7158,7 +7316,7 @@ app.get("/api/sniper-listings", async (req, res) => {
           avgSalePrices[row.edition_id] = row.avg_sale_usd ? Number(row.avg_sale_usd) : null;
         }
       } catch (err) {
-        console.error("[Sniper] Error fetching avg sale prices:", err.message);
+        sniperError("[Sniper] Error fetching avg sale prices:", err.message);
       }
     }
 
@@ -7275,7 +7433,7 @@ app.get("/api/sniper-listings", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("[Sniper] Error:", err);
+    sniperError("[Sniper] Error:", err);
     return res.status(500).json({
       ok: false,
       error: "Failed to fetch sniper listings: " + (err.message || String(err))
@@ -10906,7 +11064,7 @@ app.post("/api/trades/:id/complete", async (req, res) => {
 
 // ================== ADMIN ANALYTICS API ==================
 
-// POST /api/trades/:id/execute - Mark trade as executing (on-chain in progress)
+// POST /api/trades/:id/execute - Complete a trade (mark as executed)
 app.post("/api/trades/:id/execute", async (req, res) => {
   try {
     const user = req.session?.user;
@@ -10916,13 +11074,12 @@ app.post("/api/trades/:id/execute", async (req, res) => {
 
     const wallet = user.default_wallet_address?.toLowerCase();
     const tradeId = parseInt(req.params.id);
-    const { flowWallet, childWallet } = req.body;
 
     if (!tradeId) {
       return res.status(400).json({ ok: false, error: "Invalid trade ID" });
     }
 
-    // Get trade to verify both parties are ready
+    // Get trade to verify status
     const { rows: trades } = await pool.query(`SELECT * FROM trades WHERE id = $1`, [tradeId]);
 
     if (trades.length === 0) {
@@ -10939,38 +11096,25 @@ app.post("/api/trades/:id/execute", async (req, res) => {
       return res.status(403).json({ ok: false, error: "Not authorized for this trade" });
     }
 
-    // Trade must be accepted before execution
-    if (trade.status !== 'accepted' && trade.status !== 'ready') {
-      return res.status(400).json({ ok: false, error: "Trade must be accepted before execution" });
+    // Trade must be in 'ready' status to execute
+    if (trade.status !== 'ready') {
+      return res.status(400).json({ ok: false, error: `Trade must be ready to execute (current status: ${trade.status})` });
     }
 
-    // Update trade with Flow wallet info and mark as executing
-    const updateField = isInitiator ? 'initiator_child_wallet' : 'target_child_wallet';
-
-    await pool.query(`
-      UPDATE trades 
-      SET ${updateField} = $2, updated_at = NOW()
-      WHERE id = $1
-    `, [tradeId, childWallet || null]);
-
-    // Mark as executing if both parties have provided child wallets
+    // Mark trade as completed
     const { rows: updated } = await pool.query(`
       UPDATE trades 
-      SET status = CASE 
-        WHEN initiator_child_wallet IS NOT NULL AND target_child_wallet IS NOT NULL THEN 'executing'
-        ELSE status 
-      END,
-      updated_at = NOW()
+      SET status = 'completed', updated_at = NOW()
       WHERE id = $1
       RETURNING *
     `, [tradeId]);
 
-    console.log(`[Trade] Trade #${tradeId} execute initiated by ${wallet?.substring(0, 8)}...`);
+    console.log(`[Trade] Trade #${tradeId} executed/completed by ${wallet?.substring(0, 8)}...`);
 
     return res.json({
       ok: true,
       trade: updated[0],
-      readyForSwap: updated[0].status === 'executing'
+      message: "Trade executed successfully! Both parties should now transfer their moments."
     });
   } catch (err) {
     console.error("POST /api/trades/:id/execute error:", err);
