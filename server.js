@@ -491,7 +491,7 @@ async function processFlowEvent(event) {
       try {
         const momentResult = await pgQuery(
           `SELECT first_name, last_name, team_name, position, tier, set_name, series_name
-           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+           FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
           [liveEvent.nftId]
         );
         const moment = momentResult.rows[0];
@@ -553,13 +553,13 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
   }
 }
 
-// Fetch NFT metadata on-demand and cache in nft_core_metadata table
+// Fetch NFT metadata on-demand and cache in nft_core_metadata_v2 table
 // Uses Snowflake for metadata lookup (most reliable source)
 async function fetchAndCacheNFTMetadata(nftId) {
   try {
     // Check if metadata already exists
     const existing = await pgQuery(
-      `SELECT 1 FROM nft_core_metadata WHERE nft_id = $1`,
+      `SELECT 1 FROM nft_core_metadata_v2 WHERE nft_id = $1`,
       [nftId]
     );
 
@@ -600,7 +600,7 @@ async function fetchAndCacheNFTMetadata(nftId) {
       if (rows && rows.length > 0) {
         const row = rows[0];
         await pgQuery(`
-          INSERT INTO nft_core_metadata (
+          INSERT INTO nft_core_metadata_v2 (
             nft_id, edition_id, play_id, series_id, set_id, tier,
             serial_number, max_mint_size, first_name, last_name,
             team_name, position, jersey_number, series_name, set_name
@@ -810,7 +810,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
 
     // Check which NFTs are missing metadata
     const metadataCheck = await pgQuery(
-      `SELECT nft_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+      `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
       [nftIdsArray]
     );
     const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
@@ -1285,7 +1285,7 @@ app.get("/api/top-holders", async (req, res) => {
         COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
         COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE
         m.edition_id = $1
@@ -1446,7 +1446,7 @@ app.get("/api/search-editions", async (req, res) => {
             eps.lowest_ask_usd,
             eps.avg_sale_usd,
             eps.top_sale_usd
-          FROM nft_core_metadata e
+          FROM nft_core_metadata_v2 e
           LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = e.edition_id
           ${whereClauseLive}
           GROUP BY e.edition_id, eps.lowest_ask_usd, eps.avg_sale_usd, eps.top_sale_usd
@@ -1496,7 +1496,7 @@ app.get("/api/edition-moments", async (req, res) => {
         tier,
         series_name,
         set_name
-      FROM nft_core_metadata
+      FROM nft_core_metadata_v2
       WHERE edition_id = $1
       ORDER BY serial_number NULLS LAST, nft_id
       LIMIT 1000;
@@ -1576,7 +1576,7 @@ app.get("/api/search-moments", async (req, res) => {
         tier,
         series_name,
         set_name
-      FROM nft_core_metadata
+      FROM nft_core_metadata_v2
       ${whereClause}
       ORDER BY last_name NULLS LAST, first_name NULLS LAST, nft_id
       LIMIT $${idx};
@@ -1646,7 +1646,7 @@ app.get("/api/explorer-filters", async (req, res) => {
         SELECT DISTINCT
           COALESCE(first_name, '') AS first_name,
           COALESCE(last_name, '')  AS last_name
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE first_name IS NOT NULL
           AND first_name <> ''
           AND last_name IS NOT NULL
@@ -1656,7 +1656,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `),
       pgQuery(`
         SELECT DISTINCT team_name
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE team_name IS NOT NULL
           AND team_name <> ''
         ORDER BY team_name
@@ -1664,7 +1664,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `),
       pgQuery(`
         SELECT DISTINCT series_name
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE series_name IS NOT NULL
           AND series_name <> ''
         ORDER BY series_name
@@ -1672,7 +1672,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `),
       pgQuery(`
         SELECT DISTINCT set_name
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE set_name IS NOT NULL
           AND set_name <> ''
         ORDER BY set_name
@@ -1680,7 +1680,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `),
       pgQuery(`
         SELECT DISTINCT position
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE position IS NOT NULL
           AND position <> ''
         ORDER BY position
@@ -1688,7 +1688,7 @@ app.get("/api/explorer-filters", async (req, res) => {
       `),
       pgQuery(`
         SELECT DISTINCT tier
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE tier IS NOT NULL
           AND tier <> ''
         ORDER BY tier
@@ -2027,7 +2027,7 @@ app.get("/api/wallet-summary", async (req, res) => {
             COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
 
           FROM wallet_holdings h
-          LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+          LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
           LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = m.edition_id
           WHERE h.wallet_address = $1
           GROUP BY h.wallet_address;
@@ -2059,7 +2059,7 @@ app.get("/api/wallet-summary", async (req, res) => {
             COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
 
           FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
-          LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+          LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
           LEFT JOIN wallet_holdings h 
             ON h.nft_id = nft_ids.nft_id 
             AND h.wallet_address = $1
@@ -2120,7 +2120,7 @@ app.get("/api/wallet-summary", async (req, res) => {
           AS priced_moments
 
       FROM wallet_holdings h
-      JOIN nft_core_metadata m
+      JOIN nft_core_metadata_v2 m
         ON m.nft_id = h.nft_id
       LEFT JOIN public.edition_price_scrape eps
         ON eps.edition_id = m.edition_id
@@ -2320,7 +2320,7 @@ app.get("/api/query", async (req, res) => {
             m.series_name,
             m.set_name
           FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
-          LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+          LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
           LEFT JOIN wallet_holdings h 
             ON h.nft_id = nft_ids.nft_id 
             AND h.wallet_address = $${nftIds.length + 1}::text
@@ -2427,7 +2427,7 @@ app.get("/api/query", async (req, res) => {
           if (nftIds.length > 0) {
             const nftIdStrings = nftIds.map(id => id.toString());
             const metadataCheck = await pgQuery(
-              `SELECT nft_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+              `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
               [nftIdStrings]
             );
             const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
@@ -2474,7 +2474,7 @@ app.get("/api/query", async (req, res) => {
         m.series_name,
         m.set_name
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1
       ORDER BY h.is_locked DESC, h.last_event_ts DESC;
       `,
@@ -2580,7 +2580,7 @@ app.get("/api/query-blockchain", async (req, res) => {
           m.series_name,
           m.set_name
         FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
-        LEFT JOIN nft_core_metadata m ON m.nft_id = nft_ids.nft_id
+        LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
         LEFT JOIN wallet_holdings h 
           ON h.nft_id = nft_ids.nft_id 
           AND h.wallet_address = $${nftIds.length + 1}::text
@@ -2652,7 +2652,7 @@ app.get("/api/profiles", async (req, res) => {
         FROM public.wallet_profiles AS wp
         LEFT JOIN public.wallet_holdings AS wh
           ON wh.wallet_address = wp.wallet_address
-        LEFT JOIN public.nft_core_metadata AS ncm
+        LEFT JOIN public.nft_core_metadata_v2 AS ncm
           ON ncm.nft_id = wh.nft_id
         WHERE 
           LOWER(wp.display_name) LIKE LOWER($1 || '%')
@@ -2933,7 +2933,7 @@ app.get("/api/teams", async (req, res) => {
       const { rows } = await pool.query(
         `
         SELECT DISTINCT team_name
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE team_name IS NOT NULL AND team_name != ''
         ORDER BY team_name ASC
         LIMIT 100;
@@ -3051,13 +3051,13 @@ app.post("/api/insights/refresh", async (req, res) => {
           COUNT(*) FILTER (WHERE serial_number <= 10)::bigint AS serial_10,
           COUNT(*) FILTER (WHERE serial_number <= 100)::bigint AS serial_100,
           COUNT(*) FILTER (WHERE serial_number <= 1000)::bigint AS serial_1000
-        FROM nft_core_metadata;
+        FROM nft_core_metadata_v2;
       `),
 
       // Top 5 teams
       pool.query(`
         SELECT team_name, COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE team_name IS NOT NULL AND team_name != ''
         GROUP BY team_name
         ORDER BY count DESC
@@ -3070,7 +3070,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           CONCAT(first_name, ' ', last_name) AS player_name,
           team_name,
           COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE first_name IS NOT NULL AND last_name IS NOT NULL
         GROUP BY first_name, last_name, team_name
         ORDER BY count DESC
@@ -3080,7 +3080,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       // Top 5 sets
       pool.query(`
         SELECT set_name, COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE set_name IS NOT NULL AND set_name != ''
         GROUP BY set_name
         ORDER BY count DESC
@@ -3090,7 +3090,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       // Position breakdown
       pool.query(`
         SELECT position, COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE position IS NOT NULL AND position != ''
         GROUP BY position
         ORDER BY count DESC;
@@ -3135,7 +3135,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       // 📅 Series breakdown
       pool.query(`
         SELECT series_name, COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE series_name IS NOT NULL AND series_name != ''
         GROUP BY series_name
         ORDER BY series_name;
@@ -3144,7 +3144,7 @@ app.post("/api/insights/refresh", async (req, res) => {
       // 🔢 Popular jersey numbers
       pool.query(`
         SELECT jersey_number, COUNT(*)::bigint AS count
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE jersey_number IS NOT NULL AND jersey_number > 0
         GROUP BY jersey_number
         ORDER BY count DESC
@@ -3159,7 +3159,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           COUNT(*) FILTER (WHERE max_mint_size BETWEEN 251 AND 1000)::bigint AS standard,
           COUNT(*) FILTER (WHERE max_mint_size BETWEEN 1001 AND 10000)::bigint AS large,
           COUNT(*) FILTER (WHERE max_mint_size > 10000)::bigint AS mass
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE max_mint_size IS NOT NULL AND max_mint_size > 0;
       `),
 
@@ -3173,7 +3173,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           m.set_name,
           e.lowest_ask_usd
         FROM edition_price_scrape e
-        JOIN nft_core_metadata m ON m.edition_id = e.edition_id
+        JOIN nft_core_metadata_v2 m ON m.edition_id = e.edition_id
         WHERE e.lowest_ask_usd > 0
         ORDER BY e.lowest_ask_usd DESC
         LIMIT 5;
@@ -3187,7 +3187,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           COUNT(*) FILTER (WHERE serial_number BETWEEN 101 AND 500)::bigint AS tier_101_500,
           COUNT(*) FILTER (WHERE serial_number BETWEEN 501 AND 1000)::bigint AS tier_501_1000,
           COUNT(*) FILTER (WHERE serial_number > 1000)::bigint AS tier_1000_plus
-        FROM nft_core_metadata
+        FROM nft_core_metadata_v2
         WHERE serial_number IS NOT NULL;
       `),
 
@@ -3199,7 +3199,7 @@ app.post("/api/insights/refresh", async (req, res) => {
           COUNT(*)::bigint AS moment_count,
           ROUND(SUM(COALESCE(e.lowest_ask_usd, 0))::numeric, 2) AS floor_value
         FROM wallet_holdings h
-        JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+        JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         LEFT JOIN edition_price_scrape e ON e.edition_id = m.edition_id
         LEFT JOIN top_wallets_snapshot t ON t.wallet_address = h.wallet_address
         WHERE h.wallet_address NOT IN ('0xe4cf4bdc1751c65d', '0xb6f2481eba4df97b')
@@ -3429,7 +3429,7 @@ app.get("/api/query-paged", async (req, res) => {
         m.set_name,
         COUNT(*) OVER ()::int AS total_count
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1
       ORDER BY h.last_event_ts DESC
       LIMIT $2 OFFSET $3;
@@ -4261,7 +4261,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
               tier,
               set_name,
               series_name
-            FROM nft_core_metadata 
+            FROM nft_core_metadata_v2 
             WHERE nft_id = $1 LIMIT 1`,
             [event.nftId]
           );
@@ -4543,7 +4543,7 @@ app.get("/api/lightnode-events", async (req, res) => {
       if (event.nftId) {
         try {
           const result = await pgQuery(
-            `SELECT first_name, last_name, team_name, position, tier, set_name, series_name FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+            `SELECT first_name, last_name, team_name, position, tier, set_name, series_name FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
             [event.nftId]
           );
           const moment = result.rows[0];
@@ -5149,7 +5149,7 @@ async function processListingEvent(event) {
       try {
         const result = await pgQuery(
           `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name, series_name, jersey_number
-           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+           FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
         if (result.rows[0]) {
@@ -5188,7 +5188,7 @@ async function processListingEvent(event) {
       try {
         const result = await pgQuery(
           `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position, jersey_number
-           FROM nft_core_metadata WHERE nft_id = $1 LIMIT 1`,
+           FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
         if (result.rows[0]) {
@@ -6573,7 +6573,7 @@ app.get("/api/sniper/find-listing", async (req, res) => {
              sl.buyer_address, sl.listing_data, sl.updated_at,
              m.serial_number, m.first_name, m.last_name, m.team_name, m.tier
       FROM sniper_listings sl
-      JOIN nft_core_metadata m ON m.nft_id = sl.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = sl.nft_id
       WHERE 1=1
     `;
     const params = [];
@@ -6927,7 +6927,7 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (allNftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT nft_id, series_name, jersey_number FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+          `SELECT nft_id, series_name, jersey_number FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
           [allNftIds]
         );
         metaResult.rows.forEach(row => {
@@ -6947,7 +6947,7 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (allEditionIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT edition_id, series_name FROM nft_core_metadata WHERE edition_id = ANY($1::text[]) AND series_name IS NOT NULL`,
+          `SELECT edition_id, series_name FROM nft_core_metadata_v2 WHERE edition_id = ANY($1::text[]) AND series_name IS NOT NULL`,
           [allEditionIds]
         );
         metaResult.rows.forEach(row => {
@@ -7073,7 +7073,7 @@ app.get("/api/sniper-warmup", async (req, res) => {
     let editionIds = [];
     if (nftIds.length > 0) {
       const metaResult = await pgQuery(
-        `SELECT DISTINCT edition_id FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+        `SELECT DISTINCT edition_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
         [nftIds]
       );
       editionIds = metaResult.rows.map(r => r.edition_id).filter(Boolean);
@@ -7261,7 +7261,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         const metaResult = await pgQuery(
           `SELECT nft_id, edition_id, serial_number, first_name, last_name, 
                   team_name, position, tier, set_name, series_name
-           FROM nft_core_metadata 
+           FROM nft_core_metadata_v2 
            WHERE nft_id = ANY($1::text[])`,
           [nftIds]
         );
@@ -7541,7 +7541,7 @@ app.get("/api/sniper-active-listings", async (req, res) => {
         const metaResult = await pgQuery(
           `SELECT nft_id, edition_id, serial_number, first_name, last_name,
                   team_name, position, tier, set_name
-           FROM nft_core_metadata WHERE nft_id = ANY($1::text[])`,
+           FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
           [nftIds]
         );
 
@@ -9869,11 +9869,11 @@ app.get("/api/filter-options", async (req, res) => {
 
     let query = "";
     if (type === "teams") {
-      query = `SELECT DISTINCT team_name as option FROM nft_core_metadata WHERE team_name IS NOT NULL AND team_name != '' ORDER BY team_name`;
+      query = `SELECT DISTINCT team_name as option FROM nft_core_metadata_v2 WHERE team_name IS NOT NULL AND team_name != '' ORDER BY team_name`;
     } else if (type === "sets") {
-      query = `SELECT DISTINCT set_name as option FROM nft_core_metadata WHERE set_name IS NOT NULL AND set_name != '' ORDER BY set_name`;
+      query = `SELECT DISTINCT set_name as option FROM nft_core_metadata_v2 WHERE set_name IS NOT NULL AND set_name != '' ORDER BY set_name`;
     } else if (type === "series") {
-      query = `SELECT DISTINCT series_name as option FROM nft_core_metadata WHERE series_name IS NOT NULL AND series_name != '' ORDER BY series_name`;
+      query = `SELECT DISTINCT series_name as option FROM nft_core_metadata_v2 WHERE series_name IS NOT NULL AND series_name != '' ORDER BY series_name`;
     } else {
       return res.status(400).json({ ok: false, error: "Invalid type. Use: teams, sets, or series" });
     }
@@ -9953,7 +9953,7 @@ app.get("/api/search-nfts-advanced", async (req, res) => {
         m.set_name, m.series_name, m.tier, m.serial_number, m.max_mint_size,
         m.jersey_number,
         h.wallet_address, p.display_name as owner_name
-      FROM nft_core_metadata m
+      FROM nft_core_metadata_v2 m
       LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE ${whereClause}
@@ -10000,7 +10000,7 @@ app.get("/api/search-nfts", async (req, res) => {
         m.set_name, m.series_name, m.tier, m.serial_number, m.max_mint_size,
         m.jersey_number,
         h.wallet_address, p.display_name as owner_name
-      FROM nft_core_metadata m
+      FROM nft_core_metadata_v2 m
       LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE 
@@ -10068,7 +10068,7 @@ async function refreshSetsCatalog() {
       COUNT(DISTINCT CASE WHEN UPPER(tier) = 'LEGENDARY' THEN edition_id END) as legendary,
       COUNT(DISTINCT CASE WHEN UPPER(tier) = 'ULTIMATE' THEN edition_id END) as ultimate,
       now()
-    FROM nft_core_metadata
+    FROM nft_core_metadata_v2
     WHERE set_name IS NOT NULL
     GROUP BY set_name
     ON CONFLICT (set_name) DO UPDATE SET
@@ -10164,7 +10164,7 @@ app.get("/api/set-completion", async (req, res) => {
         COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'LEGENDARY' THEN m.edition_id END) as legendary,
         COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'ULTIMATE' THEN m.edition_id END) as ultimate
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1 AND m.set_name IS NOT NULL
       GROUP BY m.set_name
       ORDER BY m.set_name`,
@@ -10177,7 +10177,7 @@ app.get("/api/set-completion", async (req, res) => {
       WITH owned AS (
         SELECT DISTINCT m.edition_id
         FROM wallet_holdings h
-        JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+        JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         WHERE h.wallet_address = $1
       ),
       missing AS (
@@ -10197,7 +10197,7 @@ app.get("/api/set-completion", async (req, res) => {
     // Team totals (for team-level tracking)
     const teamTotalsRes = await pgQuery(`
       SELECT team_name, COUNT(DISTINCT edition_id) AS total_editions
-      FROM nft_core_metadata
+      FROM nft_core_metadata_v2
       WHERE team_name IS NOT NULL AND team_name <> ''
       GROUP BY team_name
     `);
@@ -10231,7 +10231,7 @@ app.get("/api/set-completion", async (req, res) => {
       `
       SELECT m.team_name, COUNT(DISTINCT m.edition_id) AS owned_editions
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1 AND m.team_name IS NOT NULL AND m.team_name <> ''
       GROUP BY m.team_name;
       `,
@@ -10292,7 +10292,7 @@ app.get("/api/serial-finder", async (req, res) => {
         m.serial_number, m.jersey_number, m.series_name, m.position,
         p.display_name
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE m.serial_number = $1
     `;
@@ -10385,7 +10385,7 @@ app.get("/api/wallet-compare", async (req, res) => {
         COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int as ultimate,
         COALESCE(SUM(eps.lowest_ask_usd), 0)::numeric as floor_value
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id
       WHERE h.wallet_address = $1
@@ -10405,11 +10405,11 @@ app.get("/api/wallet-compare", async (req, res) => {
       `SELECT COUNT(DISTINCT m1.edition_id)::int as shared_editions,
               COUNT(DISTINCT CONCAT(m1.first_name, m1.last_name))::int as shared_players
        FROM wallet_holdings h1
-       JOIN nft_core_metadata m1 ON m1.nft_id = h1.nft_id
+       JOIN nft_core_metadata_v2 m1 ON m1.nft_id = h1.nft_id
        WHERE h1.wallet_address = $1
          AND m1.edition_id IN (
            SELECT m2.edition_id FROM wallet_holdings h2
-           JOIN nft_core_metadata m2 ON m2.nft_id = h2.nft_id
+           JOIN nft_core_metadata_v2 m2 ON m2.nft_id = h2.nft_id
            WHERE h2.wallet_address = $2
          )`,
       [w1, w2]
@@ -10438,7 +10438,7 @@ async function computeRarityScore(walletAddress) {
       h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
       m.first_name, m.last_name, m.edition_id
     FROM wallet_holdings h
-    JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+    JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
     WHERE h.wallet_address = $1`,
     [walletAddress]
   );
@@ -10634,7 +10634,7 @@ app.get("/api/rarity-score", async (req, res) => {
         h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
         m.first_name, m.last_name
       FROM wallet_holdings h
-      JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1`,
       [wallet]
     );
@@ -11217,7 +11217,7 @@ app.get("/api/listings", async (req, res) => {
       SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size,
              p.display_name as seller_name
       FROM listings l
-      LEFT JOIN nft_core_metadata m ON m.nft_id = l.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = l.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = l.seller_wallet
       WHERE l.status = 'active'
       ORDER BY l.created_at DESC
@@ -11247,7 +11247,7 @@ app.get("/api/my-listings", async (req, res) => {
     const { rows } = await pool.query(`
       SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size
       FROM listings l
-      LEFT JOIN nft_core_metadata m ON m.nft_id = l.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = l.nft_id
       WHERE l.seller_wallet = $1 AND l.status = 'active'
       ORDER BY l.created_at DESC
     `, [wallet]);
