@@ -13,6 +13,7 @@ import { Pool } from "pg"; // (still imported; fine even if unused)
 import session from "express-session";
 import bcrypt from "bcrypt";
 import WebSocket from "ws";
+import * as eventProcessor from "./services/event-processor.js";
 
 dotenv.config();
 
@@ -279,11 +280,8 @@ let flowWsConnected = false;
 let flowWsReconnectTimer = null;
 let lastFlowEventTime = null;
 
-// Event types we care about
-const ALLDAY_EVENT_TYPES = [
-  `${ALLDAY_CONTRACT}.Deposit`,
-  `${ALLDAY_CONTRACT}.Withdraw`
-];
+// Event types we care about - expanded to include metadata events for self-managed data
+const ALLDAY_EVENT_TYPES = eventProcessor.ALLDAY_EVENT_TYPES;
 
 function addLiveEvent(event) {
   liveEventsCache.unshift(event);
@@ -458,7 +456,10 @@ async function processFlowEvent(event) {
 
     console.log(`Live event: ${eventType} NFT=${nftId} from=${fromAddr} to=${toAddr}`);
 
-    // Update wallet holdings in real-time
+    // Process event for new normalized tables (series, sets, plays, editions, nfts, holdings)
+    await eventProcessor.processBlockchainEvent(event);
+
+    // Update legacy wallet_holdings table in real-time (keep for backward compatibility)
     if (nftId && eventType === 'Deposit' && toAddr) {
       await updateWalletHoldingOnDeposit(toAddr, nftId, timestamp, blockHeight);
     } else if (nftId && eventType === 'Withdraw' && fromAddr) {
