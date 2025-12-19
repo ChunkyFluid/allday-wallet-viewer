@@ -5,6 +5,7 @@
 import { pgQuery } from "../db.js";
 
 const ALLDAY_CONTRACT = "A.e4cf4bdc1751c65d.AllDay";
+const NFTLOCKER_CONTRACT = "0xb6f2481eba4df97b"; // NFTLocker holds locked NFTs - don't track as wallet owner
 
 // All event types we want to process
 export const ALLDAY_EVENT_TYPES = [
@@ -267,6 +268,13 @@ export async function handleDeposit(event, payload) {
         return;
     }
 
+    // Ignore deposits TO the NFTLocker contract (these are locked NFTs)
+    // The original owner should remain the owner, just with is_locked = true
+    if (toAddr === NFTLOCKER_CONTRACT.toLowerCase()) {
+        console.log(`[Event] Deposit: Ignoring deposit to NFTLocker contract for NFT ${nftId}`);
+        return;
+    }
+
     try {
         await pgQuery(`
       INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
@@ -293,6 +301,13 @@ export async function handleWithdraw(event, payload) {
         return;
     }
 
+    // Ignore withdrawals FROM the NFTLocker contract (these are unlocked NFTs)
+    // The owner is still tracked separately
+    if (fromAddr === NFTLOCKER_CONTRACT.toLowerCase()) {
+        console.log(`[Event] Withdraw: Ignoring withdraw from NFTLocker contract for NFT ${nftId}`);
+        return;
+    }
+
     try {
         await pgQuery(`
       DELETE FROM holdings WHERE wallet_address = $1 AND nft_id = $2
@@ -315,9 +330,9 @@ export async function handleNFTLocked(event, payload) {
     }
 
     try {
-        await pgQuery(`
-      UPDATE holdings SET is_locked = TRUE WHERE nft_id = $1
-    `, [nftId]);
+        // Update is_locked in both tables (new and legacy)
+        await pgQuery(`UPDATE holdings SET is_locked = TRUE WHERE nft_id = $1`, [nftId]);
+        await pgQuery(`UPDATE wallet_holdings SET is_locked = TRUE WHERE nft_id = $1`, [nftId]);
 
         console.log(`[Event] ✅ NFTLocked: NFT ${nftId}`);
     } catch (err) {
@@ -336,9 +351,9 @@ export async function handleNFTUnlocked(event, payload) {
     }
 
     try {
-        await pgQuery(`
-      UPDATE holdings SET is_locked = FALSE WHERE nft_id = $1
-    `, [nftId]);
+        // Update is_locked in both tables (new and legacy)
+        await pgQuery(`UPDATE holdings SET is_locked = FALSE WHERE nft_id = $1`, [nftId]);
+        await pgQuery(`UPDATE wallet_holdings SET is_locked = FALSE WHERE nft_id = $1`, [nftId]);
 
         console.log(`[Event] ✅ NFTUnlocked: NFT ${nftId}`);
     } catch (err) {

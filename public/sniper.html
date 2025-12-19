@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Moment Sniper | NFL All Day</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
   <style>
     :root {
       --sniper-bg: #050815;
@@ -86,8 +89,15 @@
     }
 
     @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
     }
 
     /* Stats Bar - right side of header */
@@ -120,8 +130,13 @@
       margin-top: 2px;
     }
 
-    .stat-card.deals .stat-value { color: #22c55e; }
-    .stat-card.listings .stat-value { color: #3b82f6; }
+    .stat-card.deals .stat-value {
+      color: #22c55e;
+    }
+
+    .stat-card.listings .stat-value {
+      color: #3b82f6;
+    }
 
     /* Two Column Layout */
     .layout-two-column {
@@ -229,8 +244,13 @@
     }
 
     @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .auto-refresh-row {
@@ -365,8 +385,15 @@
     }
 
     @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+      }
     }
 
     /* Card Content */
@@ -398,10 +425,25 @@
       letter-spacing: 0.5px;
     }
 
-    .tier-badge.legendary { background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f2937; }
-    .tier-badge.rare { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; }
-    .tier-badge.uncommon { background: linear-gradient(135deg, #10b981, #059669); color: white; }
-    .tier-badge.common { background: #4b5563; color: white; }
+    .tier-badge.legendary {
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      color: #1f2937;
+    }
+
+    .tier-badge.rare {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+    }
+
+    .tier-badge.uncommon {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+
+    .tier-badge.common {
+      background: #4b5563;
+      color: white;
+    }
 
     .card-body {
       padding: 16px;
@@ -548,8 +590,13 @@
       font-size: 0.875rem;
     }
 
-    #status.error { color: var(--deal-hot); }
-    #status.success { color: var(--deal-good); }
+    #status.error {
+      color: var(--deal-hot);
+    }
+
+    #status.success {
+      color: var(--deal-good);
+    }
 
     /* Loading skeleton */
     .skeleton {
@@ -560,8 +607,13 @@
     }
 
     @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
     }
 
     /* View toggle */
@@ -652,8 +704,13 @@
       color: #e5e7eb;
     }
 
-    .listings-table th.sorted-asc::after { content: " ▲"; }
-    .listings-table th.sorted-desc::after { content: " ▼"; }
+    .listings-table th.sorted-asc::after {
+      content: " ▲";
+    }
+
+    .listings-table th.sorted-desc::after {
+      content: " ▼";
+    }
 
     .listings-table tr {
       background: var(--sniper-card);
@@ -669,10 +726,21 @@
       font-weight: 600;
     }
 
-    .listings-table .deal-cell.hot { color: var(--deal-hot); }
-    .listings-table .deal-cell.warm { color: var(--deal-warm); }
-    .listings-table .deal-cell.good { color: var(--deal-good); }
-    .listings-table .deal-cell.neutral { color: var(--deal-neutral); }
+    .listings-table .deal-cell.hot {
+      color: var(--deal-hot);
+    }
+
+    .listings-table .deal-cell.warm {
+      color: var(--deal-warm);
+    }
+
+    .listings-table .deal-cell.good {
+      color: var(--deal-good);
+    }
+
+    .listings-table .deal-cell.neutral {
+      color: var(--deal-neutral);
+    }
 
     .listings-table th {
       background: rgba(15, 23, 42, 0.8);
@@ -734,13 +802,16 @@
       .layout-two-column {
         grid-template-columns: 1fr;
       }
+
       .filters-card {
         position: static;
       }
+
       .page-header {
         flex-direction: column;
         align-items: flex-start;
       }
+
       .stats-bar {
         width: 100%;
         justify-content: flex-start;
@@ -751,72 +822,80 @@
       .sniper-container {
         padding: 1rem 0.75rem;
       }
-      
-      .page-header h1 { font-size: 1.1rem; }
-      
+
+      .page-header h1 {
+        font-size: 1.1rem;
+      }
+
       .page-header-left {
         width: 100%;
       }
-      
+
       .stats-bar {
         gap: 8px;
       }
-      
-      .stat-card { 
-        min-width: 70px; 
+
+      .stat-card {
+        min-width: 70px;
         padding: 8px 12px;
         flex: 1;
       }
-      .stat-card .stat-value { font-size: 1.1rem; }
-      .stat-card .stat-label { font-size: 0.6rem; }
-      
+
+      .stat-card .stat-value {
+        font-size: 1.1rem;
+      }
+
+      .stat-card .stat-label {
+        font-size: 0.6rem;
+      }
+
       /* Show filter toggle on mobile */
       .filters-toggle {
         display: flex;
       }
-      
+
       /* Hide filters by default on mobile */
       .filters-card {
         display: none;
         margin-bottom: 1rem;
       }
-      
+
       .filters-card.open {
         display: block;
       }
-      
+
       .layout-two-column {
         gap: 0;
       }
-      
+
       /* Table improvements */
       .results-card {
         border-radius: 12px;
       }
-      
+
       .results-header {
         padding: 0.75rem 1rem;
         flex-direction: column;
         gap: 0.75rem;
         align-items: stretch;
       }
-      
+
       .results-info {
         font-size: 0.8rem;
         text-align: center;
       }
-      
+
       .view-toggle {
         justify-content: center;
       }
-      
+
       /* Make table scrollable horizontally */
       .listings-table {
         display: block;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
       }
-      
+
       .listings-table thead,
       .listings-table tbody,
       .listings-table tr {
@@ -824,39 +903,39 @@
         width: 100%;
         table-layout: fixed;
       }
-      
+
       .listings-table {
         min-width: 800px;
       }
-      
+
       .listings-table th,
       .listings-table td {
         padding: 10px 8px;
         font-size: 0.75rem;
       }
-      
-      .listings-grid { 
+
+      .listings-grid {
         grid-template-columns: 1fr;
         padding: 1rem;
         gap: 12px;
       }
-      
+
       .listing-card {
         border-radius: 10px;
       }
-      
+
       .card-image {
         height: 140px;
       }
-      
+
       .card-body {
         padding: 12px;
       }
-      
+
       .player-name {
         font-size: 1rem;
       }
-      
+
       .btn-snipe {
         padding: 14px;
         font-size: 0.85rem;
@@ -867,14 +946,19 @@
       .sniper-container {
         padding: 0.75rem 0.5rem;
       }
-      
-      .page-header h1 { font-size: 1rem; }
-      
-      .stat-card { 
+
+      .page-header h1 {
+        font-size: 1rem;
+      }
+
+      .stat-card {
         padding: 6px 10px;
       }
-      .stat-card .stat-value { font-size: 1rem; }
-      
+
+      .stat-card .stat-value {
+        font-size: 1rem;
+      }
+
       .listings-table th,
       .listings-table td {
         padding: 8px 6px;
@@ -891,13 +975,13 @@
       .listings-table {
         display: none !important;
       }
-      
+
       .mobile-listings {
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
-      
+
       .mobile-card {
         display: flex;
         align-items: center;
@@ -910,21 +994,21 @@
         color: inherit;
         transition: transform 0.15s, border-color 0.15s;
       }
-      
+
       .mobile-card:hover {
         transform: translateX(4px);
         border-color: #3b82f6;
       }
-      
+
       .mobile-card.is-deal {
         border-left: 3px solid #22c55e;
       }
-      
+
       .mobile-card.is-hot-deal {
         border-left: 3px solid #22c55e;
         background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(15, 23, 42, 0.9));
       }
-      
+
       .mobile-card-icon {
         width: 40px;
         height: 40px;
@@ -935,25 +1019,39 @@
         font-size: 1.25rem;
         flex-shrink: 0;
       }
-      
-      .mobile-card-icon.common { background: #4b5563; }
-      .mobile-card-icon.uncommon { background: #6b7280; }
-      .mobile-card-icon.rare { background: #f97316; }
-      .mobile-card-icon.legendary { background: linear-gradient(135deg, #ffd54f, #ffb300); }
-      .mobile-card-icon.ultimate { background: linear-gradient(135deg, #ff5b81, #6f42c1); }
-      
+
+      .mobile-card-icon.common {
+        background: #4b5563;
+      }
+
+      .mobile-card-icon.uncommon {
+        background: #6b7280;
+      }
+
+      .mobile-card-icon.rare {
+        background: #f97316;
+      }
+
+      .mobile-card-icon.legendary {
+        background: linear-gradient(135deg, #ffd54f, #ffb300);
+      }
+
+      .mobile-card-icon.ultimate {
+        background: linear-gradient(135deg, #ff5b81, #6f42c1);
+      }
+
       .mobile-card-main {
         flex: 1;
         min-width: 0;
       }
-      
+
       .mobile-card-header {
         display: flex;
         align-items: center;
         gap: 8px;
         margin-bottom: 2px;
       }
-      
+
       .mobile-card-player {
         font-weight: 600;
         font-size: 0.95rem;
@@ -961,7 +1059,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      
+
       .mobile-card-team {
         font-size: 0.65rem;
         font-weight: 600;
@@ -971,7 +1069,7 @@
         color: var(--text-muted);
         flex-shrink: 0;
       }
-      
+
       .mobile-card-tier {
         font-size: 0.6rem;
         font-weight: 600;
@@ -980,13 +1078,32 @@
         text-transform: uppercase;
         flex-shrink: 0;
       }
-      
-      .mobile-card-tier.common { background: #4b5563; color: #e5e7eb; }
-      .mobile-card-tier.uncommon { background: #6b7280; color: #e5e7eb; }
-      .mobile-card-tier.rare { background: #f97316; color: #111; }
-      .mobile-card-tier.legendary { background: linear-gradient(135deg, #ffd54f, #ffb300); color: #111; }
-      .mobile-card-tier.ultimate { background: linear-gradient(135deg, #ff5b81, #6f42c1); color: #fff; }
-      
+
+      .mobile-card-tier.common {
+        background: #4b5563;
+        color: #e5e7eb;
+      }
+
+      .mobile-card-tier.uncommon {
+        background: #6b7280;
+        color: #e5e7eb;
+      }
+
+      .mobile-card-tier.rare {
+        background: #f97316;
+        color: #111;
+      }
+
+      .mobile-card-tier.legendary {
+        background: linear-gradient(135deg, #ffd54f, #ffb300);
+        color: #111;
+      }
+
+      .mobile-card-tier.ultimate {
+        background: linear-gradient(135deg, #ff5b81, #6f42c1);
+        color: #fff;
+      }
+
       .mobile-card-details {
         font-size: 0.75rem;
         color: var(--text-muted);
@@ -995,60 +1112,69 @@
         gap: 8px;
         flex-wrap: wrap;
       }
-      
+
       .mobile-card-set {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 150px;
       }
-      
+
       .mobile-card-right {
         text-align: right;
         flex-shrink: 0;
       }
-      
+
       .mobile-card-price {
         font-family: 'JetBrains Mono', monospace;
         font-size: 1rem;
         font-weight: 700;
         color: #3b82f6;
       }
-      
+
       .mobile-card.is-deal .mobile-card-price,
       .mobile-card.is-hot-deal .mobile-card-price {
         color: #22c55e;
       }
-      
+
       .mobile-card-deal {
         font-size: 0.7rem;
         font-weight: 600;
       }
-      
-      .mobile-card-deal.positive { color: #22c55e; }
-      .mobile-card-deal.negative { color: #ef4444; }
-      .mobile-card-deal.neutral { color: #6b7280; }
-      
+
+      .mobile-card-deal.positive {
+        color: #22c55e;
+      }
+
+      .mobile-card-deal.negative {
+        color: #ef4444;
+      }
+
+      .mobile-card-deal.neutral {
+        color: #6b7280;
+      }
+
       .mobile-card-serial {
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.7rem;
         color: var(--text-muted);
       }
-      
+
       .mobile-card-serial.low-serial {
         color: #fbbf24;
         font-weight: 600;
       }
-      
+
       .view-toggle {
         display: none;
       }
     }
   </style>
 </head>
+
 <body>
   <div id="app-header"></div>
-  
+
   <div class="sniper-container">
     <!-- Page Header: Title left, Stats right -->
     <div class="page-header">
@@ -1059,7 +1185,7 @@
           <span id="live-status">Connecting...</span>
         </div>
       </div>
-      
+
       <div class="stats-bar">
         <div class="stat-card deals">
           <div class="stat-value" id="stat-deals">0</div>
@@ -1256,12 +1382,17 @@
 
         <!-- Mobile Card View -->
         <div class="mobile-listings" id="mobile-listings"></div>
-        
+
         <!-- Pagination -->
-        <div id="sniper-pager" style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; justify-content: center; font-size: 0.85rem;">
-          <button id="sniper-page-prev" style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;" disabled>← Prev</button>
+        <div id="sniper-pager"
+          style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; justify-content: center; font-size: 0.85rem;">
+          <button id="sniper-page-prev"
+            style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;"
+            disabled>← Prev</button>
           <span id="sniper-page-info" style="color: #9ca3af; min-width: 200px; text-align: center;"></span>
-          <button id="sniper-page-next" style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;" disabled>Next →</button>
+          <button id="sniper-page-next"
+            style="padding: 0.5rem 1rem; background: rgba(111, 66, 193, 0.2); border: 1px solid rgba(111, 66, 193, 0.4); border-radius: 6px; color: #e5e7eb; cursor: pointer;"
+            disabled>Next →</button>
         </div>
       </div>
     </div>
@@ -1390,7 +1521,7 @@
       const mins = Math.floor(diff / 60000);
       const hours = Math.floor(diff / 3600000);
       const days = Math.floor(diff / 86400000);
-      
+
       if (mins < 1) return 'Just now';
       if (mins < 60) return `${mins}m ago`;
       if (hours < 24) return `${hours}h ago`;
@@ -1408,22 +1539,22 @@
         // Check if user is signed in
         const meRes = await fetch('/api/me', { credentials: 'include' });
         const meData = await meRes.json();
-        
+
         if (!meData.ok || !meData.user || !meData.user.default_wallet_address) {
           ownedCounts = {};
           userWallet = null;
           return;
         }
-        
+
         userWallet = meData.user.default_wallet_address;
-        
+
         // Fetch wallet moments from blockchain (real-time data)
         // Fallback to database if blockchain query fails
         let walletData = null;
         try {
           const walletRes = await fetch(`/api/query-blockchain?wallet=${encodeURIComponent(userWallet)}`);
           walletData = await walletRes.json();
-        if (!walletData.ok || !walletData.rows) {
+          if (!walletData.ok || !walletData.rows) {
             // Fallback to database
             const fallbackRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
             walletData = await fallbackRes.json();
@@ -1434,12 +1565,12 @@
           const fallbackRes = await fetch(`/api/query?wallet=${encodeURIComponent(userWallet)}`);
           walletData = await fallbackRes.json();
         }
-        
+
         if (!walletData || !walletData.ok || !walletData.rows) {
           ownedCounts = {};
           return;
         }
-        
+
         // Count duplicates by edition_id
         const counts = {};
         for (const moment of walletData.rows) {
@@ -1447,7 +1578,7 @@
             counts[moment.edition_id] = (counts[moment.edition_id] || 0) + 1;
           }
         }
-        
+
         ownedCounts = counts;
       } catch (err) {
         console.error('Error fetching owned counts:', err);
@@ -1455,17 +1586,17 @@
         userWallet = null;
       }
     }
-    
+
     // Get owned count for a listing
     function getOwnedCount(editionId) {
       if (!editionId || !ownedCounts[editionId]) return null;
       return ownedCounts[editionId];
     }
-    
+
     // Warmup the cache on first load
     let cacheWarmedUp = false;
     let availableTeams = [];
-    
+
     async function warmupCache() {
       if (cacheWarmedUp) return;
       try {
@@ -1480,7 +1611,7 @@
         console.error('Warmup error:', e);
       }
     }
-    
+
     // Fetch all listings
     async function fetchListings() {
       if (isLoadingListings) {
@@ -1488,11 +1619,11 @@
         pendingRefresh = true;
         return;
       }
-      
+
       btnRefresh.classList.add('loading');
       isLoadingListings = true;
       pendingRefresh = false;
-      
+
       if (statusEl) {
         statusEl.textContent = 'Loading listings...';
         statusEl.className = '';
@@ -1503,22 +1634,22 @@
       try {
         // Fetch owned counts if user is signed in (do this in parallel with listings)
         const ownedPromise = fetchOwnedCounts();
-        
+
         // Always use real-time endpoint - it's fast and reads from in-memory array
         // The watcher continuously populates the array, so it should have recent listings
         let data;
         let isHistoricalData = false;
-        
+
         if (isInitialLoad) {
           console.log('[Sniper] Initial load - fetching real-time listings...');
           isInitialLoad = false; // Mark as no longer initial load
         }
-        
+
         // Use real-time endpoint (fast - reads from in-memory array)
         // Add timeout to prevent hanging
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased for slow connections)
-        
+
         try {
           // Build query params including marketplace and status filters
           const params = new URLSearchParams();
@@ -1528,17 +1659,17 @@
           if (filterStatus.value && filterStatus.value !== 'active') {
             params.append('status', filterStatus.value);
           }
-          
+
           const response = await fetch(`/api/sniper-deals?${params.toString()}`, { signal: controller.signal });
           clearTimeout(timeoutId);
-          
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
-          
+
           data = await response.json();
           console.log('[Sniper] Real-time response:', { ok: data.ok, count: data.listings?.length || 0, watching: data.watching });
-          
+
           // If no listings yet and watcher just started, show a message
           if (data.listings && data.listings.length === 0 && !data.watching) {
             console.log('[Sniper] No listings yet - watcher may still be starting');
@@ -1568,16 +1699,16 @@
         }
 
         listings = data.listings || [];
-        
+
         if (!Array.isArray(listings)) {
           console.error('[Sniper] listings is not an array!', typeof listings, listings);
           listings = [];
         }
-        
+
         console.log('[Sniper] Final listings count:', listings.length);
-        
+
         console.log('[Sniper] Processed listings:', listings.length, 'isHistorical:', isHistoricalData);
-        
+
         // Normalize listing structure if coming from historical endpoint
         // (sniper-listings uses currentFloor, sniper-deals uses floor)
         if (isHistoricalData && listings.length > 0) {
@@ -1590,21 +1721,21 @@
           });
           console.log('[Sniper] Normalized historical listings:', listings.length);
         }
-        
+
         // Ensure we have listings array even if empty
         if (!Array.isArray(listings)) {
           console.error('[Sniper] listings is not an array:', typeof listings, listings);
           listings = [];
         }
-        
+
         // Wait for owned counts to finish
         await ownedPromise;
-        
+
         // Update stats
         const dealsCount = listings.filter(l => l.dealPercent && l.dealPercent > 0).length;
         document.getElementById('stat-deals').textContent = dealsCount || 0;
         document.getElementById('stat-listings').textContent = listings.length || 0;
-        
+
         // Populate team dropdown from API data (only if available)
         if (data.availableTeams && data.availableTeams.length > 0) {
           availableTeams = data.availableTeams;
@@ -1633,12 +1764,12 @@
             filterTeam.value = currentTeam;
           }
         }
-        
+
         // Populate series and set multi-selects from listings data
         if (listings.length > 0) {
           const uniqueSeries = [...new Set(listings.map(l => l.seriesName).filter(Boolean))].sort();
           const uniqueSets = [...new Set(listings.map(l => l.setName).filter(Boolean))].sort();
-          
+
           if (uniqueSeries.length > 0) {
             seriesMultiSelect.setItems(uniqueSeries);
           }
@@ -1646,11 +1777,11 @@
             setMultiSelect.setItems(uniqueSets);
           }
         }
-        
+
         // Update live indicator (only if data available from real-time endpoint)
         if (data.watching !== undefined) {
-          document.getElementById('live-status').textContent = data.watching 
-            ? `LIVE · Block ${data.lastCheckedBlock || '?'}` 
+          document.getElementById('live-status').textContent = data.watching
+            ? `LIVE · Block ${data.lastCheckedBlock || '?'}`
             : 'Offline';
           document.getElementById('cache-status').textContent = `${data.floorCacheSize || 0} floors cached`;
           document.getElementById('live-dot').style.background = data.watching ? '#22c55e' : '#ef4444';
@@ -1662,17 +1793,17 @@
         }
 
         isLoadingListings = false;
-        
+
         console.log('[Sniper] About to render listings:', listings.length);
         renderListings();
-        
+
         const timestamp = new Date().toLocaleTimeString();
         const totalCount = data.total || data.count || listings.length;
         statusEl.textContent = `${timestamp} • ${totalCount} listings, ${dealsCount} deals`;
         statusEl.className = dealsCount > 0 ? 'success' : '';
-        
+
         console.log('[Sniper] Render complete, listings array length:', listings.length);
-        
+
         // If there's a pending refresh, trigger it now
         if (pendingRefresh) {
           pendingRefresh = false;
@@ -1682,12 +1813,12 @@
       } catch (err) {
         console.error('Error fetching listings:', err);
         isLoadingListings = false;
-        
+
         // Only show error message if it's not a timeout during auto-refresh
         // (timeouts during auto-refresh are expected if server is slow)
         const isAutoRefresh = autoRefreshCheckbox && autoRefreshCheckbox.checked;
         const isTimeout = err.message && err.message.includes('timed out');
-        
+
         if (!isAutoRefresh || !isTimeout) {
           statusEl.textContent = 'Error: ' + err.message;
           statusEl.className = 'error';
@@ -1696,11 +1827,11 @@
           statusEl.textContent = 'Refreshing...';
           statusEl.className = '';
         }
-        
+
         document.getElementById('live-dot').style.background = '#ef4444';
         // Still render even on error (will show empty state)
         renderListings();
-        
+
         // If there's a pending refresh, trigger it now (after a delay)
         if (pendingRefresh) {
           pendingRefresh = false;
@@ -1710,7 +1841,7 @@
         btnRefresh.classList.remove('loading');
       }
     }
-    
+
     // Warmup on load
     warmupCache();
 
@@ -1802,7 +1933,7 @@
       // Player search
       const playerSearch = filterPlayer.value.toLowerCase().trim();
       if (playerSearch) {
-        filtered = filtered.filter(l => 
+        filtered = filtered.filter(l =>
           l.playerName?.toLowerCase().includes(playerSearch)
         );
       }
@@ -1863,13 +1994,13 @@
     function renderListings() {
       console.log('[Sniper renderListings] Called, isLoading:', isLoadingListings, 'listings count:', listings?.length || 0, 'type:', typeof listings);
       const mobileListings = document.getElementById('mobile-listings');
-      
+
       // Ensure listings is an array
       if (!Array.isArray(listings)) {
         console.error('[Sniper renderListings] listings is not an array!', typeof listings, listings);
         listings = [];
       }
-      
+
       // If listings are currently being loaded, show loading state
       if (isLoadingListings && listings.length === 0) {
         listingsGrid.innerHTML = `
@@ -1896,14 +2027,14 @@
         }
         return;
       }
-      
+
       const filtered = getFilteredListings();
       const total = filtered.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      
+
       // Update current page if it's out of bounds
       currentPage = Math.max(1, Math.min(currentPage, totalPages));
-      
+
       // Get the slice for current page
       const start = (currentPage - 1) * PAGE_SIZE;
       const end = Math.min(start + PAGE_SIZE, total);
@@ -1936,16 +2067,16 @@
         const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
         const soldClass = l.isSold ? 'listing-sold' : (l.isUnlisted ? 'listing-unlisted' : '');
         const ownedCount = getOwnedCount(l.editionId);
-        const ownedBadge = ownedCount 
+        const ownedBadge = ownedCount
           ? `<span style="display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);" title="You own ${ownedCount} of this moment">x${ownedCount}</span>`
           : '';
 
-        const marketplaceBadge = l.marketplace === 'flowty' 
+        const marketplaceBadge = l.marketplace === 'flowty'
           ? `<div style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(139, 92, 246, 0.9); color: white; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 5;">Flowty</div>`
           : l.marketplace === 'nflad'
-          ? `<div style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(59, 130, 246, 0.9); color: white; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 5;">NFLAD</div>`
-          : '';
-        
+            ? `<div style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(59, 130, 246, 0.9); color: white; border-radius: 4px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; z-index: 5;">NFLAD</div>`
+            : '';
+
         return `
           <div class="listing-card ${soldClass}">
             <div class="card-image">
@@ -2004,17 +2135,17 @@
         const isHotDeal = l.dealPercent >= 15;
         const isGoodDeal = l.dealPercent >= 5;
         const isOverpriced = l.dealPercent < 0;
-        
+
         // Gold serial only if #1 or matches jersey number
         const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
-        
+
         // Row background
         let rowBg = '';
         if (isHotDeal) rowBg = 'background: rgba(34, 197, 94, 0.2);';
         else if (isGoodDeal) rowBg = 'background: rgba(34, 197, 94, 0.1);';
         else if (isDeal) rowBg = 'background: rgba(34, 197, 94, 0.05);';
         else if (isOverpriced) rowBg = 'background: rgba(239, 68, 68, 0.05);';
-        
+
         // Deal display
         let dealDisplay = '—';
         let dealColor = '#6b7280';
@@ -2028,7 +2159,7 @@
           dealDisplay = '=';
           dealColor = '#6b7280';
         }
-        
+
         // Button style
         let btnBg = '#3b82f6';
         let btnText = 'View';
@@ -2036,15 +2167,15 @@
         else if (l.isUnlisted) { btnBg = '#9ca3af'; btnText = '❌ DELISTED'; }
         else if (isHotDeal) { btnBg = '#22c55e'; btnText = '🔥 SNIPE!'; }
         else if (isDeal) { btnBg = '#4ade80'; btnText = '⚡ BUY'; }
-        
+
         const soldClass = l.isSold ? 'listing-sold' : (l.isUnlisted ? 'listing-unlisted' : '');
-        
+
         // Get owned count
         const ownedCount = getOwnedCount(l.editionId);
-        const ownedDisplay = ownedCount 
+        const ownedDisplay = ownedCount
           ? `<span class="duplicate-count" title="You own ${ownedCount} of this moment" style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);">${ownedCount}</span>`
           : '<span style="color: #6b7280;">—</span>';
-        
+
         return `
           <tr class="${soldClass}" style="${rowBg}">
             <td>
@@ -2060,8 +2191,8 @@
             <td style="font-family: 'JetBrains Mono', monospace; color: ${dealColor}; font-weight: 600;">${dealDisplay}</td>
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
             <td style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
-            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || ''}">${l.sellerName || '-'}</td>
-            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerName || l.buyerAddr || '-') : (l.isUnlisted ? '—' : '-')}</td>
+            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || l.sellerAddress || ''}">${l.sellerAddress ? `<a href="/?wallet=${l.sellerAddress}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.sellerName || l.sellerAddress?.substring(0, 8) + '...' || '-'}</a>` : '-'}</td>
+            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerAddr ? `<a href="/?wallet=${l.buyerAddr}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.buyerName || l.buyerAddr?.substring(0, 8) + '...' || '-'}</a>` : '-') : (l.isUnlisted ? '—' : '-')}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
               <a href="${l.listingUrl || '#'}" target="_blank" 
@@ -2081,7 +2212,7 @@
         const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
         const tierClass = getTierClass(l.tier);
         const teamAbbrev = getTeamAbbrev(l.teamName);
-        
+
         // Deal display
         let dealDisplay = '';
         let dealClass = 'neutral';
@@ -2092,20 +2223,20 @@
           dealDisplay = `↑${Math.abs(l.dealPercent).toFixed(0)}%`;
           dealClass = 'negative';
         }
-        
+
         // Card class
         let cardClass = 'mobile-card';
         if (l.isSold) cardClass += ' listing-sold';
         else if (l.isUnlisted) cardClass += ' listing-unlisted';
         else if (isHotDeal) cardClass += ' is-hot-deal';
         else if (isDeal) cardClass += ' is-deal';
-        
+
         // Get owned count
         const ownedCount = getOwnedCount(l.editionId);
-        const ownedBadge = ownedCount 
+        const ownedBadge = ownedCount
           ? `<span style="display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; background: rgba(111, 66, 193, 0.25); color: #0dcaf0; border: 1px solid rgba(13, 202, 240, 0.3);" title="You own ${ownedCount} of this moment">x${ownedCount}</span>`
           : '';
-        
+
         return `
           <a href="${l.listingUrl || '#'}" target="_blank" class="${cardClass}">
             <div class="mobile-card-icon ${tierClass}">🏈</div>
@@ -2138,12 +2269,12 @@
           </a>
         `;
       }).join('');
-      
+
       // Update pagination controls
       const pagerInfo = document.getElementById('sniper-page-info');
       const pagerPrev = document.getElementById('sniper-page-prev');
       const pagerNext = document.getElementById('sniper-page-next');
-      
+
       if (pagerInfo) {
         const from = total ? start + 1 : 0;
         const to = end;
@@ -2160,7 +2291,7 @@
     // Auto-refresh every 3 seconds for live sniping
     function startAutoRefresh() {
       if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-      
+
       countdownValue = 5;
       countdownEl.textContent = `${countdownValue}s`;
 
@@ -2208,7 +2339,7 @@
         });
       }
     });
-    
+
     // Pagination button listeners
     const pagerPrev = document.getElementById('sniper-page-prev');
     const pagerNext = document.getElementById('sniper-page-next');
@@ -2236,7 +2367,7 @@
       th.addEventListener('click', () => {
         const key = th.dataset.sort;
         const currentSort = sortBy.value;
-        
+
         // Map table columns to sort values
         const sortMap = {
           'player': 'time-desc', // No direct player sort, use time
@@ -2260,7 +2391,7 @@
     // Mobile filter toggle
     const filtersToggle = document.getElementById('filters-toggle');
     const filtersCard = document.getElementById('filters-card');
-    
+
     if (filtersToggle && filtersCard) {
       filtersToggle.addEventListener('click', () => {
         filtersCard.classList.toggle('open');
@@ -2274,5 +2405,5 @@
     startAutoRefresh();
   </script>
 </body>
-</html>
 
+</html>

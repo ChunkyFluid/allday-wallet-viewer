@@ -1,71 +1,273 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Set Completion | NFL All Day</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <style>
-    :root { --bg: #050815; --card: #0b1020; --border: #1b2236; --text: #f8f9ff; --text-muted: #8c95b8; --accent: #22c55e; --purple: #6f42c1; }
-    body { background: radial-gradient(circle at top, #101526 0, #050815 55%); min-height: 100vh; font-family: 'Outfit', sans-serif; color: var(--text); margin: 0; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { font-size: 2rem; background: linear-gradient(135deg, #22c55e, #6f42c1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.5rem; }
-    .search-box { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
-    .search-box input { flex: 1; min-width: 250px; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 1rem; }
-    .search-box button { padding: 1rem 2rem; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent), var(--purple)); color: white; font-weight: 600; cursor: pointer; }
-    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .summary-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; }
-    .summary-card .value { font-size: 2rem; font-weight: 700; color: var(--accent); }
-    .summary-card .label { font-size: 0.85rem; color: var(--text-muted); }
-    .sets-grid { display: grid; gap: 1rem; }
-    .set-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
-    .set-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .set-name { font-size: 1.2rem; font-weight: 600; }
-    .set-progress { font-size: 0.9rem; color: var(--accent); }
-    .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 1rem; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 4px; transition: width 0.3s; }
-    .set-tiers { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .tier-badge { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-    .tier-common { background: rgba(156,163,175,0.2); color: #9ca3af; }
-    .tier-uncommon { background: rgba(34,197,94,0.2); color: #22c55e; }
-    .tier-rare { background: rgba(59,130,246,0.2); color: #3b82f6; }
-    .tier-legendary { background: rgba(168,85,247,0.2); color: #a855f7; }
-    .tier-ultimate { background: rgba(251,191,36,0.2); color: #fbbf24; }
-    .complete { border-color: var(--accent); box-shadow: 0 0 20px rgba(34,197,94,0.2); }
-    .loading, .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
-    .filter-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .filter-btn { padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
-    .filter-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-    .desktop-only { display: block; }
-    .mobile-only { display: none; }
-    .table thead th.sortable { cursor: pointer; }
-    .table thead th.sortable::after { content: ' ⇅'; font-size: 0.75em; color: var(--text-muted); }
-    .table thead th.sortable.sort-asc::after { content: ' ↑'; }
-    .table thead th.sortable.sort-desc::after { content: ' ↓'; }
+    :root {
+      --bg: #050815;
+      --card: #0b1020;
+      --border: #1b2236;
+      --text: #f8f9ff;
+      --text-muted: #8c95b8;
+      --accent: #22c55e;
+      --purple: #6f42c1;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #101526 0, #050815 55%);
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #22c55e, #6f42c1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .search-box input {
+      flex: 1;
+      min-width: 250px;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .search-box button {
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .summary-card .label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .sets-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .set-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .set-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .set-name {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .set-progress {
+      font-size: 0.9rem;
+      color: var(--accent);
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--purple));
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .set-tiers {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tier-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tier-common {
+      background: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+    }
+
+    .tier-uncommon {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .tier-rare {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+
+    .tier-legendary {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+
+    .tier-ultimate {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .complete {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+    }
+
+    .loading,
+    .empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .filter-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .desktop-only {
+      display: block;
+    }
+
+    .mobile-only {
+      display: none;
+    }
+
+    .table thead th.sortable {
+      cursor: pointer;
+    }
+
+    .table thead th.sortable::after {
+      content: ' ⇅';
+      font-size: 0.75em;
+      color: var(--text-muted);
+    }
+
+    .table thead th.sortable.sort-asc::after {
+      content: ' ↑';
+    }
+
+    .table thead th.sortable.sort-desc::after {
+      content: ' ↓';
+    }
+
     /* spinner styles are provided globally in styles.css */
     @media (max-width: 768px) {
-      .desktop-only { display: none; }
-      .mobile-only { display: grid; }
+      .desktop-only {
+        display: none;
+      }
+
+      .mobile-only {
+        display: grid;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="app-header"></div>
   <script src="/layout.js"></script>
   <main class="app-main">
     <div class="container">
       <h1>📊 Set Completion Tracker</h1>
-      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Track your progress towards completing NFL All Day sets</p>
-      
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Track your progress towards completing NFL All Day
+        sets</p>
+
       <div class="search-box">
         <input type="text" id="wallet-input" placeholder="Search by name or wallet address..." />
         <button onclick="loadCompletion()">Check Progress</button>
       </div>
       <script src="/wallet-search.js"></script>
       <script src="/js/multi-select.js"></script>
-      
+
       <div id="results"></div>
     </div>
   </main>
@@ -113,41 +315,183 @@
       }
     }
     loadCatalog();
-    
+
     async function loadCompletion() {
       // Use data attribute if available (from autocomplete), otherwise use input value
       const wallet = (input.dataset.walletAddress || input.value).trim().toLowerCase();
       if (!wallet || !wallet.startsWith('0x')) return;
-      
+
       walletLoading = true;
-      updateStatus("Analyzing set completion…");
-      
+      showLoadingState("Analyzing set completion");
+
       try {
         const res = await fetch(`/api/set-completion?wallet=${wallet}`);
         const data = await res.json();
-        
+
         if (!data.ok) throw new Error(data.error);
-        
+
         const ownedMap = new Map((data.sets || []).map(s => [s.set_name, s]));
         const base = catalogSets.length ? catalogSets : data.sets || [];
         allSets = base.map(s => {
           const owned = ownedMap.get(s.set_name);
-          return owned ? owned : { ...s, owned: 0, completion: 0, by_tier: { Common:0, Uncommon:0, Rare:0, Legendary:0, Ultimate:0 }, cost_to_complete: s.cost_to_complete || 0 };
+          return owned ? owned : { ...s, owned: 0, completion: 0, by_tier: { Common: 0, Uncommon: 0, Rare: 0, Legendary: 0, Ultimate: 0 }, cost_to_complete: s.cost_to_complete || 0 };
         });
         renderResults({ summary: summarize(allSets), sets: allSets, team_progress: data.team_progress || [] });
       } catch (err) {
+        hideLoadingState();
         updateStatus(`❌ ${err.message}`);
       } finally {
         walletLoading = false;
+        hideLoadingState();
         updateStatus("");
       }
     }
-    
+
+    let loadingStepIndex = 0;
+    let loadingInterval = null;
+    const loadingSteps = [
+      { icon: '📋', text: 'Loading set catalog' },
+      { icon: '🔍', text: 'Scanning your collection' },
+      { icon: '💰', text: 'Calculating costs to complete' },
+      { icon: '🏈', text: 'Analyzing team progress' },
+      { icon: '✨', text: 'Preparing results' }
+    ];
+
+    function showLoadingState(message) {
+      const existingLoader = document.getElementById('loading-overlay');
+      if (existingLoader) existingLoader.remove();
+      clearInterval(loadingInterval);
+      loadingStepIndex = 0;
+
+      const loader = document.createElement('div');
+      loader.id = 'loading-overlay';
+      loader.innerHTML = `
+        <div style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem 3rem;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          text-align: center;
+          min-width: 300px;
+        ">
+          <div class="spinning-football" style="
+            font-size: 3rem;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+          ">🏈</div>
+          <div style="color: var(--text); font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">
+            ${message}<span class="loading-dots"></span>
+          </div>
+          <div id="loading-steps" style="text-align: left; width: 100%;">
+            ${loadingSteps.map((step, i) => `
+              <div class="loading-step" data-step="${i}" style="
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.4rem 0;
+                color: var(--text-muted);
+                font-size: 0.85rem;
+                opacity: 0.4;
+                transition: all 0.3s ease;
+              ">
+                <span class="step-icon">${step.icon}</span>
+                <span class="step-text">${step.text}</span>
+                <span class="step-check" style="margin-left: auto; display: none;">✓</span>
+              </div>
+            `).join('')}
+          </div>
+          <div style="
+            margin-top: 1rem;
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+          ">
+            <div id="loading-progress-bar" style="
+              height: 100%;
+              background: linear-gradient(90deg, var(--accent), var(--purple));
+              width: 0%;
+              transition: width 0.5s ease;
+            "></div>
+          </div>
+        </div>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+          }
+          @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+          }
+          .loading-step.active {
+            opacity: 1 !important;
+            color: var(--text) !important;
+          }
+          .loading-step.complete {
+            opacity: 0.8 !important;
+            color: var(--accent) !important;
+          }
+          .loading-step.complete .step-check {
+            display: inline !important;
+            color: var(--accent);
+          }
+        </style>
+      `;
+      results.innerHTML = '';
+      results.appendChild(loader);
+
+      // Start animating through steps
+      updateLoadingStep(0);
+      loadingInterval = setInterval(() => {
+        if (loadingStepIndex < loadingSteps.length - 1) {
+          loadingStepIndex++;
+          updateLoadingStep(loadingStepIndex);
+        }
+      }, 2000); // Progress every 2 seconds
+    }
+
+    function updateLoadingStep(stepIndex) {
+      const steps = document.querySelectorAll('.loading-step');
+      const progressBar = document.getElementById('loading-progress-bar');
+
+      steps.forEach((step, i) => {
+        step.classList.remove('active', 'complete');
+        if (i < stepIndex) {
+          step.classList.add('complete');
+        } else if (i === stepIndex) {
+          step.classList.add('active');
+        }
+      });
+
+      if (progressBar) {
+        const progress = ((stepIndex + 1) / loadingSteps.length) * 100;
+        progressBar.style.width = `${progress}%`;
+      }
+    }
+
+    function hideLoadingState() {
+      clearInterval(loadingInterval);
+      const loader = document.getElementById('loading-overlay');
+      if (loader) loader.remove();
+    }
+
     // Initialize wallet search with autocomplete
     initWalletSearch('wallet-input', (wallet) => {
       loadCompletion();
     });
-    
+
     // Check URL params on page load
     const params = new URLSearchParams(window.location.search);
     if (params.get('wallet')) {
@@ -155,7 +499,7 @@
       loadCompletion();
       autoLoaded = true;
     }
-    
+
     // If logged in with a default wallet, auto-load it
     (async () => {
       if (autoLoaded) return;
@@ -182,12 +526,12 @@
         avg_completion: sets.length > 0 ? sets.reduce((a, b) => a + (b.completion || 0), 0) / sets.length : 0
       };
     }
-    
+
     function setFilterName(list) {
       setNameFilter = list || [];
       renderSets();
     }
-    
+
     function filterSets(filter) {
       currentFilter = filter;
       document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -195,7 +539,7 @@
       });
       renderSets();
     }
-    
+
     function renderResults(data) {
       const { summary, sets, team_progress = [] } = data;
       teamProgress = team_progress;
@@ -204,7 +548,7 @@
         .map(s => ({ ...s, missing: Math.max(0, (s.total || 0) - (s.owned || 0)) }))
         .sort((a, b) => a.missing - b.missing)
         .slice(0, 3);
-      
+
       let html = `
         <div class="summary-cards">
           <div class="summary-card">
@@ -228,16 +572,15 @@
         
         <div class="summary-card" style="margin-bottom:1rem; text-align:left;">
           <div class="label" style="margin-bottom:0.35rem; text-transform:uppercase; letter-spacing:0.08em; font-size:0.75rem;">Next up</div>
-          ${
-            inProgress.length
-              ? inProgress.map(s => 
-                  `<div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:0.15rem;">
+          ${inProgress.length
+          ? inProgress.map(s =>
+            `<div style="display:flex; justify-content:space-between; font-size:0.9rem; margin-bottom:0.15rem;">
                     <span>${s.set_name}</span>
                     <span style="color:var(--accent); font-weight:600;">-${s.missing} need (${Math.round(s.completion || 0)}%)</span>
                   </div>`
-                ).join('')
-              : '<div style="color:var(--text-muted);">No in-progress sets</div>'
-          }
+          ).join('')
+          : '<div style="color:var(--text-muted);">No in-progress sets</div>'
+        }
         </div>
         
         <div class="filter-row">
@@ -286,9 +629,9 @@
           <div id="team-cards" class="mobile-only sets-grid"></div>
         </div>
       `;
-      
+
       results.innerHTML = html;
-      
+
       // init multi-select after DOM exists
       if (!setMulti) {
         setMulti = new MultiSelect('set-filter', {
@@ -305,7 +648,7 @@
         // refresh items if catalog changed
         if (catalogSets.length) setMulti.setItems(catalogSets.map(s => s.set_name));
       }
-      
+
       // wire sortable headers
       const headers = document.querySelectorAll('#sets-table th.sortable');
       headers.forEach(th => {
@@ -321,11 +664,11 @@
           renderSets();
         });
       });
-      
+
       renderSets();
       renderTeams();
     }
-    
+
     function updateStatus(msg) {
       const status = document.getElementById('set-status');
       if (!status) return;
@@ -380,7 +723,7 @@
         <div class="set-card">
           <div class="set-header">
             <div class="set-name">${t.team_name}</div>
-            <div class="set-progress">${t.owned || 0}/${t.total || 0} (${Math.round(t.completion||0)}%)</div>
+            <div class="set-progress">${t.owned || 0}/${t.total || 0} (${Math.round(t.completion || 0)}%)</div>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" style="width: ${t.completion || 0}%"></div>
@@ -393,7 +736,7 @@
       const container = document.getElementById('sets-container');
       const tbody = document.getElementById('sets-tbody');
       let filtered = allSets;
-      
+
       if (currentFilter === 'complete') filtered = allSets.filter(s => s.completion === 100);
       else if (currentFilter === 'inprogress') filtered = allSets.filter(s => s.completion > 0 && s.completion < 100);
       else if (currentFilter === 'notstarted') filtered = allSets.filter(s => s.completion === 0);
@@ -403,22 +746,22 @@
         const selected = new Set(setNameFilter.map(v => v.toLowerCase()));
         filtered = filtered.filter(s => selected.has((s.set_name || "").toLowerCase()));
       }
-      
+
       filtered = sortSets(filtered);
-      
+
       if (filtered.length === 0) {
         container.innerHTML = '<div class="empty">No sets match this filter</div>';
         if (tbody) tbody.innerHTML = '';
         return;
       }
-      
+
       if (tbody) {
         tbody.innerHTML = filtered.map(set => `
           <tr>
             <td>${set.set_name}</td>
             <td>${set.owned || 0} / ${set.total || 0}</td>
             <td>${Math.round(set.completion || 0)}%</td>
-            <td>${set.cost_to_complete != null ? `$${(set.cost_to_complete||0).toFixed(2)}` : '—'}</td>
+            <td>${set.cost_to_complete != null ? `$${(set.cost_to_complete || 0).toFixed(2)}` : '—'}</td>
             <td>${set.by_tier?.Common || 0}</td>
             <td>${set.by_tier?.Uncommon || 0}</td>
             <td>${set.by_tier?.Rare || 0}</td>
@@ -427,28 +770,28 @@
           </tr>
         `).join('');
       }
-      
+
       container.innerHTML = filtered.map(set => `
         <div class="set-card ${set.completion === 100 ? 'complete' : ''}">
           <div class="set-header">
             <div class="set-name">${set.set_name} ${set.completion === 100 ? '✅' : ''}</div>
             <div class="set-progress">
               ${set.owned}/${set.total} (${Math.round(set.completion)}%)
-              ${set.cost_to_complete != null ? `<div style="font-size:0.8rem; color:var(--text-muted);">Cost to complete: $${(set.cost_to_complete||0).toFixed(2)}</div>` : ''}
+              ${set.cost_to_complete != null ? `<div style="font-size:0.8rem; color:var(--text-muted);">Cost to complete: $${(set.cost_to_complete || 0).toFixed(2)}</div>` : ''}
             </div>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" style="width: ${set.completion}%"></div>
           </div>
           <div class="set-tiers">
-            ${set.by_tier ? Object.entries(set.by_tier).map(([tier, count]) => 
-              count > 0 ? `<span class="tier-badge tier-${tier.toLowerCase()}">${tier}: ${count}</span>` : ''
-            ).join('') : ''}
+            ${set.by_tier ? Object.entries(set.by_tier).map(([tier, count]) =>
+        count > 0 ? `<span class="tier-badge tier-${tier.toLowerCase()}">${tier}: ${count}</span>` : ''
+      ).join('') : ''}
           </div>
         </div>
       `).join('');
     }
   </script>
 </body>
-</html>
 
+</html>

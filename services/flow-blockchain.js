@@ -45,7 +45,7 @@ export async function getWalletNFTIds(walletAddress) {
     }
 
     const cadence = loadCadenceScript("get_wallet_nft_ids.cdc");
-    
+
     const result = await fcl.query({
       cadence: cadence,
       args: (arg, t) => [
@@ -62,6 +62,44 @@ export async function getWalletNFTIds(walletAddress) {
 }
 
 /**
+ * Get all LOCKED NFT IDs for a wallet from NFTLocker contract
+ * These are NFTs that are locked and held in the separate NFTLocker contract
+ * @param {string} walletAddress - Flow wallet address (0x...)
+ * @returns {Promise<number[]>} Array of locked NFT IDs
+ */
+export async function getLockedNFTIds(walletAddress) {
+  try {
+    // Validate address format
+    if (!walletAddress || !walletAddress.startsWith("0x")) {
+      throw new Error("Invalid wallet address format");
+    }
+
+    const cadence = loadCadenceScript("get_locked_nft_ids.cdc");
+
+    const result = await fcl.query({
+      cadence: cadence,
+      args: (arg, t) => [
+        arg(walletAddress, t.Address)
+      ]
+    });
+
+    // Result is an array of UInt64, convert to numbers
+    const lockedIds = Array.isArray(result) ? result.map(id => Number(id)) : [];
+    if (lockedIds.length > 0) {
+      console.log(`[Flow] Found ${lockedIds.length} locked NFTs for ${walletAddress.substring(0, 10)}...`);
+    }
+    return lockedIds;
+  } catch (err) {
+    // If NFTLocker collection doesn't exist for this wallet, return empty array
+    if (err.message && (err.message.includes("Could not borrow") || err.message.includes("nil"))) {
+      return [];
+    }
+    console.error(`[Flow] Error getting locked NFT IDs for ${walletAddress}:`, err.message);
+    return []; // Return empty on error rather than throwing
+  }
+}
+
+/**
  * Get metadata for a specific NFT
  * @param {string} walletAddress - Wallet address that owns the NFT
  * @param {number} nftId - NFT ID
@@ -70,7 +108,7 @@ export async function getWalletNFTIds(walletAddress) {
 export async function getNFTMetadata(walletAddress, nftId) {
   try {
     const cadence = loadCadenceScript("get_nft_metadata.cdc");
-    
+
     const result = await fcl.query({
       cadence: cadence,
       args: (arg, t) => [
@@ -95,7 +133,7 @@ export async function getNFTMetadata(walletAddress, nftId) {
 export async function getNFTFullDetails(walletAddress, nftId) {
   try {
     const cadence = loadCadenceScript("get_nft_full_details.cdc");
-    
+
     const result = await fcl.query({
       cadence: cadence,
       args: (arg, t) => [
@@ -121,7 +159,7 @@ export async function getWalletNFTsWithMetadata(walletAddress) {
   try {
     // First get all NFT IDs
     const nftIds = await getWalletNFTIds(walletAddress);
-    
+
     if (nftIds.length === 0) {
       return [];
     }
@@ -189,12 +227,12 @@ export async function getLockedStatus(nftIds) {
   try {
     const accessNode = process.env.FLOW_ACCESS_NODE || "https://rest-mainnet.onflow.org";
     const NFT_LOCKER_CONTRACT = "A.b6f2481eba4df97b.NFTLocker";
-    
+
     // For now, use database as source of truth for locked status
     // Flow events API requires block heights and is complex for historical data
     // We'll update locked status incrementally as events come in via WebSocket
     // For initial sync, use database which has been populated by Snowflake
-    
+
     // TODO: In the future, we can query Flow events API with proper block ranges
     // For now, return empty map to preserve existing database values
     console.log(`[Flow] Using database for locked status (Flow events API requires block height ranges)`);
@@ -202,7 +240,7 @@ export async function getLockedStatus(nftIds) {
 
     // Build map of NFT ID -> latest lock/unlock timestamp
     const lockMap = new Map(); // nft_id -> { lockedAt, unlockedAt }
-    
+
     // Process locked events - extract NFT ID from event payload
     for (const event of lockedEvents) {
       try {
@@ -211,7 +249,7 @@ export async function getLockedStatus(nftIds) {
         const fields = payload.fields || [];
         const idField = fields.find(f => f.name === "id");
         const nftId = idField?.value?.value || payload.id?.value;
-        
+
         if (nftId && nftIds.includes(nftId.toString())) {
           const nftIdStr = nftId.toString();
           const timestamp = new Date(event.blockTimestamp).getTime();
@@ -236,7 +274,7 @@ export async function getLockedStatus(nftIds) {
         const fields = payload.fields || [];
         const idField = fields.find(f => f.name === "id");
         const nftId = idField?.value?.value || payload.id?.value;
-        
+
         if (nftId && nftIds.includes(nftId.toString())) {
           const nftIdStr = nftId.toString();
           const timestamp = new Date(event.blockTimestamp).getTime();
@@ -271,7 +309,7 @@ export async function getLockedStatus(nftIds) {
     if (lockedCount > 0) {
       console.log(`[Flow] Found ${lockedCount} locked NFTs from blockchain events`);
     }
-    
+
     return result;
   } catch (err) {
     console.error(`[Flow] Error getting locked status:`, err.message);
@@ -287,6 +325,7 @@ export async function getLockedStatus(nftIds) {
 // Export for use in other modules
 export default {
   getWalletNFTIds,
+  getLockedNFTIds,
   getNFTMetadata,
   getNFTFullDetails,
   getWalletNFTsWithMetadata,

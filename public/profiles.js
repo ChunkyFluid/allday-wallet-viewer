@@ -21,8 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function fetchSummary(wallet) {
     try {
-      // Use blockchain source for real-time data
-      const url = `/api/wallet-summary?wallet=${encodeURIComponent(wallet)}&source=blockchain`;
+      // Use fast database query (data kept current by sync scripts)
+      const url = `/api/wallet-summary?wallet=${encodeURIComponent(wallet)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!data.ok) {

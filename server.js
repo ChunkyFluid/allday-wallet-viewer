@@ -1928,11 +1928,14 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
   }
 }
 
-// Wallet summary - NOW WITH LIVE DATA!
+// Wallet summary - OPTIMIZED FOR FAST LOADING!
+// Default: database (fast), use ?live=true for real-time blockchain data
 app.get("/api/wallet-summary", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
-    const useLive = req.query.live !== 'false'; // Default to live data
+    // Default to database (fast) - use ?live=true for real-time blockchain data
+    const useLive = req.query.live === 'true';
+
 
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
@@ -1952,17 +1955,59 @@ app.get("/api/wallet-summary", async (req, res) => {
       try {
         console.log(`[Wallet Summary] Fetching live data from Flow blockchain for ${wallet}...`);
         const flowService = await import("./services/flow-blockchain.js");
-        const nftIds = await flowService.getWalletNFTIds(wallet);
 
-        if (nftIds && nftIds.length >= 0) {
-          liveNftIds = nftIds.map(id => id.toString());
-          dataSource = 'blockchain';
-          console.log(`[Wallet Summary] Got ${liveNftIds.length} NFTs from Flow blockchain`);
-        } else {
-          console.log(`[Wallet Summary] Wallet has no NFTs or collection not set up`);
-          liveNftIds = []; // Empty wallet
-          dataSource = 'blockchain';
+        // Fetch BOTH unlocked (in wallet) and locked (in NFTLocker) NFT IDs
+        const [unlockedIds, blockchainLockedIds] = await Promise.all([
+          flowService.getWalletNFTIds(wallet).catch(() => []),
+          flowService.getLockedNFTIds ? flowService.getLockedNFTIds(wallet).catch(() => []) : Promise.resolve([])
+        ]);
+
+        // If blockchain doesn't return locked NFTs, fall back to database
+        let lockedIds = blockchainLockedIds;
+        if (lockedIds.length === 0) {
+          // Get locked NFT IDs from database (synced from Snowflake)
+          const lockedResult = await pgQuery(
+            `SELECT nft_id FROM holdings WHERE wallet_address = $1 AND is_locked = true
+             UNION
+             SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1 AND is_locked = true`,
+            [wallet]
+          );
+          lockedIds = lockedResult.rows.map(r => r.nft_id);
+          if (lockedIds.length > 0) {
+            console.log(`[Wallet Summary] Got ${lockedIds.length} locked NFTs from database (fallback)`);
+          }
         }
+
+        // Combine both, tracking which are locked
+        // ACTUALLY deduplicate - an NFT might appear in both unlocked (blockchain) and locked (db) during sync
+        const lockedSet = new Set(lockedIds.map(id => id.toString()));
+        const seenIds = new Set();
+        const allNftIds = [];
+
+        // Add unlocked first (from blockchain - fresh data)
+        for (const id of unlockedIds) {
+          const idStr = id.toString();
+          if (!seenIds.has(idStr)) {
+            seenIds.add(idStr);
+            allNftIds.push({ id: idStr, is_locked: false });
+          }
+        }
+
+        // Add locked (from database) - only if not already seen
+        for (const id of lockedIds) {
+          const idStr = id.toString();
+          if (!seenIds.has(idStr)) {
+            seenIds.add(idStr);
+            allNftIds.push({ id: idStr, is_locked: true });
+          }
+        }
+
+        liveNftIds = allNftIds.map(n => n.id);
+        // Store locked status for the query
+        req.lockedNftIds = lockedSet;
+
+        dataSource = 'blockchain';
+        console.log(`[Wallet Summary] Got ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${allNftIds.length} total NFTs (deduplicated)`);
       } catch (blockchainErr) {
         console.warn(`[Wallet Summary] Flow blockchain query failed, falling back to database:`, blockchainErr.message);
         // Try fallback to FindLab API
@@ -1994,80 +2039,52 @@ app.get("/api/wallet-summary", async (req, res) => {
     let statsResult;
 
     if (liveNftIds !== null && liveNftIds.length > 0) {
-      // Use LIVE blockchain data - but prioritize wallet_holdings for locked status
-      // First check if wallet_holdings has locked status data
-      const holdingsCheck = await pgQuery(
-        `SELECT COUNT(*)::int as total, COUNT(CASE WHEN is_locked = true THEN 1 END)::int as locked
-         FROM wallet_holdings WHERE wallet_address = $1`,
-        [wallet]
+      // ALWAYS use blockchain NFT IDs as source of truth for which NFTs exist
+      // Join with wallet_holdings only for locked status
+      const nftIdPlaceholders = liveNftIds.map((_, idx) => `$${idx + 2}`).join(', ');
+      statsResult = await pgQuery(
+        `
+        SELECT
+          $1 AS wallet_address,
+
+          COUNT(*)::int AS moments_total,
+          -- Use new holdings table first (from Snowflake sync), fallback to old wallet_holdings
+          COUNT(*) FILTER (WHERE COALESCE(hn.is_locked, h.is_locked, false))::int AS locked_count,
+          COUNT(*) FILTER (WHERE NOT COALESCE(hn.is_locked, h.is_locked, false))::int AS unlocked_count,
+
+          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
+          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
+          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
+          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
+          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
+
+          COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
+          COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
+          COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
+
+        FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+        LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id::text
+        LEFT JOIN wallet_holdings h 
+          ON h.nft_id = nft_ids.nft_id::text 
+          AND LOWER(h.wallet_address) = LOWER($1)
+        LEFT JOIN holdings hn
+          ON hn.nft_id = nft_ids.nft_id::text
+          AND LOWER(hn.wallet_address) = LOWER($1)
+        LEFT JOIN public.edition_price_scrape eps
+          ON eps.edition_id = m.edition_id;
+        `,
+        [wallet, ...liveNftIds]
       );
 
-      const hasLockedData = holdingsCheck.rows[0]?.locked > 0 || holdingsCheck.rows[0]?.total === liveNftIds.length;
+      console.log(`[Wallet Summary] Using blockchain data: ${statsResult.rows[0]?.moments_total || 0} total, ${statsResult.rows[0]?.locked_count || 0} locked (from db join)`);
 
-      if (hasLockedData) {
-        // Use wallet_holdings as source of truth for locked status (it has the data)
-        // Don't filter by blockchain NFT IDs - use ALL wallet_holdings data
-        statsResult = await pgQuery(
-          `
-          SELECT
-            h.wallet_address,
-
-            COUNT(*)::int AS moments_total,
-            COUNT(*) FILTER (WHERE h.is_locked = true)::int AS locked_count,
-            COUNT(*) FILTER (WHERE h.is_locked = false)::int AS unlocked_count,
-
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
-
-            COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
-            COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
-            COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
-
-          FROM wallet_holdings h
-          LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
-          LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = m.edition_id
-          WHERE h.wallet_address = $1
-          GROUP BY h.wallet_address;
-          `,
-          [wallet]
-        );
-
-        console.log(`[Wallet Summary] Using wallet_holdings: ${statsResult.rows[0]?.locked_count || 0} locked out of ${statsResult.rows[0]?.moments_total || 0} total`);
-      } else {
-        // Fall back to blockchain NFT IDs with wallet_holdings join (for when wallet_holdings doesn't have locked data yet)
-        const nftIdPlaceholders = liveNftIds.map((_, idx) => `$${idx + 2}`).join(', ');
-        statsResult = await pgQuery(
-          `
-          SELECT
-            $1 AS wallet_address,
-
-            COUNT(*)::int AS moments_total,
-            COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
-            COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
-
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
-            COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
-
-            COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
-            COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
-            COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
-
-          FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
-          LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
-          LEFT JOIN wallet_holdings h 
-            ON h.nft_id = nft_ids.nft_id 
-            AND h.wallet_address = $1
-          LEFT JOIN public.edition_price_scrape eps
-            ON eps.edition_id = m.edition_id;
-          `,
-          [wallet, ...liveNftIds]
-        );
+      // Override locked/unlocked counts with blockchain data (more accurate)
+      if (req.lockedNftIds && req.lockedNftIds.size > 0) {
+        const lockedCount = req.lockedNftIds.size;
+        const unlockedCount = liveNftIds.length - lockedCount;
+        statsResult.rows[0].locked_count = lockedCount;
+        statsResult.rows[0].unlocked_count = unlockedCount;
+        console.log(`[Wallet Summary] Overriding with blockchain locked data: ${lockedCount} locked, ${unlockedCount} unlocked`);
       }
     } else if (liveNftIds !== null && liveNftIds.length === 0) {
       // Live data returned empty wallet
@@ -2256,13 +2273,15 @@ app.get("/api/prices", async (req, res) => {
   }
 });
 
-// Full wallet query - NOW WITH AUTO-REFRESH!
-// Supports both database (default) and blockchain (use ?source=blockchain) queries
+// Full wallet query - OPTIMIZED FOR FAST LOADING!
+// Default: database (fast cached data), use ?source=blockchain for real-time (slower)
 app.get("/api/query", async (req, res) => {
   try {
     const wallet = (req.query.wallet || "").toString().trim().toLowerCase();
     const forceRefresh = req.query.refresh === 'true' || req.query.refresh === '1';
-    const useBlockchain = req.query.source === 'blockchain' || req.query.blockchain === 'true';
+    // Default to database source for FAST loading (cached data from sync scripts)
+    // Use source=blockchain explicitly for real-time accuracy when needed
+    const useBlockchain = req.query.source === 'blockchain';
 
     if (!wallet) {
       return res.status(400).json({ ok: false, error: "Missing ?wallet=0x..." });
@@ -2280,8 +2299,28 @@ app.get("/api/query", async (req, res) => {
 
         console.log(`[Wallet Query] Using blockchain source for ${wallet.substring(0, 8)}...`);
 
-        // Get NFT IDs from blockchain
-        const nftIds = await flowService.getWalletNFTIds(wallet);
+        // Get UNLOCKED NFT IDs from blockchain
+        const unlockedIds = await flowService.getWalletNFTIds(wallet);
+
+        // Get LOCKED NFT IDs from database
+        // NOTE: Only use wallet_holdings - the 'holdings' table has stale/corrupted data
+        const lockedResult = await pgQuery(
+          `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1 AND is_locked = true`,
+          [wallet]
+        );
+        const lockedIds = lockedResult.rows.map(r => r.nft_id);
+
+        // Combine unlocked (from blockchain) + locked (from database)
+        // Use a Set to avoid duplicates (an NFT could appear in both if sync is in progress)
+        const unlockedStrings = unlockedIds.map(id => id.toString());
+        const lockedStrings = lockedIds.map(id => id.toString());
+        const lockedSet = new Set(lockedStrings);
+
+        // Deduplicate: use Set then convert back to array
+        const allNftIdsSet = new Set([...unlockedStrings, ...lockedStrings]);
+        const nftIds = Array.from(allNftIdsSet);
+
+        console.log(`[Wallet Query] Found ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${nftIds.length} total NFTs (deduplicated)`);
 
         if (nftIds.length === 0) {
           return res.json({
@@ -2330,13 +2369,19 @@ app.get("/api/query", async (req, res) => {
         );
 
         const queryTime = Date.now() - startTime;
-        console.log(`[Wallet Query] ✅ Blockchain query completed in ${queryTime}ms - Found ${result.rowCount} moments`);
+        console.log(`[Wallet Query] ✅ Completed in ${queryTime}ms - Found ${result.rowCount} moments`);
+
+        // Post-process to ensure is_locked is set correctly from our lockedSet
+        const rows = result.rows.map(row => ({
+          ...row,
+          is_locked: lockedSet.has(row.nft_id) || row.is_locked
+        }));
 
         return res.json({
           ok: true,
           wallet,
           count: result.rowCount,
-          rows: result.rows,
+          rows: rows,
           source: 'blockchain',
           queryTime: queryTime
         });
@@ -10149,9 +10194,12 @@ app.get("/api/set-completion", async (req, res) => {
     if (!wallet) return res.status(400).json({ ok: false, error: "Missing ?wallet=" });
 
     const startTime = Date.now();
+    let stepTime = Date.now();
 
     // Get cached set totals (fast - from memory)
     const setTotals = await getSetTotals();
+    console.log(`[Set Completion] Step 1 - getSetTotals: ${Date.now() - stepTime}ms`);
+    stepTime = Date.now();
 
     // Query only what the user owns (much faster - single pass)
     const result = await pgQuery(`
@@ -10170,6 +10218,8 @@ app.get("/api/set-completion", async (req, res) => {
       ORDER BY m.set_name`,
       [wallet]
     );
+    console.log(`[Set Completion] Step 2 - owned editions: ${Date.now() - stepTime}ms`);
+    stepTime = Date.now();
 
     // Cost to complete (sum lowest ask of missing editions) using set_editions_snapshot for speed
     const costRes = await pgQuery(
@@ -10193,6 +10243,8 @@ app.get("/api/set-completion", async (req, res) => {
       [wallet]
     );
     const costMap = new Map(costRes.rows.map(r => [r.set_name, Number(r.cost_to_complete) || 0]));
+    console.log(`[Set Completion] Step 3 - cost to complete: ${Date.now() - stepTime}ms`);
+    stepTime = Date.now();
 
     // Team totals (for team-level tracking)
     const teamTotalsRes = await pgQuery(`
@@ -10202,6 +10254,8 @@ app.get("/api/set-completion", async (req, res) => {
       GROUP BY team_name
     `);
     const teamTotals = new Map(teamTotalsRes.rows.map(r => [(r.team_name || "").toLowerCase(), parseInt(r.total_editions)]));
+    console.log(`[Set Completion] Step 4 - team totals: ${Date.now() - stepTime}ms`);
+    stepTime = Date.now();
 
     // Merge with cached totals
     const sets = result.rows.map(r => {
@@ -11648,6 +11702,53 @@ app.get("/api/admin/analytics/sessions", async (req, res) => {
   }
 });
 
+// ================== VISIT COUNTER ==================
+
+// Ensure visit counter table exists
+async function initVisitCounterTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS site_visits (
+        id SERIAL PRIMARY KEY,
+        total_count INTEGER DEFAULT 0,
+        last_updated TIMESTAMPTZ DEFAULT NOW()
+      );
+      INSERT INTO site_visits (id, total_count) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;
+    `);
+  } catch (err) {
+    console.error("Error initializing visit counter table:", err.message);
+  }
+}
+
+// POST /api/visit - record a visit and return count
+app.post("/api/visit", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      UPDATE site_visits 
+      SET total_count = total_count + 1, last_updated = NOW() 
+      WHERE id = 1 
+      RETURNING total_count;
+    `);
+    const count = rows[0]?.total_count || 0;
+    return res.json({ ok: true, count });
+  } catch (err) {
+    console.error("POST /api/visit error:", err.message);
+    return res.json({ ok: false, count: 0 });
+  }
+});
+
+// GET /api/visit-count - get current count without incrementing
+app.get("/api/visit-count", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT total_count FROM site_visits WHERE id = 1`);
+    const count = rows[0]?.total_count || 0;
+    return res.json({ ok: true, count });
+  } catch (err) {
+    console.error("GET /api/visit-count error:", err.message);
+    return res.json({ ok: false, count: 0 });
+  }
+});
+
 // ================== SERVER START ==================
 
 app.listen(port, async () => {
@@ -11658,6 +11759,7 @@ app.listen(port, async () => {
   await initListingsTable();
   await initBundlesTable();
   await initAnalyticsTables();
+  await initVisitCounterTable();
 
   // Set up insights refresh after server starts
   setTimeout(() => {

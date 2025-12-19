@@ -1,1210 +1,1307 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Chunky's NFLAD Viewer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="stylesheet" href="/header.css" />
-    <style>
-      :root {
-        --bg-main: #050816;
-        --bg-card: #101322;
-        --border-subtle: rgba(255, 255, 255, 0.06);
-        --text-main: #f9fafb;
-        --text-muted: #9ca3af;
-        --accent-purple: #6f42c1;
-        --accent-blue: #007bff;
-        --accent-cyan: #0dcaf0;
-        --accent-teal: #17a2b8;
-        --accent-alt: #00cccc;
-        --danger: #f97373;
-        --success: #22c55e;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
-        color: var(--text-main);
-      }
-
-      a {
-        color: var(--accent-cyan);
-        text-decoration: none;
-      }
-
-      a:hover {
-        text-decoration: underline;
-      }
-
-      .app-shell {
-        max-width: 95%;
-        margin: 0 auto;
-        padding: 1.5rem 4%;
-        min-height: 100vh;
-      }
-
-      .app-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-
-      .brand-logo {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-      }
-
-      .brand-logo img {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-      }
-
-      .brand-title {
-        font-weight: 700;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        font-size: 0.95rem;
-      }
-
-      .wallet-form {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex: 0 0 420px;
-      }
-
-      #wallet-input {
-        flex: 1;
-        border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.5rem 0.9rem;
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        font-size: 0.9rem;
-      }
-
-      #wallet-input::placeholder {
-        color: var(--text-muted);
-      }
-
-      .btn-primary {
-        border-radius: 999px;
-        border: none;
-        padding: 0.5rem 1.1rem;
-        background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-        color: white;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .btn-primary:hover {
-        filter: brightness(1.05);
-      }
-
-      .btn-secondary {
-        border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.3rem 0.8rem;
-        background: transparent;
-        color: var(--text-muted);
-        font-size: 0.78rem;
-        cursor: pointer;
-      }
-
-      .btn-secondary:hover {
-        border-color: var(--accent-cyan);
-        color: var(--accent-cyan);
-      }
-
-      .wallet-summary-card {
-        margin-bottom: 1rem;
-        padding: 1rem 1.25rem;
-        border-radius: 0.75rem;
-        background: rgba(15, 15, 30, 0.9);
-        border: 1px solid var(--border-subtle);
-        display: none;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      .wallet-summary-main {
-        display: flex;
-        flex-direction: column;
-        gap: 0.1rem;
-      }
-
-      .wallet-summary-label {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-      }
-
-      .wallet-summary-address {
-        font-weight: 600;
-        font-size: 0.9rem;
-      }
-
-      .wallet-summary-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-        font-size: 0.75rem;
-      }
-
-      .chip {
-        border-radius: 999px;
-        padding: 0.2rem 0.7rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(15, 23, 42, 0.9);
-      }
-
-      .chip-pill-tier {
-        border-radius: 999px;
-        padding: 0.15rem 0.6rem;
-        font-size: 0.7rem;
-        font-weight: 500;
-        transition: opacity 0.2s, transform 0.1s;
-      }
-
-      .chip-pill-tier:hover {
-        opacity: 0.8;
-        transform: scale(1.05);
-      }
-
-      .chip-common {
-        background: #4b5563;
-        color: #e5e7eb;
-      }
-
-      .chip-uncommon {
-        background: #6b7280;
-        color: #e5e7eb;
-      }
-
-      .chip-rare {
-        background: #f97316;
-        color: #111827;
-      }
-
-      .chip-legendary {
-        background: linear-gradient(135deg, #facc15, #f97316);
-        color: #111827;
-      }
-
-      .chip-ultimate {
-        background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
-        color: white;
-      }
-
-      .duplicate-count {
-        display: inline-block;
-        margin-left: 0.35rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        background: rgba(111, 66, 193, 0.25);
-        color: var(--accent-cyan);
-        border: 1px solid rgba(13, 202, 240, 0.3);
-        vertical-align: middle;
-      }
-      
-      /* When used in the Owned column, no margin needed */
-      td .duplicate-count {
-        margin-left: 0;
-      }
-
-      .content {
-        display: grid;
-        grid-template-columns: minmax(110px, 260px) minmax(0, 1fr);
-        gap: 1.25rem;
-        align-items: flex-start;
-      }
-
-      .filters-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 1rem 1.25rem;
-        font-size: 0.85rem;
-      }
-
-      .filters-panel h3 {
-        margin: 0 0 0.75rem;
-        font-size: 0.8rem;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
-
-      .filter-group {
-        margin-bottom: 0.65rem;
-      }
-
-      .filter-group label {
-        display: block;
-        font-size: 0.7rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        margin-bottom: 0.15rem;
-      }
-
-      .filter-select {
-        width: 100%;
-        border-radius: 0.5rem;
-        border: 1px solid var(--border-subtle);
-        background: #020617;
-        color: var(--text-main);
-        padding: 0.35rem 0.6rem;
-        font-size: 0.8rem;
-      }
-
-      .reset-filters {
-        margin-top: 0.4rem;
-        border: none;
-        background: none;
-        color: var(--accent-cyan);
-        font-size: 0.75rem;
-        cursor: pointer;
-        padding: 0;
-      }
-
-      .table-panel {
-        background: var(--bg-card);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 0.75rem 0.75rem 0.5rem;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-
-      .table-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        margin-bottom: 0.35rem;
-      }
-
-      #moments-title {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: var(--text-muted);
-      }
-
-      .export-btn {
-        border-radius: 999px;
-        border: 1px solid var(--accent-teal);
-        background: transparent;
-        color: var(--accent-teal);
-        font-size: 0.8rem;
-        padding: 0.3rem 0.8rem;
-        cursor: pointer;
-      }
-
-      .export-btn:hover {
-        background: rgba(13, 148, 136, 0.1);
-      }
-
-      .table-wrapper {
-        overflow-x: auto;
-        max-height: 80vh;
-        width: 100%;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.78rem;
-        table-layout: auto;
-      }
-
-      thead {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        background: #020617;
-      }
-
-      th,
-      td {
-        padding: 0.25rem 0.4rem;
-        text-align: left;
-        white-space: nowrap;
-        font-size: 0.85rem;
-      }
-
-      /* Allow some columns to be more compact */
-      td:nth-child(2), /* Team */
-      td:nth-child(3), /* Pos */
-      td:nth-child(5), /* Serial */
-      td:nth-child(6), /* Max */
-      td:nth-child(7), /* Series */
-      td:nth-child(8), /* Set */
-      td:nth-child(13), /* Date */
-      td:nth-child(14) { /* Links */
-        padding: 0.25rem 0.3rem;
-      }
-
-      /* Compact series and set columns with ellipsis */
-      td:nth-child(7), /* Series */
-      td:nth-child(8) { /* Set */
-        max-width: 70px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      /* Compact player name column */
-      td:first-child {
-        max-width: 140px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      /* Make price columns more compact */
-      td:nth-child(9), /* Low Ask */
-      td:nth-child(10), /* ASP */
-      td:nth-child(11) { /* Top Sale */
-        padding: 0.25rem 0.35rem;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.8rem;
-      }
-
-      th {
-        font-size: 0.72rem;
-        color: var(--text-muted);
-        font-weight: 500;
-        border-bottom: 1px solid var(--border-subtle);
-        cursor: pointer;
-      }
-
-      th.sortable {
-        cursor: pointer;
-        user-select: none;
-        position: relative;
-      }
-
-      th.sortable:hover {
-        color: var(--accent-cyan);
-        background: rgba(15, 23, 42, 0.3);
-      }
-
-      th.sort-asc::after {
-        content: " ▲";
-        font-size: 0.65em;
-        color: var(--accent-cyan);
-      }
-
-      th.sort-desc::after {
-        content: " ▼";
-        font-size: 0.65em;
-        color: var(--accent-cyan);
-      }
-
-      tbody tr:nth-child(2n) {
-        background: rgba(15, 23, 42, 0.7);
-      }
-
-      tbody tr:nth-child(2n + 1) {
-        background: rgba(15, 23, 42, 0.4);
-      }
-
-      tbody tr:hover {
-        background: rgba(37, 99, 235, 0.25);
-      }
-
-      /* Loading Animation */
-      .wallet-loading {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 3rem 2rem;
-        min-height: 300px;
-      }
-
-      .loading-spinner {
-        width: 48px;
-        height: 48px;
-        border: 4px solid rgba(13, 202, 240, 0.2);
-        border-top-color: var(--accent-cyan);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 1rem;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-
-      .loading-text {
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .loading-dots {
-        display: inline-flex;
-        gap: 0.25rem;
-      }
-
-      .loading-dots span {
-        width: 6px;
-        height: 6px;
-        background: var(--accent-cyan);
-        border-radius: 50%;
-        animation: bounce 1.4s infinite ease-in-out both;
-      }
-
-      .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-      .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-      @keyframes bounce {
-        0%, 80%, 100% {
-          transform: scale(0);
-          opacity: 0.5;
-        }
-        40% {
-          transform: scale(1);
-          opacity: 1;
-        }
-      }
-
-      /* Skeleton loader for table */
-      .skeleton-row {
-        display: table-row;
-      }
-
-      .skeleton-cell {
-        display: table-cell;
-        padding: 0.75rem 0.5rem;
-        height: 40px;
-      }
 
-      .skeleton-bar {
-        height: 12px;
-        background: linear-gradient(
-          90deg,
+<head>
+  <meta charset="UTF-8" />
+  <title>Chunky's NFLAD Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/header.css" />
+  <style>
+    :root {
+      --bg-main: #050816;
+      --bg-card: #101322;
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --accent-purple: #6f42c1;
+      --accent-blue: #007bff;
+      --accent-cyan: #0dcaf0;
+      --accent-teal: #17a2b8;
+      --accent-alt: #00cccc;
+      --danger: #f97373;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 55%);
+      color: var(--text-main);
+    }
+
+    a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .app-shell {
+      max-width: 95%;
+      margin: 0 auto;
+      padding: 1.5rem 4%;
+      min-height: 100vh;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #facc15, #ec4899);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .brand-logo img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+
+    .brand-title {
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-size: 0.95rem;
+    }
+
+    .wallet-form {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 0 0 420px;
+    }
+
+    #wallet-input {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 0.5rem 0.9rem;
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      font-size: 0.9rem;
+    }
+
+    #wallet-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-primary {
+      border-radius: 999px;
+      border: none;
+      padding: 0.5rem 1.1rem;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      color: white;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.05);
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 0.3rem 0.8rem;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+
+    .wallet-summary-card {
+      margin-bottom: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: 0.75rem;
+      background: rgba(15, 15, 30, 0.9);
+      border: 1px solid var(--border-subtle);
+      display: none;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .wallet-summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    .wallet-summary-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .wallet-summary-address {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .wallet-summary-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 0.2rem 0.7rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .chip-pill-tier {
+      border-radius: 999px;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .chip-pill-tier:hover {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+
+    .chip-common {
+      background: #4b5563;
+      color: #e5e7eb;
+    }
+
+    .chip-uncommon {
+      background: #6b7280;
+      color: #e5e7eb;
+    }
+
+    .chip-rare {
+      background: #f97316;
+      color: #111827;
+    }
+
+    .chip-legendary {
+      background: linear-gradient(135deg, #facc15, #f97316);
+      color: #111827;
+    }
+
+    .chip-ultimate {
+      background: linear-gradient(135deg, #ec4899, #6366f1, #22c55e);
+      color: white;
+    }
+
+    .duplicate-count {
+      display: inline-block;
+      margin-left: 0.35rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(111, 66, 193, 0.25);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(13, 202, 240, 0.3);
+      vertical-align: middle;
+    }
+
+    /* When used in the Owned column, no margin needed */
+    td .duplicate-count {
+      margin-left: 0;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(110px, 260px) minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+
+    .filters-panel {
+      background: var(--bg-card);
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-subtle);
+      padding: 1rem 1.25rem;
+      font-size: 0.85rem;
+    }
+
+    .filters-panel h3 {
+      margin: 0 0 0.75rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .filter-group {
+      margin-bottom: 0.65rem;
+    }
+
+    .filter-group label {
+      display: block;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.15rem;
+    }
+
+    .filter-select {
+      width: 100%;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-subtle);
+      background: #020617;
+      color: var(--text-main);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .reset-filters {
+      margin-top: 0.4rem;
+      border: none;
+      background: none;
+      color: var(--accent-cyan);
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .table-panel {
+      background: var(--bg-card);
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-subtle);
+      padding: 0.75rem 0.75rem 0.5rem;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+
+    #moments-title {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .export-btn {
+      border-radius: 999px;
+      border: 1px solid var(--accent-teal);
+      background: transparent;
+      color: var(--accent-teal);
+      font-size: 0.8rem;
+      padding: 0.3rem 0.8rem;
+      cursor: pointer;
+    }
+
+    .export-btn:hover {
+      background: rgba(13, 148, 136, 0.1);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 80vh;
+      width: 100%;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      table-layout: auto;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #020617;
+    }
+
+    th,
+    td {
+      padding: 0.25rem 0.4rem;
+      text-align: left;
+      white-space: nowrap;
+      font-size: 0.85rem;
+    }
+
+    /* Allow some columns to be more compact */
+    td:nth-child(2),
+    /* Team */
+    td:nth-child(3),
+    /* Pos */
+    td:nth-child(5),
+    /* Serial */
+    td:nth-child(6),
+    /* Max */
+    td:nth-child(7),
+    /* Series */
+    td:nth-child(8),
+    /* Set */
+    td:nth-child(13),
+    /* Date */
+    td:nth-child(14) {
+      /* Links */
+      padding: 0.25rem 0.3rem;
+    }
+
+    /* Compact series and set columns with ellipsis */
+    td:nth-child(7),
+    /* Series */
+    td:nth-child(8) {
+      /* Set */
+      max-width: 70px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Compact player name column */
+    td:first-child {
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Make price columns more compact */
+    td:nth-child(9),
+    /* Low Ask */
+    td:nth-child(10),
+    /* ASP */
+    td:nth-child(11) {
+      /* Top Sale */
+      padding: 0.25rem 0.35rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    th {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+    }
+
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+
+    th.sortable:hover {
+      color: var(--accent-cyan);
+      background: rgba(15, 23, 42, 0.3);
+    }
+
+    th.sort-asc::after {
+      content: " ▲";
+      font-size: 0.65em;
+      color: var(--accent-cyan);
+    }
+
+    th.sort-desc::after {
+      content: " ▼";
+      font-size: 0.65em;
+      color: var(--accent-cyan);
+    }
+
+    tbody tr:nth-child(2n) {
+      background: rgba(15, 23, 42, 0.7);
+    }
+
+    tbody tr:nth-child(2n + 1) {
+      background: rgba(15, 23, 42, 0.4);
+    }
+
+    tbody tr:hover {
+      background: rgba(37, 99, 235, 0.25);
+    }
+
+    /* Loading Animation */
+    .wallet-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+      min-height: 300px;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(13, 202, 240, 0.2);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-text {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .loading-dots {
+      display: inline-flex;
+      gap: 0.25rem;
+    }
+
+    .loading-dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-cyan);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .loading-dots span:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    .loading-dots span:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      80%,
+      100% {
+        transform: scale(0);
+        opacity: 0.5;
+      }
+
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* Skeleton loader for table */
+    .skeleton-row {
+      display: table-row;
+    }
+
+    .skeleton-cell {
+      display: table-cell;
+      padding: 0.75rem 0.5rem;
+      height: 40px;
+    }
+
+    .skeleton-bar {
+      height: 12px;
+      background: linear-gradient(90deg,
           rgba(255, 255, 255, 0.05) 0%,
           rgba(255, 255, 255, 0.1) 50%,
-          rgba(255, 255, 255, 0.05) 100%
-        );
-        background-size: 200% 100%;
-        border-radius: 4px;
-        animation: shimmer 1.5s infinite;
+          rgba(255, 255, 255, 0.05) 100%);
+      background-size: 200% 100%;
+      border-radius: 4px;
+      animation: shimmer 1.5s infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
       }
 
-      @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
+      100% {
+        background-position: 200% 0;
       }
+    }
 
-      .skeleton-bar.short { width: 60%; }
-      .skeleton-bar.medium { width: 80%; }
-      .skeleton-bar.long { width: 100%; }
+    .skeleton-bar.short {
+      width: 60%;
+    }
 
-      .locked-pill {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.1rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 500;
-      }
+    .skeleton-bar.medium {
+      width: 80%;
+    }
 
-      .locked-pill.locked {
-        background: rgba(236, 72, 153, 0.15);
-        color: #f472b6;
-        border: 1px solid rgba(236, 72, 153, 0.7);
-      }
+    .skeleton-bar.long {
+      width: 100%;
+    }
 
-      .locked-pill.unlocked {
-        background: rgba(16, 185, 129, 0.15);
-        color: #6ee7b7;
-        border: 1px solid rgba(16, 185, 129, 0.7);
-      }
+    .locked-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
 
-      .link-group {
-        display: flex;
-        flex-direction: row;
-        gap: 0.3rem;
-        font-size: 0.75rem;
-      }
+    .locked-pill.locked {
+      background: rgba(236, 72, 153, 0.15);
+      color: #f472b6;
+      border: 1px solid rgba(236, 72, 153, 0.7);
+    }
 
-      .link-group a {
-        color: var(--accent-cyan);
-      }
+    .locked-pill.unlocked {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.7);
+    }
 
-      .link-group a:hover {
-        text-decoration: underline;
-      }
+    .link-group {
+      display: flex;
+      flex-direction: row;
+      gap: 0.3rem;
+      font-size: 0.75rem;
+    }
 
-      /* Profile Search Styles */
-      .profile-search-section {
-        margin-bottom: 1.25rem;
-        padding: 0;
+    .link-group a {
+      color: var(--accent-cyan);
+    }
+
+    .link-group a:hover {
+      text-decoration: underline;
+    }
+
+    /* Profile Search Styles */
+    .profile-search-section {
+      margin-bottom: 1.25rem;
+      padding: 0;
+    }
+
+    .profile-search-card {
+      background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-subtle);
+      padding: 1.2rem;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 400px;
+    }
+
+    .profiles-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .profiles-help {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .search-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 0.4rem 0.75rem;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .profiles-status {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .profiles-list {
+      margin-top: 0.25rem;
+      padding: 0;
+      list-style: none;
+      overflow: auto;
+      flex: 1 1 auto;
+    }
+
+    .profile-item-btn {
+      width: 100%;
+      text-align: left;
+      background: rgba(15, 23, 42, 0.7);
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-subtle);
+      padding: 0.5rem 0.6rem;
+      margin-bottom: 0.35rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .profile-item-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .profile-item-btn.active {
+      border-color: var(--accent-blue);
+      background: rgba(37, 99, 235, 0.3);
+    }
+
+    .profile-item-main {
+      min-width: 0;
+    }
+
+    .profile-item-name {
+      font-weight: 600;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .profile-item-address {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: ui-monospace, monospace;
+    }
+
+    .profile-item-stats {
+      text-align: right;
+      font-size: 0.7rem;
+      white-space: nowrap;
+    }
+
+    .profile-item-stats .unlocked {
+      color: #22c55e;
+    }
+
+    @media (max-width: 960px) {
+      .content {
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .profile-search-card {
-        background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
-        border-radius: 0.75rem;
-        border: 1px solid var(--border-subtle);
-        padding: 1.2rem;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        max-height: 400px;
+        max-height: 300px;
       }
+    }
 
-      .profiles-title {
-        font-size: 0.95rem;
-        font-weight: 600;
-      }
+    /* Mobile search wrapper */
+    .mobile-search-wrapper {
+      display: none;
+      margin-bottom: 1rem;
+    }
 
-      .profiles-help {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-      }
+    .mobile-search-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+    }
 
-      .search-label {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 0.25rem;
-        color: var(--text-muted);
-      }
+    .mobile-search-card .search-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 1rem;
+      border-radius: 10px;
+    }
 
-      .search-input {
-        width: 100%;
-        background: rgba(15, 23, 42, 0.9);
-        border-radius: 999px;
-        border: 1px solid var(--border-subtle);
-        padding: 0.4rem 0.75rem;
-        color: var(--text-main);
-        font-size: 0.85rem;
-        outline: none;
-      }
+    .mobile-search-card .profiles-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 0.5rem;
+    }
 
-      .search-input::placeholder {
-        color: var(--text-muted);
-      }
+    /* Mobile filter toggle */
+    .filters-toggle {
+      display: none;
+      width: 100%;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #f9fafb;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-      .profiles-status {
-        font-size: 0.78rem;
-        color: var(--text-muted);
-      }
+    .filters-toggle .toggle-icon {
+      transition: transform 0.2s;
+    }
 
-      .profiles-list {
-        margin-top: 0.25rem;
-        padding: 0;
-        list-style: none;
-        overflow: auto;
-        flex: 1 1 auto;
-      }
+    .filters-toggle.open .toggle-icon {
+      transform: rotate(180deg);
+    }
 
-      .profile-item-btn {
-        width: 100%;
-        text-align: left;
-        background: rgba(15, 23, 42, 0.7);
-        border-radius: 0.5rem;
-        border: 1px solid var(--border-subtle);
-        padding: 0.5rem 0.6rem;
-        margin-bottom: 0.35rem;
-        cursor: pointer;
-        font-size: 0.78rem;
-        color: var(--text-main);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-      }
+    .desktop-only-block {
+      display: block;
+    }
 
-      .profile-item-btn:hover {
-        border-color: var(--accent-cyan);
-        background: rgba(15, 23, 42, 0.9);
-      }
-
-      .profile-item-btn.active {
-        border-color: var(--accent-blue);
-        background: rgba(37, 99, 235, 0.3);
-      }
-
-      .profile-item-main {
-        min-width: 0;
-      }
-
-      .profile-item-name {
-        font-weight: 600;
-        font-size: 0.8rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .profile-item-address {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-family: ui-monospace, monospace;
-      }
-
-      .profile-item-stats {
-        text-align: right;
-        font-size: 0.7rem;
-        white-space: nowrap;
-      }
-
-      .profile-item-stats .unlocked {
-        color: #22c55e;
-      }
-
-      @media (max-width: 960px) {
-        .content {
-          grid-template-columns: minmax(0, 1fr);
-        }
-        .profile-search-card {
-          max-height: 300px;
-        }
-      }
-
-      /* Mobile search wrapper */
+    @media (max-width: 768px) {
       .mobile-search-wrapper {
-        display: none;
-        margin-bottom: 1rem;
-      }
-
-      .mobile-search-card {
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 12px;
-      }
-
-      .mobile-search-card .search-input {
-        width: 100%;
-        padding: 12px 16px;
-        font-size: 1rem;
-        border-radius: 10px;
-      }
-
-      .mobile-search-card .profiles-list {
-        max-height: 200px;
-        overflow-y: auto;
-        margin-top: 0.5rem;
-      }
-
-      /* Mobile filter toggle */
-      .filters-toggle {
-        display: none;
-        width: 100%;
-        padding: 12px 16px;
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.6));
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        color: #f9fafb;
-        font-size: 0.9rem;
-        font-weight: 600;
-        cursor: pointer;
-        margin-bottom: 1rem;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .filters-toggle .toggle-icon {
-        transition: transform 0.2s;
-      }
-
-      .filters-toggle.open .toggle-icon {
-        transform: rotate(180deg);
-      }
-
-      .desktop-only-block {
         display: block;
       }
 
-      @media (max-width: 768px) {
-        .mobile-search-wrapper {
-          display: block;
-        }
-
-        .desktop-only-block {
-          display: none !important;
-        }
-
-        .filters-toggle {
-          display: flex;
-        }
-
-        .filters-panel {
-          display: none;
-          margin-bottom: 1rem;
-        }
-
-        .filters-panel.open {
-          display: block;
-        }
-
-        /* Simplified mobile wallet overview */
-        .mobile-hidden {
-          display: none !important;
-        }
-
-        .mobile-show {
-          display: flex !important;
-        }
-
-        .wallet-summary-card {
-          padding: 0.75rem !important;
-        }
-
-        .wallet-summary-address {
-          font-size: 0.8rem;
-          word-break: break-all;
-        }
-
-        .chip-pill-tier {
-          font-size: 0.65rem;
-          padding: 0.1rem 0.5rem;
-        }
-
-        .wallet-summary-chips {
-          gap: 0.3rem;
-        }
+      .desktop-only-block {
+        display: none !important;
       }
-    </style>
-  </head>
-  <body>
-    <link rel="stylesheet" href="/header.css" />
-    <div id="app-header"></div>
-    <script src="/layout.js"></script>
-    <div class="app-shell">
-      <!-- Mobile Search (always visible) -->
-      <div class="mobile-search-wrapper" id="mobile-search-wrapper">
-        <div class="mobile-search-card">
-          <input
-            id="mobile-search-input"
-            type="text"
-            class="search-input"
-            placeholder="🔎 Search wallet or name..."
-            autocomplete="off"
-          />
-          <div id="mobile-search-status" class="profiles-status"></div>
-          <ul id="mobile-search-list" class="profiles-list"></ul>
-        </div>
+
+      .filters-toggle {
+        display: flex;
+      }
+
+      .filters-panel {
+        display: none;
+        margin-bottom: 1rem;
+      }
+
+      .filters-panel.open {
+        display: block;
+      }
+
+      /* Simplified mobile wallet overview */
+      .mobile-hidden {
+        display: none !important;
+      }
+
+      .mobile-show {
+        display: flex !important;
+      }
+
+      .wallet-summary-card {
+        padding: 0.75rem !important;
+      }
+
+      .wallet-summary-address {
+        font-size: 0.8rem;
+        word-break: break-all;
+      }
+
+      .chip-pill-tier {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.5rem;
+      }
+
+      .wallet-summary-chips {
+        gap: 0.3rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <link rel="stylesheet" href="/header.css" />
+  <div id="app-header"></div>
+  <script src="/layout.js"></script>
+  <div class="app-shell">
+    <!-- Mobile Search (always visible) -->
+    <div class="mobile-search-wrapper" id="mobile-search-wrapper">
+      <div class="mobile-search-card">
+        <input id="mobile-search-input" type="text" class="search-input" placeholder="🔎 Search wallet or name..."
+          autocomplete="off" />
+        <div id="mobile-search-status" class="profiles-status"></div>
+        <ul id="mobile-search-list" class="profiles-list"></ul>
       </div>
-
-      <!-- Mobile Filter Toggle -->
-      <button class="filters-toggle" id="filters-toggle">
-        <span>🎚️ Filters</span>
-        <span class="toggle-icon">▼</span>
-      </button>
-
-      <main class="content">
-        <aside class="filters-panel" id="filters-panel">
-          <!-- Profile Search Section (desktop) -->
-          <section id="profile-search-section" class="profile-search-section desktop-only-block">
-            <div class="profile-search-card">
-              <div class="profiles-title">🔎 Find Wallet</div>
-              <div>
-                <input
-                  id="prof-search-input"
-                  type="text"
-                  class="search-input"
-                  placeholder="Name or wallet address..."
-                  autocomplete="off"
-                />
-              </div>
-              <div id="prof-status" class="profiles-status"></div>
-              <ul id="prof-list" class="profiles-list"></ul>
-            </div>
-          </section>
-
-          <h3>🎚️ Filters</h3>
-
-          <!-- Sort Options (Mobile-friendly) -->
-          <div class="filter-group">
-            <label for="mobile-sort-key">Sort By</label>
-            <select id="mobile-sort-key" class="filter-select">
-              <option value="last_event_ts">Last Event (Newest)</option>
-              <option value="playerName">Player Name</option>
-              <option value="team_name">Team</option>
-              <option value="position">Position</option>
-              <option value="tier">Tier</option>
-              <option value="serial_number">Serial Number</option>
-              <option value="max_mint_size">Max Mint Size</option>
-              <option value="series_name">Series</option>
-              <option value="set_name">Set</option>
-              <option value="low_ask_usd">Low Ask Price</option>
-              <option value="avg_sale_usd">Average Sale Price</option>
-              <option value="top_sale_usd">Top Sale Price</option>
-              <option value="is_locked">Locked Status</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
-            <label for="mobile-sort-dir">Sort Direction</label>
-            <select id="mobile-sort-dir" class="filter-select">
-              <option value="desc">Descending (High→Low / Z→A)</option>
-              <option value="asc">Ascending (Low→High / A→Z)</option>
-            </select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-team">Team</label>
-            <select id="filter-team" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-player">Player</label>
-            <select id="filter-player" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-series">Series</label>
-            <select id="filter-series" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-set">Set</label>
-            <select id="filter-set" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-tier">Tier</label>
-            <select id="filter-tier" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-position">Position</label>
-            <select id="filter-position" class="filter-select"></select>
-          </div>
-
-          <div class="filter-group">
-            <label for="filter-locked">Locked status</label>
-            <select id="filter-locked" class="filter-select"></select>
-          </div>
-
-          <button id="reset-filters" class="reset-filters">Reset filters</button>
-        </aside>
-
-        <section class="table-panel">
-          <section id="wallet-summary-card" class="wallet-summary-card"></section>
-          <div class="table-header">
-            <h3 id="moments-title">Moments</h3>
-            <button id="export-csv" class="export-btn">Export CSV</button>
-          </div>
-
-          <div class="table-wrapper">
-            <table id="wallet-table">
-              <thead>
-                <tr>
-                  <th class="sortable" data-sort-key="playerName">Player</th>
-                  <th class="sortable" data-sort-key="owned_count">Owned</th>
-                  <th class="sortable" data-sort-key="team_name">Team</th>
-                  <th class="sortable" data-sort-key="position">Pos</th>
-                  <th class="sortable" data-sort-key="tier">Tier</th>
-                  <th class="sortable" data-sort-key="serial_number">#</th>
-                  <th class="sortable" data-sort-key="max_mint_size">Max</th>
-                  <th class="sortable" data-sort-key="series_name">Series</th>
-                  <th class="sortable" data-sort-key="set_name">Set</th>
-                  <th class="sortable" data-sort-key="low_ask_usd">Low</th>
-                  <th class="sortable" data-sort-key="avg_sale_usd">ASP</th>
-                  <th class="sortable" data-sort-key="top_sale_usd">Top</th>
-                  <th class="sortable" data-sort-key="is_locked">🔒</th>
-                  <th class="sortable" data-sort-key="last_event_ts">Date</th>
-                  <th>Links</th>
-                </tr>
-              </thead>
-              <tbody id="wallet-tbody"></tbody>
-            </table>
-          </div>
-
-          <!-- Mobile Card View -->
-          <div class="mobile-cards" id="wallet-mobile-cards"></div>
-
-          <div
-            id="wallet-pager"
-            style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem">
-            <button id="wallet-page-prev" class="btn-secondary" type="button">Prev</button>
-            <button id="wallet-page-next" class="btn-secondary" type="button">Next</button>
-            <span id="wallet-page-info"></span>
-          </div>
-        </section>
-      </main>
     </div>
 
-    <!-- Nav account is handled by layout.js -->
+    <!-- Mobile Filter Toggle -->
+    <button class="filters-toggle" id="filters-toggle">
+      <span>🎚️ Filters</span>
+      <span class="toggle-icon">▼</span>
+    </button>
 
-    <script>
-      async function maybeLoadDefaultWallet() {
-        const params = new URLSearchParams(window.location.search);
-        const walletFromUrl = (params.get("wallet") || "").trim();
-        if (walletFromUrl) {
-          if (typeof window.runQuery === "function") {
-            window.runQuery(walletFromUrl);
-          } else if (typeof window.loadWallet === "function") {
-            window.loadWallet(walletFromUrl);
-          }
+    <main class="content">
+      <aside class="filters-panel" id="filters-panel">
+        <!-- Profile Search Section (desktop) -->
+        <section id="profile-search-section" class="profile-search-section desktop-only-block">
+          <div class="profile-search-card">
+            <div class="profiles-title">🔎 Find Wallet</div>
+            <div>
+              <input id="prof-search-input" type="text" class="search-input" placeholder="Name or wallet address..."
+                autocomplete="off" />
+            </div>
+            <div id="prof-status" class="profiles-status"></div>
+            <ul id="prof-list" class="profiles-list"></ul>
+          </div>
+        </section>
+
+        <h3>🎚️ Filters</h3>
+
+        <!-- Sort Options (Mobile-friendly) -->
+        <div class="filter-group">
+          <label for="mobile-sort-key">Sort By</label>
+          <select id="mobile-sort-key" class="filter-select">
+            <option value="last_event_ts">Last Event (Newest)</option>
+            <option value="playerName">Player Name</option>
+            <option value="team_name">Team</option>
+            <option value="position">Position</option>
+            <option value="tier">Tier</option>
+            <option value="serial_number">Serial Number</option>
+            <option value="max_mint_size">Max Mint Size</option>
+            <option value="series_name">Series</option>
+            <option value="set_name">Set</option>
+            <option value="low_ask_usd">Low Ask Price</option>
+            <option value="avg_sale_usd">Average Sale Price</option>
+            <option value="top_sale_usd">Top Sale Price</option>
+            <option value="is_locked">Locked Status</option>
+            <option value="badge_count">Badges (Special)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="mobile-sort-dir">Sort Direction</label>
+          <select id="mobile-sort-dir" class="filter-select">
+            <option value="desc">Descending (High→Low / Z→A)</option>
+            <option value="asc">Ascending (Low→High / A→Z)</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-team">Team</label>
+          <select id="filter-team" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-player">Player</label>
+          <select id="filter-player" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-series">Series</label>
+          <select id="filter-series" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-set">Set</label>
+          <select id="filter-set" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-tier">Tier</label>
+          <select id="filter-tier" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-position">Position</label>
+          <select id="filter-position" class="filter-select"></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-locked">Locked status</label>
+          <select id="filter-locked" class="filter-select"></select>
+        </div>
+
+        <!-- Parallel Variant Filter -->
+        <div class="filter-group">
+          <label>Parallel Variant</label>
+          <div class="parallel-filter-list"
+            style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.25rem;">
+            <label class="parallel-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="parallel-sapphire" value="sapphire"
+                style="accent-color: #3b82f6; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem; color: #3b82f6;">💠</span> Sapphire (/25)
+            </label>
+            <label class="parallel-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="parallel-emerald" value="emerald"
+                style="accent-color: #10b981; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem; color: #10b981;">💚</span> Emerald (/50)
+            </label>
+            <label class="parallel-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="parallel-ruby" value="ruby"
+                style="accent-color: #ef4444; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem; color: #ef4444;">❤️</span> Ruby (/299)
+            </label>
+            <label class="parallel-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="parallel-standard" value="standard"
+                style="accent-color: #6b7280; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem; color: #6b7280;">⚪</span> Standard
+            </label>
+          </div>
+        </div>
+
+        <!-- Badge Filter Checkboxes -->
+        <div class="filter-group">
+          <label>Badge</label>
+          <div class="badge-filter-list"
+            style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.25rem;">
+            <label class="badge-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="badge-serial1" value="serial1"
+                style="accent-color: #fbbf24; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem;">🥇</span> #1 Serial
+            </label>
+            <label class="badge-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="badge-perfect" value="perfect"
+                style="accent-color: #ec4899; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem;">🎯</span> Perfect Serial
+            </label>
+            <label class="badge-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="badge-jersey" value="jersey"
+                style="accent-color: #22c55e; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem;">🏈</span> Jersey Match
+            </label>
+            <label class="badge-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="badge-69" value="69" style="accent-color: #f97316; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem;">😏</span> 69 Serial
+            </label>
+            <label class="badge-checkbox"
+              style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem;">
+              <input type="checkbox" id="badge-420" value="420"
+                style="accent-color: #22c55e; width: 14px; height: 14px;">
+              <span style="font-size: 0.9rem;">🌿</span> 420 Serial
+            </label>
+          </div>
+        </div>
+
+        <button id="reset-filters" class="reset-filters">Reset filters</button>
+      </aside>
+
+      <section class="table-panel">
+        <section id="wallet-summary-card" class="wallet-summary-card"></section>
+        <div class="table-header">
+          <h3 id="moments-title">Moments</h3>
+          <button id="export-csv" class="export-btn">Export CSV</button>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="wallet-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort-key="playerName">Player</th>
+                <th class="sortable" data-sort-key="owned_count">Owned</th>
+                <th class="sortable" data-sort-key="team_name">Team</th>
+                <th class="sortable" data-sort-key="position">Pos</th>
+                <th class="sortable" data-sort-key="tier">Tier</th>
+                <th class="sortable" data-sort-key="serial_number">#</th>
+                <th class="sortable" data-sort-key="max_mint_size">Max</th>
+                <th class="sortable" data-sort-key="series_name">Series</th>
+                <th class="sortable" data-sort-key="set_name">Set</th>
+                <th class="sortable" data-sort-key="low_ask_usd">Low</th>
+                <th class="sortable" data-sort-key="avg_sale_usd">ASP</th>
+                <th class="sortable" data-sort-key="top_sale_usd">Top</th>
+                <th class="sortable" data-sort-key="is_locked">🔒</th>
+                <th class="sortable" data-sort-key="last_event_ts">Date</th>
+                <th>Links</th>
+              </tr>
+            </thead>
+            <tbody id="wallet-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="mobile-cards" id="wallet-mobile-cards"></div>
+
+        <div id="wallet-pager"
+          style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem">
+          <button id="wallet-page-prev" class="btn-secondary" type="button">Prev</button>
+          <button id="wallet-page-next" class="btn-secondary" type="button">Next</button>
+          <span id="wallet-page-info"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Nav account is handled by layout.js -->
+
+  <script>
+    async function maybeLoadDefaultWallet() {
+      const params = new URLSearchParams(window.location.search);
+      const walletFromUrl = (params.get("wallet") || "").trim();
+      if (walletFromUrl) {
+        if (typeof window.runQuery === "function") {
+          window.runQuery(walletFromUrl);
+        } else if (typeof window.loadWallet === "function") {
+          window.loadWallet(walletFromUrl);
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/me", { credentials: "include" });
+        if (!res.ok) {
+          console.warn("GET /api/me failed with HTTP", res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!data.ok || !data.user || !data.user.default_wallet_address) {
           return;
         }
 
+        const wallet = (data.user.default_wallet_address || "").trim();
+        if (!wallet) return;
+
+        if (typeof window.runQuery === "function") {
+          window.runQuery(wallet);
+        } else if (typeof window.loadWallet === "function") {
+          window.loadWallet(wallet);
+        } else {
+          console.warn("No runQuery/loadWallet function found to load wallet automatically");
+        }
+      } catch (err) {
+        console.error("Failed to auto-load default wallet:", err);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", maybeLoadDefaultWallet);
+  </script>
+
+  <script src="app.js"></script>
+  <script>
+    // Profile search functionality
+    (function () {
+      const searchInput = document.getElementById("prof-search-input");
+      const statusEl = document.getElementById("prof-status");
+      const listEl = document.getElementById("prof-list");
+
+      if (!searchInput || !statusEl || !listEl) {
+        console.warn("Profile search elements not found");
+        return;
+      }
+
+      let currentProfiles = [];
+      let currentSelectedIndex = -1;
+      let searchTimeout = null;
+
+      function formatNumber(n) {
+        if (n == null) return "0";
+        return Number(n).toLocaleString();
+      }
+
+      function renderList() {
+        listEl.innerHTML = "";
+
+        if (!currentProfiles.length) {
+          const li = document.createElement("li");
+          li.className = "profiles-help";
+          li.textContent = "No profiles found for this search.";
+          listEl.appendChild(li);
+          return;
+        }
+
+        currentProfiles.forEach((p, idx) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "profile-item-btn" + (idx === currentSelectedIndex ? " active" : "");
+          btn.dataset.index = String(idx);
+
+          const mainDiv = document.createElement("div");
+          mainDiv.className = "profile-item-main";
+
+          const nameDiv = document.createElement("div");
+          nameDiv.className = "profile-item-name";
+          nameDiv.textContent = p.display_name || "(unknown)";
+
+          const addrDiv = document.createElement("div");
+          addrDiv.className = "profile-item-address";
+          addrDiv.textContent = p.wallet_address || "";
+
+          mainDiv.appendChild(nameDiv);
+          mainDiv.appendChild(addrDiv);
+
+          const statsDiv = document.createElement("div");
+          statsDiv.className = "profile-item-stats";
+          statsDiv.innerHTML =
+            '<div>' +
+            formatNumber(p.total_moments) +
+            " moments</div>" +
+            '<div class="unlocked">' +
+            formatNumber(p.unlocked_moments) +
+            " unlocked</div>";
+
+          btn.appendChild(mainDiv);
+          btn.appendChild(statsDiv);
+
+          btn.addEventListener("click", () => {
+            currentSelectedIndex = idx;
+            renderList();
+            loadWalletFromProfile(p);
+          });
+
+          const li = document.createElement("li");
+          li.appendChild(btn);
+          listEl.appendChild(li);
+        });
+      }
+
+      async function loadWalletFromProfile(profile) {
+        const walletAddress = profile.wallet_address;
+        if (!walletAddress) return;
+
+        // Update the wallet input field
+        const walletInput = document.getElementById("wallet-input");
+        if (walletInput) {
+          walletInput.value = walletAddress;
+        }
+
+        // Load the wallet using the existing runQuery function
+        if (window.runQuery) {
+          await window.runQuery(walletAddress);
+        }
+
+        // Scroll to top to show the wallet summary
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      async function runSearch(term) {
+        const trimmed = term.trim();
+
+        if (!trimmed) {
+          currentProfiles = [];
+          currentSelectedIndex = -1;
+          statusEl.textContent = "";
+          listEl.innerHTML = "";
+          return;
+        }
+
+        statusEl.textContent = "Searching…";
+
         try {
-          const res = await fetch("/api/me", { credentials: "include" });
-          if (!res.ok) {
-            console.warn("GET /api/me failed with HTTP", res.status);
-            return;
-          }
+          const res = await fetch(
+            "/api/profiles?query=" + encodeURIComponent(trimmed)
+          );
           const data = await res.json();
-          if (!data.ok || !data.user || !data.user.default_wallet_address) {
-            return;
+
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Search failed");
           }
 
-          const wallet = (data.user.default_wallet_address || "").trim();
-          if (!wallet) return;
+          currentProfiles = data.profiles || [];
+          currentSelectedIndex = currentProfiles.length ? 0 : -1;
 
-          if (typeof window.runQuery === "function") {
-            window.runQuery(wallet);
-          } else if (typeof window.loadWallet === "function") {
-            window.loadWallet(wallet);
+          if (!currentProfiles.length) {
+            statusEl.textContent = "No profiles found for \"" + trimmed + "\".";
           } else {
-            console.warn("No runQuery/loadWallet function found to load wallet automatically");
+            statusEl.textContent =
+              "Found " +
+              currentProfiles.length +
+              " profile(s) for \"" +
+              trimmed +
+              "\".";
           }
+
+          renderList();
         } catch (err) {
-          console.error("Failed to auto-load default wallet:", err);
+          console.error("profiles search error:", err);
+          statusEl.textContent = "Search failed: " + (err.message || "Check console for details.");
+          currentProfiles = [];
+          currentSelectedIndex = -1;
+          renderList();
         }
       }
 
-      document.addEventListener("DOMContentLoaded", maybeLoadDefaultWallet);
-    </script>
+      searchInput.addEventListener("input", () => {
+        const value = searchInput.value;
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => runSearch(value), 300);
+      });
+    })();
+  </script>
 
-    <script src="app.js"></script>
-    <script>
-      // Profile search functionality
-      (function () {
-        const searchInput = document.getElementById("prof-search-input");
-        const statusEl = document.getElementById("prof-status");
-        const listEl = document.getElementById("prof-list");
+  <script>
+    // Mobile filter toggle
+    (function () {
+      const toggle = document.getElementById('filters-toggle');
+      const panel = document.getElementById('filters-panel');
 
-        if (!searchInput || !statusEl || !listEl) {
-          console.warn("Profile search elements not found");
-          return;
-        }
-
-        let currentProfiles = [];
-        let currentSelectedIndex = -1;
-        let searchTimeout = null;
-
-        function formatNumber(n) {
-          if (n == null) return "0";
-          return Number(n).toLocaleString();
-        }
-
-        function renderList() {
-          listEl.innerHTML = "";
-
-          if (!currentProfiles.length) {
-            const li = document.createElement("li");
-            li.className = "profiles-help";
-            li.textContent = "No profiles found for this search.";
-            listEl.appendChild(li);
-            return;
-          }
-
-          currentProfiles.forEach((p, idx) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "profile-item-btn" + (idx === currentSelectedIndex ? " active" : "");
-            btn.dataset.index = String(idx);
-
-            const mainDiv = document.createElement("div");
-            mainDiv.className = "profile-item-main";
-
-            const nameDiv = document.createElement("div");
-            nameDiv.className = "profile-item-name";
-            nameDiv.textContent = p.display_name || "(unknown)";
-
-            const addrDiv = document.createElement("div");
-            addrDiv.className = "profile-item-address";
-            addrDiv.textContent = p.wallet_address || "";
-
-            mainDiv.appendChild(nameDiv);
-            mainDiv.appendChild(addrDiv);
-
-            const statsDiv = document.createElement("div");
-            statsDiv.className = "profile-item-stats";
-            statsDiv.innerHTML =
-              '<div>' +
-              formatNumber(p.total_moments) +
-              " moments</div>" +
-              '<div class="unlocked">' +
-              formatNumber(p.unlocked_moments) +
-              " unlocked</div>";
-
-            btn.appendChild(mainDiv);
-            btn.appendChild(statsDiv);
-
-            btn.addEventListener("click", () => {
-              currentSelectedIndex = idx;
-              renderList();
-              loadWalletFromProfile(p);
-            });
-
-            const li = document.createElement("li");
-            li.appendChild(btn);
-            listEl.appendChild(li);
-          });
-        }
-
-        async function loadWalletFromProfile(profile) {
-          const walletAddress = profile.wallet_address;
-          if (!walletAddress) return;
-
-          // Update the wallet input field
-          const walletInput = document.getElementById("wallet-input");
-          if (walletInput) {
-            walletInput.value = walletAddress;
-          }
-
-          // Load the wallet using the existing runQuery function
-          if (window.runQuery) {
-            await window.runQuery(walletAddress);
-          }
-
-          // Scroll to top to show the wallet summary
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        async function runSearch(term) {
-          const trimmed = term.trim();
-
-          if (!trimmed) {
-            currentProfiles = [];
-            currentSelectedIndex = -1;
-            statusEl.textContent = "";
-            listEl.innerHTML = "";
-            return;
-          }
-
-          statusEl.textContent = "Searching…";
-
-          try {
-            const res = await fetch(
-              "/api/profiles?query=" + encodeURIComponent(trimmed)
-            );
-            const data = await res.json();
-
-            if (!res.ok || !data.ok) {
-              throw new Error(data.error || "Search failed");
-            }
-
-            currentProfiles = data.profiles || [];
-            currentSelectedIndex = currentProfiles.length ? 0 : -1;
-
-            if (!currentProfiles.length) {
-              statusEl.textContent = "No profiles found for \"" + trimmed + "\".";
-            } else {
-              statusEl.textContent =
-                "Found " +
-                currentProfiles.length +
-                " profile(s) for \"" +
-                trimmed +
-                "\".";
-            }
-
-            renderList();
-          } catch (err) {
-            console.error("profiles search error:", err);
-            statusEl.textContent = "Search failed: " + (err.message || "Check console for details.");
-            currentProfiles = [];
-            currentSelectedIndex = -1;
-            renderList();
-          }
-        }
-
-        searchInput.addEventListener("input", () => {
-          const value = searchInput.value;
-          if (searchTimeout) clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => runSearch(value), 300);
+      if (toggle && panel) {
+        toggle.addEventListener('click', () => {
+          panel.classList.toggle('open');
+          toggle.classList.toggle('open');
         });
-      })();
-    </script>
+      }
+    })();
 
-    <script>
-      // Mobile filter toggle
-      (function() {
-        const toggle = document.getElementById('filters-toggle');
-        const panel = document.getElementById('filters-panel');
-        
-        if (toggle && panel) {
-          toggle.addEventListener('click', () => {
-            panel.classList.toggle('open');
-            toggle.classList.toggle('open');
-          });
-        }
-      })();
+    // Mobile search functionality (mirrors the desktop search)
+    (function () {
+      const searchInput = document.getElementById('mobile-search-input');
+      const statusEl = document.getElementById('mobile-search-status');
+      const listEl = document.getElementById('mobile-search-list');
 
-      // Mobile search functionality (mirrors the desktop search)
-      (function() {
-        const searchInput = document.getElementById('mobile-search-input');
-        const statusEl = document.getElementById('mobile-search-status');
-        const listEl = document.getElementById('mobile-search-list');
+      if (!searchInput || !statusEl || !listEl) return;
 
-        if (!searchInput || !statusEl || !listEl) return;
+      let currentProfiles = [];
+      let searchTimeout = null;
 
-        let currentProfiles = [];
-        let searchTimeout = null;
+      function formatNumber(n) {
+        if (n == null) return "0";
+        return Number(n).toLocaleString();
+      }
 
-        function formatNumber(n) {
-          if (n == null) return "0";
-          return Number(n).toLocaleString();
-        }
+      function renderList() {
+        listEl.innerHTML = "";
+        if (!currentProfiles.length) return;
 
-        function renderList() {
-          listEl.innerHTML = "";
-          if (!currentProfiles.length) return;
-
-          currentProfiles.forEach((p) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "profile-item-btn";
-            btn.innerHTML = `
+        currentProfiles.forEach((p) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "profile-item-btn";
+          btn.innerHTML = `
               <div class="profile-item-main">
                 <div class="profile-item-name">${p.display_name || "(unknown)"}</div>
                 <div class="profile-item-address">${p.wallet_address || ""}</div>
@@ -1213,57 +1310,100 @@
                 <div>${formatNumber(p.total_moments)} moments</div>
               </div>
             `;
-            btn.addEventListener("click", () => {
-              if (window.runQuery && p.wallet_address) {
-                window.runQuery(p.wallet_address);
-                listEl.innerHTML = "";
-                searchInput.value = "";
-                statusEl.textContent = "";
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            });
-            const li = document.createElement("li");
-            li.appendChild(btn);
-            listEl.appendChild(li);
-          });
-        }
-
-        async function runSearch(term) {
-          const trimmed = term.trim();
-          if (!trimmed) {
-            currentProfiles = [];
-            statusEl.textContent = "";
-            listEl.innerHTML = "";
-            return;
-          }
-
-          statusEl.textContent = "Searching…";
-
-          try {
-            const res = await fetch("/api/profiles?query=" + encodeURIComponent(trimmed));
-            const data = await res.json();
-
-            if (!res.ok || !data.ok) {
-              throw new Error(data.error || "Search failed");
+          btn.addEventListener("click", () => {
+            if (window.runQuery && p.wallet_address) {
+              window.runQuery(p.wallet_address);
+              listEl.innerHTML = "";
+              searchInput.value = "";
+              statusEl.textContent = "";
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }
+          });
+          const li = document.createElement("li");
+          li.appendChild(btn);
+          listEl.appendChild(li);
+        });
+      }
 
-            currentProfiles = data.profiles || [];
-            statusEl.textContent = currentProfiles.length 
-              ? `Found ${currentProfiles.length} profile(s)` 
-              : `No profiles found`;
-            renderList();
-          } catch (err) {
-            statusEl.textContent = "Search failed";
-            currentProfiles = [];
-            renderList();
-          }
+      async function runSearch(term) {
+        const trimmed = term.trim();
+        if (!trimmed) {
+          currentProfiles = [];
+          statusEl.textContent = "";
+          listEl.innerHTML = "";
+          return;
         }
 
-        searchInput.addEventListener("input", () => {
-          if (searchTimeout) clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => runSearch(searchInput.value), 300);
+        statusEl.textContent = "Searching…";
+
+        try {
+          const res = await fetch("/api/profiles?query=" + encodeURIComponent(trimmed));
+          const data = await res.json();
+
+          if (!res.ok || !data.ok) {
+            throw new Error(data.error || "Search failed");
+          }
+
+          currentProfiles = data.profiles || [];
+          statusEl.textContent = currentProfiles.length
+            ? `Found ${currentProfiles.length} profile(s)`
+            : `No profiles found`;
+          renderList();
+        } catch (err) {
+          statusEl.textContent = "Search failed";
+          currentProfiles = [];
+          renderList();
+        }
+      }
+
+      searchInput.addEventListener("input", () => {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => runSearch(searchInput.value), 300);
+      });
+    })();
+  </script>
+
+  <!-- Visit Counter Footer -->
+  <footer
+    style="margin-top: 2rem; padding: 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.75rem;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <span>👁️ <span id="visit-count">-</span> visits</span>
+      <span>•</span>
+      <span>Built with ❤️ by Chunky</span>
+      <span>•</span>
+      <span>© 2024 NFL All Day Wallet Viewer</span>
+    </div>
+  </footer>
+
+  <script>
+    // Simple visit counter using server API
+    (function initVisitCounter() {
+      const counterEl = document.getElementById('visit-count');
+      if (!counterEl) return;
+
+      // Record visit and get count
+      fetch('/api/visit', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.count) {
+            counterEl.textContent = data.count.toLocaleString();
+          }
+        })
+        .catch(() => {
+          // Fallback: try to get count without recording
+          fetch('/api/visit-count')
+            .then(r => r.json())
+            .then(data => {
+              if (data.count) {
+                counterEl.textContent = data.count.toLocaleString();
+              }
+            })
+            .catch(() => {
+              counterEl.textContent = '?';
+            });
         });
-      })();
-    </script>
-  </body>
+    })();
+  </script>
+</body>
+
 </html>

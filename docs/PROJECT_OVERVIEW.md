@@ -20,8 +20,8 @@ A full-stack web application for exploring **NFL ALL DAY** (Dapper Labs' NFL NFT
 ┌─────────────────────────────────────────────────────────────────┐
 │                        DATA SOURCES                              │
 ├─────────────────────────────────────────────────────────────────┤
-│  Flow Blockchain ──► Snowflake (FACT_EVENTS) ──► PostgreSQL     │
-│      (real-time)        (analytics/history)      (app database) │
+│  Flow Blockchain ──► Real-time Events ──► PostgreSQL            │
+│      (WebSocket)      (Deposit/Withdraw)    (app database)      │
 │                                                                  │
 │  Dapper API ──► Display Names, Pricing                          │
 │  FindLab API ──► Wallet NFT lookups (fallback)                  │
@@ -39,6 +39,7 @@ A full-stack web application for exploring **NFL ALL DAY** (Dapper Labs' NFL NFT
 ├─────────────────────────────────────────────────────────────────┤
 │  services/                                                       │
 │  ├── flow-blockchain.js - FCL integration, Cadence execution    │
+│  ├── event-processor.js - Real-time blockchain event handler    │
 │  └── findlabs-client.js - FindLab API fallback                  │
 └─────────────────────────────────────────────────────────────────┘
            │
@@ -70,6 +71,16 @@ A full-stack web application for exploring **NFL ALL DAY** (Dapper Labs' NFL NFT
 | `wallet_profiles` | Display names from Dapper API |
 | `edition_price_scrape` | Pricing: lowest_ask, avg_sale, top_sale per edition |
 
+### Normalized Tables (Snowflake-independent)
+| Table | Purpose |
+|-------|---------|
+| `series` | Series lookup (id, name) |
+| `sets` | Set lookup (id, name) |
+| `plays` | Play/player info |
+| `editions` | Edition details with FK to plays, sets, series |
+| `nfts` | Individual NFTs with FK to editions |
+| `holdings` | Current ownership with is_locked status |
+
 ### Snapshot Tables (for fast reads)
 | Table | Purpose |
 |-------|---------|
@@ -82,31 +93,25 @@ A full-stack web application for exploring **NFL ALL DAY** (Dapper Labs' NFL NFT
 
 ## 🔄 Data Sync Pipeline
 
-### Snowflake Tables (you manage these)
-- `ALLDAY_VIEWER.ALLDAY.ALLDAY_CORE_NFT_METADATA` - All minted NFTs with metadata
-- `ALLDAY_VIEWER.ALLDAY.ALLDAY_WALLET_HOLDINGS_CURRENT` - Current ownership
+### Real-time Updates (Primary)
+The app now uses **real-time blockchain events** via WebSocket:
+- `Deposit` / `Withdraw` → Updates `holdings` and `wallet_holdings`
+- `NFTLocked` / `NFTUnlocked` → Updates `is_locked` status
+- `MomentNFTMinted` / `MomentNFTBurned` → Updates `nfts` table
 
-### Sync Scripts (in `scripts/`)
+### Manual Sync Scripts (in `scripts/`)
 ```bash
-# Full sync (run in this order)
-node scripts/sync_nft_core_metadata_from_snowflake.js
-node scripts/sync_wallet_holdings_from_snowflake.js
+# Sync display names from Dapper API
 node scripts/sync_wallet_profiles_from_dapper.js
+
+# Rebuild leaderboards
 node scripts/sync_leaderboards.js
 
-# Or use the master orchestrator
-node scripts/master_sync.js           # Full sync
-node scripts/master_sync.js --holdings-only  # Quick update
+# Master sync (single wallet or all)
 node scripts/master_sync.js --wallet=0x...   # Single wallet
 ```
 
-### Rebuilding Snowflake Tables
-When new sets are released, Snowflake tables need rebuilding:
-```sql
--- Run in Snowflake Worksheet
-scripts/snowflake_backfill_metadata.sql
-scripts/snowflake_backfill_holdings.sql
-```
+> **Note**: Snowflake sync scripts have been deprecated and moved to `scripts/deprecated/snowflake/`. The app no longer requires Snowflake access for normal operation.
 
 ---
 
@@ -196,16 +201,25 @@ npm run dev
 
 ## 📊 Environment Variables
 
+### Required
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string (Render) |
-| `SNOWFLAKE_ACCOUNT` | Snowflake account identifier |
-| `SNOWFLAKE_USER` | Snowflake username |
-| `SNOWFLAKE_PASSWORD` | Snowflake password |
-| `SNOWFLAKE_DATABASE` | Usually `ALLDAY_VIEWER` |
-| `SNOWFLAKE_SCHEMA` | Usually `ALLDAY` |
-| `FLOW_ACCESS_NODE` | Flow RPC endpoint (default: mainnet) |
 | `SESSION_SECRET` | Express session secret |
+
+### Optional
+| Variable | Purpose |
+|----------|---------|
+| `FLOW_ACCESS_NODE` | Flow RPC endpoint (default: mainnet) |
+
+### Deprecated (Snowflake)
+| Variable | Purpose |
+|----------|---------|
+| `SNOWFLAKE_ACCOUNT` | *(no longer required)* |
+| `SNOWFLAKE_USER` | *(no longer required)* |
+| `SNOWFLAKE_PASSWORD` | *(no longer required)* |
+| `SNOWFLAKE_DATABASE` | *(no longer required)* |
+| `SNOWFLAKE_SCHEMA` | *(no longer required)* |
 
 ---
 
