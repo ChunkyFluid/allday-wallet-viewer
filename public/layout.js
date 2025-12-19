@@ -3,13 +3,6 @@
     function buildHeaderHTML() {
         const path = normalizePath(window.location.pathname);
 
-        function navLink(href, label, opts = {}) {
-            const isActive = href === "/" ? path === "/" || path === "/index.html" : path === href;
-            const activeClass = isActive ? ' class="active"' : "";
-            const idAttr = opts.id ? ` id="${opts.id}"` : "";
-            return `<a href="${href}"${idAttr}${activeClass}>${label}</a>`;
-        }
-
         return `
       <header class="app-header">
         <a href="/" class="brand">
@@ -29,8 +22,6 @@
           <a href="/serial-finder.html" class="${path === '/serial-finder.html' ? 'active' : ''}">🏆 Serials</a>
           <a href="/wallet-compare.html" class="${path === '/wallet-compare.html' ? 'active' : ''}">⚖️ Compare</a>
           <a href="/rarity-score.html" class="${path === '/rarity-score.html' ? 'active' : ''}">📈 Rarity</a>
-          <!-- Trading hidden for now - access directly at /trades.html -->
-          <!-- <a href="/trades.html" class="${path === '/trades.html' ? 'active nav-hot' : 'nav-hot'}">🔄 Trading</a> -->
           <a href="/insights.html" class="${path === '/insights.html' ? 'active' : ''}">💡 Insights</a>
           <a href="/faq.html" class="${path === '/faq.html' ? 'active' : ''}">❓ FAQ</a>
           <a href="/login.html" id="nav-account-link" class="${path === '/login.html' ? 'active' : ''}">🔑 Login</a>
@@ -40,6 +31,24 @@
         Website made with ❤️ by Chunky. Its an ongoing Project. Not my job/income. May be paid to use in future. Donations Welcome.</span>
         <a href="https://www.paypal.com/ncp/payment/7L6XYSZY9TQBJ" target="_blank" class="donate-link">💖 Donate</a>
       </div>
+    `;
+    }
+
+    function buildFooterHTML() {
+        return `
+      <footer style="margin-top: 3rem; padding: 2rem 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); font-size: 0.8rem; background: rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: center; align-items: center; gap: 1.5rem; flex-wrap: wrap; max-width: 1200px; margin: 0 auto;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.1rem;">👁️</span>
+            <span id="visit-count" style="font-weight: 600; color: #fff; font-family: 'JetBrains Mono', monospace;">-</span> 
+            <span>unique visits</span>
+          </div>
+          <span style="opacity: 0.3;">•</span>
+          <span>Built with ❤️ by Chunky</span>
+          <span style="opacity: 0.3;">•</span>
+          <span>© 2025 Chunky Viewer</span>
+        </div>
+      </footer>
     `;
     }
 
@@ -129,15 +138,58 @@
         });
     }
 
-    function initHeader() {
-        const container = document.getElementById("app-header");
-        if (!container) return;
+    function initVisitCounter() {
+        const counterEl = document.getElementById('visit-count');
+        if (!counterEl) return;
 
-        container.innerHTML = buildHeaderHTML();
-        updateNavAccount();
-        initMobileMenu();
+        // Record visit and get count
+        fetch('/api/visit', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.count) {
+                    counterEl.textContent = data.count.toLocaleString();
+                }
+            })
+            .catch(() => {
+                // Fallback: try to get count without recording
+                fetch('/api/visit-count')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.count) {
+                            counterEl.textContent = data.count.toLocaleString();
+                        }
+                    })
+                    .catch(() => {
+                        counterEl.textContent = '?';
+                    });
+            });
+    }
+
+    function initLayout() {
+        // Init Header
+        const headerContainer = document.getElementById("app-header");
+        if (headerContainer) {
+            headerContainer.innerHTML = buildHeaderHTML();
+            updateNavAccount();
+            initMobileMenu();
+        }
+
+        // Init Footer
+        let footerContainer = document.getElementById("app-footer");
+        if (!footerContainer) {
+            // If no explicit footer container, append to body
+            footerContainer = document.createElement('div');
+            footerContainer.id = "app-footer";
+            document.body.appendChild(footerContainer);
+        }
+        footerContainer.innerHTML = buildFooterHTML();
+        initVisitCounter();
     }
 
     // Run immediately
-    initHeader();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initLayout);
+    } else {
+        initLayout();
+    }
 })();

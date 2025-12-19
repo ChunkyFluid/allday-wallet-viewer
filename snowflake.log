@@ -3568,3 +3568,21 @@
 {"level":"INFO","message":"[9:29:18.225 AM]: Creating Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] with host: JUSOYVN-MPC92964.snowflakecomputing.com, account: JUSOYVN-MPC92964, accessUrl: https://JUSOYVN-MPC92964.snowflakecomputing.com, user: GREENFORD, password is provided, role: ACCOUNTADMIN, database: ALLDAY_VIEWER, schema: ALLDAY, warehouse: COMPUTE_WH, region: undefined, authenticator: SNOWFLAKE, ocsp mode: FAIL_OPEN, os: win32, os version: 10.0.26100"}
 {"level":"INFO","message":"[9:29:18.226 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] additional details: passcode in password is provided, passcode is not provided, private key is not provided, application: undefined, client name: snowflake-sdk, client version: 1.15.0, retry timeout: 300, private key path: undefined, private key pass is not provided, client store temporary credential: false, browser response timeout: 120000"}
 {"level":"INFO","message":"[9:29:18.226 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] - connection object created successfully."}
+{"level":"INFO","message":"[9:30:25.828 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] - connecting. Associated Snowflake domain: GLOBAL"}
+{"level":"INFO","message":"[9:30:25.833 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] - authentication successful using: SNOWFLAKE"}
+{"level":"INFO","message":"[9:30:25.834 AM]: Trying to initialize Easy Logging"}
+{"level":"INFO","message":"[9:30:25.844 AM]: No client config detected."}
+{"level":"INFO","message":"[9:30:25.846 AM]: No config file path found. Client config will not be used."}
+{"level":"INFO","message":"[9:30:25.846 AM]: Easy Logging is disabled as no config has been found"}
+{"level":"INFO","message":"[9:30:25.854 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] - connected successfully after 26.735799999994924 milliseconds"}
+{"level":"INFO","message":"[10:34:42.505 AM]: Creating new connection object"}
+{"level":"INFO","message":"[10:34:42.529 AM]: Creating Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] with host: JUSOYVN-MPC92964.snowflakecomputing.com, account: JUSOYVN-MPC92964, accessUrl: https://JUSOYVN-MPC92964.snowflakecomputing.com, user: GREENFORD, password is provided, role: ACCOUNTADMIN, database: ALLDAY_VIEWER, schema: ALLDAY, warehouse: COMPUTE_WH, region: undefined, authenticator: SNOWFLAKE, ocsp mode: FAIL_OPEN, os: win32, os version: 10.0.26100"}
+{"level":"INFO","message":"[10:34:42.530 AM]: Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] additional details: passcode in password is provided, passcode is not provided, private key is not provided, application: undefined, client name: snowflake-sdk, client version: 1.15.0, retry timeout: 300, private key path: undefined, private key pass is not provided, client store temporary credential: false, browser response timeout: 120000"}
+{"level":"INFO","message":"[10:34:42.530 AM]: Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] - connection object created successfully."}
+{"level":"INFO","message":"[10:34:47.215 AM]: Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] - connecting. Associated Snowflake domain: GLOBAL"}
+{"level":"INFO","message":"[10:34:47.216 AM]: Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] - authentication successful using: SNOWFLAKE"}
+{"level":"INFO","message":"[10:34:47.217 AM]: Trying to initialize Easy Logging"}
+{"level":"INFO","message":"[10:34:47.235 AM]: No client config detected."}
+{"level":"INFO","message":"[10:34:47.236 AM]: No config file path found. Client config will not be used."}
+{"level":"INFO","message":"[10:34:47.236 AM]: Easy Logging is disabled as no config has been found"}
+{"level":"INFO","message":"[10:34:47.242 AM]: Connection[id: b5f09357-a93d-4813-a6ac-4461d5cdbe23] - connected successfully after 27.262300000000323 milliseconds"}

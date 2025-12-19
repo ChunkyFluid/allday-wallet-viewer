@@ -1363,47 +1363,7 @@
     })();
   </script>
 
-  <!-- Visit Counter Footer -->
-  <footer
-    style="margin-top: 2rem; padding: 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.75rem;">
-    <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap;">
-      <span>👁️ <span id="visit-count">-</span> visits</span>
-      <span>•</span>
-      <span>Built with ❤️ by Chunky</span>
-      <span>•</span>
-      <span>© 2025 Chunky Viewer</span>
-    </div>
-  </footer>
-
-  <script>
-    // Simple visit counter using server API
-    (function initVisitCounter() {
-      const counterEl = document.getElementById('visit-count');
-      if (!counterEl) return;
-
-      // Record visit and get count
-      fetch('/api/visit', { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-          if (data.count) {
-            counterEl.textContent = data.count.toLocaleString();
-          }
-        })
-        .catch(() => {
-          // Fallback: try to get count without recording
-          fetch('/api/visit-count')
-            .then(r => r.json())
-            .then(data => {
-              if (data.count) {
-                counterEl.textContent = data.count.toLocaleString();
-              }
-            })
-            .catch(() => {
-              counterEl.textContent = '?';
-            });
-        });
-    })();
-  </script>
+  <div id="app-footer"></div>
 </body>
 
 </html>

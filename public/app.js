@@ -790,8 +790,8 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
         </div>
         <!-- Mobile-only simplified stats -->
         <div class="wallet-summary-chips mobile-show" style="display: none; text-align: left;">
-          <span class="chip">💰 $${floorText}</span>
-          <span class="chip">📊 $${aspText}</span>
+          <span class="chip">💰 Floor: $${floorText}</span>
+          <span class="chip">📊 ASP: $${aspText}</span>
         </div>
 
       </div>

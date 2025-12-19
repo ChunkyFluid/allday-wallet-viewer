@@ -11767,6 +11767,11 @@ async function initVisitCounterTable() {
         last_updated TIMESTAMPTZ DEFAULT NOW()
       );
       INSERT INTO site_visits (id, total_count) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;
+
+      CREATE TABLE IF NOT EXISTS unique_visits_log (
+        visitor_hash TEXT PRIMARY KEY,
+        first_seen TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
   } catch (err) {
     console.error("Error initializing visit counter table:", err.message);
@@ -11776,12 +11781,30 @@ async function initVisitCounterTable() {
 // POST /api/visit - record a visit and return count
 app.post("/api/visit", async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      UPDATE site_visits 
-      SET total_count = total_count + 1, last_updated = NOW() 
-      WHERE id = 1 
-      RETURNING total_count;
-    `);
+    // Basic IP/UA hashing for "uniqueness"
+    const crypto = require('crypto');
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const ua = req.headers['user-agent'] || 'unknown';
+    const hash = crypto.createHash('sha256').update(ip + ua).digest('hex');
+
+    // Attempt to log the unique visit
+    const { rowCount } = await pool.query(`
+      INSERT INTO unique_visits_log (visitor_hash) 
+      VALUES ($1) 
+      ON CONFLICT (visitor_hash) DO NOTHING
+    `, [hash]);
+
+    // If it was a new unique visit, increment the total count
+    if (rowCount > 0) {
+      await pool.query(`
+        UPDATE site_visits 
+        SET total_count = total_count + 1, last_updated = NOW() 
+        WHERE id = 1
+      `);
+    }
+
+    // Always return current total count
+    const { rows } = await pool.query(`SELECT total_count FROM site_visits WHERE id = 1`);
     const count = rows[0]?.total_count || 0;
     return res.json({ ok: true, count });
   } catch (err) {
