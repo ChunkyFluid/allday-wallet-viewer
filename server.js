@@ -7005,11 +7005,12 @@ app.get("/api/sniper-deals", async (req, res) => {
       }
     }
 
-    // Batch fetch ASP for all listings
+    // Batch fetch ASP and top sale for all listings
+    const topSaleMap = new Map();
     if (allEditionIds.length > 0) {
       try {
         const priceResult = await pgQuery(
-          `SELECT edition_id, avg_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[]) AND avg_sale_usd IS NOT NULL`,
+          `SELECT edition_id, avg_sale_usd, top_sale_usd FROM edition_price_scrape WHERE edition_id = ANY($1::text[])`,
           [allEditionIds]
         );
         priceResult.rows.forEach(row => {
@@ -7020,11 +7021,30 @@ app.get("/api/sniper-deals", async (req, res) => {
               aspMap.set(row.edition_id, numValue);
             }
           }
+          const topSaleValue = row.top_sale_usd;
+          if (topSaleValue != null) {
+            const numValue = Number(topSaleValue);
+            if (!isNaN(numValue) && numValue > 0) {
+              topSaleMap.set(row.edition_id, numValue);
+            }
+          }
         });
-        //console.log(`[Sniper API] Fetched ASP for ${aspMap.size} editions out of ${allEditionIds.length} requested`);
       } catch (e) {
-        //sniperError("[Sniper] Error fetching ASP:", e.message);
+        // Silently fail - price data is optional
       }
+    }
+
+    // Helper function to detect parallel variant from set name and mint size
+    function detectParallelVariant(setName, maxMint) {
+      if (!setName) return 'standard';
+      const setLower = setName.toLowerCase();
+      if (!setLower.includes('parallel')) return 'standard';
+
+      // Detect by mint size
+      if (maxMint === 25 || maxMint === '25') return 'sapphire';
+      if (maxMint === 50 || maxMint === '50') return 'emerald';
+      if (maxMint === 299 || maxMint === '299' || !maxMint) return 'ruby';
+      return 'parallel'; // Unknown parallel variant
     }
 
     // Enrich all listings with fetched data
@@ -7053,6 +7073,39 @@ app.get("/api/sniper-deals", async (req, res) => {
           // Only set to null if it was undefined, don't overwrite if it was explicitly set to null before
           enriched.avgSale = null;
         }
+        // Add top sale price
+        if (topSaleMap.has(enriched.editionId)) {
+          enriched.topSale = topSaleMap.get(enriched.editionId);
+        }
+      }
+
+      // Detect parallel variant from set name
+      enriched.parallelVariant = detectParallelVariant(enriched.setName, enriched.maxMint);
+
+      // Special serial detection
+      const serial = enriched.serialNumber;
+      const jersey = enriched.jerseyNumber;
+
+      // Is #1 serial
+      enriched.isNumberOne = serial === 1;
+
+      // Is jersey match (serial equals player's jersey number)
+      enriched.isJerseyMatch = jersey && serial && serial === jersey;
+
+      // Low serial classifications
+      enriched.isTop10 = serial && serial <= 10;
+      enriched.isTop100 = serial && serial <= 100;
+
+      // Calculate floor delta (% savings vs floor)
+      const listPrice = enriched.listingPrice;
+      const floor = enriched.floor || enriched.floorPrice;
+      if (listPrice && floor && floor > 0) {
+        enriched.floorDelta = ((floor - listPrice) / floor) * 100; // positive = savings
+      }
+
+      // Calculate ASP delta (% savings vs average sale price)
+      if (listPrice && enriched.avgSale && enriched.avgSale > 0) {
+        enriched.aspDelta = ((enriched.avgSale - listPrice) / enriched.avgSale) * 100; // positive = savings
       }
 
       return enriched;

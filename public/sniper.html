@@ -274,6 +274,125 @@
       font-size: 0.75rem;
     }
 
+    /* Checkbox list filters */
+    .checkbox-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .filter-checkbox:hover {
+      color: var(--text);
+    }
+
+    .filter-checkbox input[type="checkbox"] {
+      accent-color: #6f42c1;
+      width: 14px;
+      height: 14px;
+    }
+
+    .filter-checkbox span {
+      font-size: 0.75rem;
+    }
+
+    /* Saved searches */
+    .saved-searches-group .filter-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-save-search,
+    .btn-delete-search {
+      background: transparent;
+      border: 1px solid var(--sniper-border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.15s;
+    }
+
+    .btn-save-search:hover {
+      background: #22c55e;
+      border-color: #22c55e;
+    }
+
+    .btn-delete-search {
+      margin-top: 0.5rem;
+      width: 100%;
+      display: none;
+    }
+
+    .btn-delete-search.visible {
+      display: block;
+    }
+
+    .btn-delete-search:hover {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+
+    /* Delta badges (savings vs floor/ASP) */
+    .delta-badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .delta-badge {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .delta-badge.savings {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .delta-badge.premium {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .delta-badge.neutral {
+      background: rgba(107, 114, 128, 0.15);
+      color: #9ca3af;
+    }
+
+    /* Special serial badges */
+    .special-badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+
+    .special-badge.jersey-match {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+    }
+
+    .special-badge.number-one {
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      color: #1f2937;
+    }
+
     /* Results Card */
     .results-card {
       background: #050915;
@@ -1274,6 +1393,65 @@
         </div>
 
         <div class="filter-group">
+          <label class="filter-label">Parallel Variant</label>
+          <div class="checkbox-list" id="filter-parallel">
+            <label class="filter-checkbox">
+              <input type="checkbox" value="sapphire" />
+              <span>💎 Sapphire (/25)</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" value="emerald" />
+              <span>💚 Emerald (/50)</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" value="ruby" />
+              <span>❤️ Ruby (/299)</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" value="standard" />
+              <span>⬜ Standard</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label class="filter-label">Special Serials</label>
+          <div class="checkbox-list" id="filter-special-serials">
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-serial-1" value="serial-1" />
+              <span>🥇 #1 Serial</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-jersey-match" value="jersey-match" />
+              <span>👕 Jersey Match</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-top10" value="top10" />
+              <span>🔟 Top 10</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-69" value="69" />
+              <span>😏 #69</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-420" value="420" />
+              <span>🌿 #420</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-group saved-searches-group">
+          <label class="filter-label">
+            Saved Searches
+            <button class="btn-save-search" id="btn-save-search" title="Save current filters">💾</button>
+          </label>
+          <select class="filter-select" id="saved-searches-select">
+            <option value="">-- Load Saved Search --</option>
+          </select>
+          <button class="btn-delete-search" id="btn-delete-search" title="Delete selected search">🗑️</button>
+        </div>
+
+        <div class="filter-group">
           <label class="filter-label">Tier</label>
           <div id="filter-tier"></div>
         </div>
@@ -1950,6 +2128,33 @@
         filtered = filtered.filter(l => l.marketplace === marketplace);
       }
 
+      // Parallel variant filter
+      const selectedParallels = [];
+      document.querySelectorAll('#filter-parallel input[type="checkbox"]:checked').forEach(cb => {
+        selectedParallels.push(cb.value);
+      });
+      if (selectedParallels.length > 0) {
+        filtered = filtered.filter(l => selectedParallels.includes(l.parallelVariant || 'standard'));
+      }
+
+      // Special serials filter
+      const filterSerial1 = document.getElementById('filter-serial-1')?.checked;
+      const filterJerseyMatch = document.getElementById('filter-jersey-match')?.checked;
+      const filterTop10 = document.getElementById('filter-top10')?.checked;
+      const filter69 = document.getElementById('filter-69')?.checked;
+      const filter420 = document.getElementById('filter-420')?.checked;
+
+      if (filterSerial1 || filterJerseyMatch || filterTop10 || filter69 || filter420) {
+        filtered = filtered.filter(l => {
+          if (filterSerial1 && l.isNumberOne) return true;
+          if (filterJerseyMatch && l.isJerseyMatch) return true;
+          if (filterTop10 && l.isTop10) return true;
+          if (filter69 && l.serialNumber === 69) return true;
+          if (filter420 && l.serialNumber === 420) return true;
+          return false;
+        });
+      }
+
       // Sort
       const sort = sortBy.value;
       filtered.sort((a, b) => {
@@ -2115,6 +2320,21 @@
                   <div class="price-value">${formatPrice(l.floor)}</div>
                 </div>
                 `}
+              </div>
+              
+              <div class="delta-badges">
+                ${l.floorDelta != null ? `
+                  <span class="delta-badge ${l.floorDelta > 0 ? 'savings' : l.floorDelta < 0 ? 'premium' : 'neutral'}">
+                    vs Floor: ${l.floorDelta > 0 ? '↓' : l.floorDelta < 0 ? '↑' : ''}${Math.abs(l.floorDelta).toFixed(1)}%
+                  </span>
+                ` : ''}
+                ${l.aspDelta != null ? `
+                  <span class="delta-badge ${l.aspDelta > 0 ? 'savings' : l.aspDelta < 0 ? 'premium' : 'neutral'}">
+                    vs ASP: ${l.aspDelta > 0 ? '↓' : l.aspDelta < 0 ? '↑' : ''}${Math.abs(l.aspDelta).toFixed(1)}%
+                  </span>
+                ` : ''}
+                ${l.isJerseyMatch ? '<span class="special-badge jersey-match">👕 Jersey</span>' : ''}
+                ${l.isNumberOne ? '<span class="special-badge number-one">🥇 #1</span>' : ''}
               </div>
               
               <div class="time-badge">
@@ -2398,6 +2618,193 @@
         filtersToggle.classList.toggle('open');
       });
     }
+
+    // New filter event listeners (parallel and special serials)
+    document.querySelectorAll('#filter-parallel input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        currentPage = 1;
+        renderListings();
+      });
+    });
+
+    document.querySelectorAll('#filter-special-serials input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        currentPage = 1;
+        renderListings();
+      });
+    });
+
+    // ==================== SAVED SEARCHES ====================
+    const SAVED_SEARCHES_KEY = 'chunky_sniper_searches';
+    const savedSearchesSelect = document.getElementById('saved-searches-select');
+    const btnSaveSearch = document.getElementById('btn-save-search');
+    const btnDeleteSearch = document.getElementById('btn-delete-search');
+
+    // Get current filter state
+    function getCurrentFilters() {
+      return {
+        sortBy: sortBy.value,
+        dealsOnly: filterDealsOnly.value,
+        status: filterStatus.value,
+        minDiscount: filterMinDiscount.value,
+        owned: filterOwned.value,
+        minPrice: filterMinPrice.value,
+        maxPrice: filterMaxPrice.value,
+        maxSerial: filterMaxSerial.value,
+        player: filterPlayer.value,
+        team: filterTeam.value,
+        marketplace: filterMarketplace.value,
+        tiers: tierMultiSelect?.getValues() || [],
+        series: seriesMultiSelect?.getValues() || [],
+        sets: setMultiSelect?.getValues() || [],
+        positions: positionMultiSelect?.getValues() || [],
+        parallels: Array.from(document.querySelectorAll('#filter-parallel input:checked')).map(cb => cb.value),
+        specialSerials: {
+          serial1: document.getElementById('filter-serial-1')?.checked || false,
+          jerseyMatch: document.getElementById('filter-jersey-match')?.checked || false,
+          top10: document.getElementById('filter-top10')?.checked || false,
+          is69: document.getElementById('filter-69')?.checked || false,
+          is420: document.getElementById('filter-420')?.checked || false
+        }
+      };
+    }
+
+    // Apply saved filter state
+    function applyFilters(filters) {
+      if (!filters) return;
+
+      if (filters.sortBy) sortBy.value = filters.sortBy;
+      if (filters.dealsOnly) filterDealsOnly.value = filters.dealsOnly;
+      if (filters.status) filterStatus.value = filters.status;
+      if (filters.minDiscount) filterMinDiscount.value = filters.minDiscount;
+      if (filters.owned) filterOwned.value = filters.owned;
+      if (filters.minPrice) filterMinPrice.value = filters.minPrice;
+      if (filters.maxPrice) filterMaxPrice.value = filters.maxPrice;
+      if (filters.maxSerial) filterMaxSerial.value = filters.maxSerial;
+      if (filters.player) filterPlayer.value = filters.player;
+      if (filters.team) filterTeam.value = filters.team;
+      if (filters.marketplace) filterMarketplace.value = filters.marketplace;
+
+      // Multi-selects (if available)
+      if (filters.tiers && tierMultiSelect) tierMultiSelect.setValues(filters.tiers);
+      if (filters.series && seriesMultiSelect) seriesMultiSelect.setValues(filters.series);
+      if (filters.sets && setMultiSelect) setMultiSelect.setValues(filters.sets);
+      if (filters.positions && positionMultiSelect) positionMultiSelect.setValues(filters.positions);
+
+      // Parallel checkboxes
+      document.querySelectorAll('#filter-parallel input').forEach(cb => {
+        cb.checked = filters.parallels?.includes(cb.value) || false;
+      });
+
+      // Special serials
+      if (filters.specialSerials) {
+        const ss = filters.specialSerials;
+        const el1 = document.getElementById('filter-serial-1');
+        const elJ = document.getElementById('filter-jersey-match');
+        const el10 = document.getElementById('filter-top10');
+        const el69 = document.getElementById('filter-69');
+        const el420 = document.getElementById('filter-420');
+        if (el1) el1.checked = ss.serial1 || false;
+        if (elJ) elJ.checked = ss.jerseyMatch || false;
+        if (el10) el10.checked = ss.top10 || false;
+        if (el69) el69.checked = ss.is69 || false;
+        if (el420) el420.checked = ss.is420 || false;
+      }
+
+      currentPage = 1;
+      renderListings();
+    }
+
+    // Load saved searches from localStorage
+    function loadSavedSearches() {
+      try {
+        const saved = localStorage.getItem(SAVED_SEARCHES_KEY);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        console.error('Error loading saved searches:', e);
+        return [];
+      }
+    }
+
+    // Save searches to localStorage
+    function saveSavedSearches(searches) {
+      try {
+        localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(searches));
+      } catch (e) {
+        console.error('Error saving searches:', e);
+      }
+    }
+
+    // Populate saved searches dropdown
+    function populateSavedSearchesDropdown() {
+      const searches = loadSavedSearches();
+      savedSearchesSelect.innerHTML = '<option value="">-- Load Saved Search --</option>';
+      searches.forEach((search, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = search.name;
+        savedSearchesSelect.appendChild(opt);
+      });
+      btnDeleteSearch.classList.toggle('visible', false);
+    }
+
+    // Save current search
+    if (btnSaveSearch) {
+      btnSaveSearch.addEventListener('click', () => {
+        const name = prompt('Enter a name for this search:');
+        if (!name || !name.trim()) return;
+
+        const searches = loadSavedSearches();
+        searches.push({
+          name: name.trim(),
+          filters: getCurrentFilters(),
+          createdAt: new Date().toISOString()
+        });
+        saveSavedSearches(searches);
+        populateSavedSearchesDropdown();
+
+        // Show confirmation
+        alert(`Search "${name.trim()}" saved!`);
+      });
+    }
+
+    // Load selected search
+    if (savedSearchesSelect) {
+      savedSearchesSelect.addEventListener('change', () => {
+        const idx = savedSearchesSelect.value;
+        if (idx === '') {
+          btnDeleteSearch.classList.remove('visible');
+          return;
+        }
+
+        const searches = loadSavedSearches();
+        const selected = searches[parseInt(idx)];
+        if (selected) {
+          applyFilters(selected.filters);
+          btnDeleteSearch.classList.add('visible');
+        }
+      });
+    }
+
+    // Delete selected search
+    if (btnDeleteSearch) {
+      btnDeleteSearch.addEventListener('click', () => {
+        const idx = savedSearchesSelect.value;
+        if (idx === '') return;
+
+        const searches = loadSavedSearches();
+        const searchName = searches[parseInt(idx)]?.name || 'this search';
+
+        if (confirm(`Delete saved search "${searchName}"?`)) {
+          searches.splice(parseInt(idx), 1);
+          saveSavedSearches(searches);
+          populateSavedSearchesDropdown();
+        }
+      });
+    }
+
+    // Initialize saved searches dropdown
+    populateSavedSearchesDropdown();
 
     // Initialize - fetch listings immediately, owned counts in parallel
     fetchListings();

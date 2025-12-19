@@ -3564,3 +3564,7 @@
 {"level":"INFO","message":"[6:47:06.335 AM]: No config file path found. Client config will not be used."}
 {"level":"INFO","message":"[6:47:06.347 AM]: Easy Logging is disabled as no config has been found"}
 {"level":"INFO","message":"[6:47:06.362 AM]: Connection[id: 122c4fba-de23-438c-9d1a-7e39e7cc8d0a] - connected successfully after 187.60800000000745 milliseconds"}
+{"level":"INFO","message":"[9:29:18.207 AM]: Creating new connection object"}
+{"level":"INFO","message":"[9:29:18.225 AM]: Creating Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] with host: JUSOYVN-MPC92964.snowflakecomputing.com, account: JUSOYVN-MPC92964, accessUrl: https://JUSOYVN-MPC92964.snowflakecomputing.com, user: GREENFORD, password is provided, role: ACCOUNTADMIN, database: ALLDAY_VIEWER, schema: ALLDAY, warehouse: COMPUTE_WH, region: undefined, authenticator: SNOWFLAKE, ocsp mode: FAIL_OPEN, os: win32, os version: 10.0.26100"}
+{"level":"INFO","message":"[9:29:18.226 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] additional details: passcode in password is provided, passcode is not provided, private key is not provided, application: undefined, client name: snowflake-sdk, client version: 1.15.0, retry timeout: 300, private key path: undefined, private key pass is not provided, client store temporary credential: false, browser response timeout: 120000"}
+{"level":"INFO","message":"[9:29:18.226 AM]: Connection[id: c66f447f-4523-48d7-bdb0-2a025ce494ba] - connection object created successfully."}
