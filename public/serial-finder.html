@@ -1,128 +1,372 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serial Finder | NFL All Day</title>
+  <title>Serial Finder | Chunky Viewer</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <style>
-    :root { --bg: #050815; --card: #0b1020; --border: #1b2236; --text: #f8f9ff; --text-muted: #8c95b8; --accent: #fbbf24; --purple: #6f42c1; }
-    body { background: radial-gradient(circle at top, #101526 0, #050815 55%); min-height: 100vh; font-family: 'Outfit', sans-serif; color: var(--text); margin: 0; }
-    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
-    h1 { font-size: 2rem; background: linear-gradient(135deg, #fbbf24, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.5rem; }
-    
+    :root {
+      --bg: #050815;
+      --card: #0b1020;
+      --border: #1b2236;
+      --text: #f8f9ff;
+      --text-muted: #8c95b8;
+      --accent: #fbbf24;
+      --purple: #6f42c1;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #101526 0, #050815 55%);
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.5rem;
+    }
+
     /* Two column layout */
-    .layout-two-column { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 1.5rem; align-items: flex-start; }
-    
+    .layout-two-column {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+
     /* Filters sidebar */
-    .filters-card { background: radial-gradient(circle at top left, #171d34 0, #050915 55%); border-radius: 16px; border: 1px solid var(--border); padding: 1.2rem; box-shadow: 0 18px 40px rgba(0,0,0,0.5); }
-    .filters-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
-    .filter-group { margin-bottom: 0.7rem; }
-    .filter-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.2rem; color: var(--text-muted); }
-    .filter-select, .filter-input { width: 100%; background: #050a18; border-radius: 10px; border: 1px solid var(--border); padding: 0.5rem 0.65rem; color: var(--text); font-size: 0.85rem; outline: none; }
-    .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
-    .filters-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
-    .btn-primary { border-radius: 999px; border: none; padding: 0.5rem 1.2rem; background: linear-gradient(135deg, var(--accent), #f59e0b); color: #000; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
-    .btn-primary:hover { filter: brightness(1.1); }
-    .btn-secondary { border-radius: 999px; border: 1px solid var(--border); padding: 0.5rem 1rem; background: transparent; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; }
-    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-    
+    .filters-card {
+      background: radial-gradient(circle at top left, #171d34 0, #050915 55%);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 1.2rem;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .filters-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .filter-group {
+      margin-bottom: 0.7rem;
+    }
+
+    .filter-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.2rem;
+      color: var(--text-muted);
+    }
+
+    .filter-select,
+    .filter-input {
+      width: 100%;
+      background: #050a18;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .filter-select:focus,
+    .filter-input:focus {
+      border-color: var(--accent);
+    }
+
+    .filters-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn-primary {
+      border-radius: 999px;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      background: linear-gradient(135deg, var(--accent), #f59e0b);
+      color: #000;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     /* Results section */
-    .results-card { background: #050915; border-radius: 16px; border: 1px solid var(--border); overflow: hidden; }
-    .results-header { padding: 0.9rem 1.3rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-    .results-title { font-size: 0.95rem; font-weight: 600; }
-    .results-subtitle { font-size: 0.8rem; color: var(--text-muted); }
-    .results-body { padding: 1rem 1.3rem; }
-    
-    .stats-row { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-    .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; flex: 1; min-width: 100px; text-align: center; }
-    .stat-value { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
-    .stat-label { font-size: 0.75rem; color: var(--text-muted); }
-    
-    .results-grid { display: grid; gap: 0.75rem; }
-    .result-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; transition: border-color 0.2s; }
-    .result-card:hover { border-color: var(--accent); }
-    .result-info h3 { margin: 0 0 0.25rem 0; font-size: 1rem; }
-    .result-info .meta { color: var(--text-muted); font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-    .serial-badge { font-size: 1.35rem; font-weight: 700; color: var(--accent); background: rgba(251,191,36,0.1); padding: 0.4rem 0.8rem; border-radius: 8px; }
-    .serial-badge.jersey { color: #22c55e; background: rgba(34,197,94,0.1); }
-    .owner-link { color: var(--accent); text-decoration: none; font-family: monospace; font-size: 0.8rem; }
-    .owner-link:hover { text-decoration: underline; }
-    .chip { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
-    .chip-common { background: rgba(156,163,175,0.2); color: #9ca3af; }
-    .chip-uncommon { background: rgba(34,197,94,0.2); color: #22c55e; }
-    .chip-rare { background: rgba(59,130,246,0.2); color: #3b82f6; }
-    .chip-legendary { background: rgba(168,85,247,0.2); color: #a855f7; }
-    .chip-ultimate { background: rgba(251,191,36,0.2); color: #fbbf24; }
-    .loading, .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
-    
+    .results-card {
+      background: #050915;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .results-header {
+      padding: 0.9rem 1.3rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .results-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .results-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .results-body {
+      padding: 1rem 1.3rem;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .stat-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .results-grid {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .result-card:hover {
+      border-color: var(--accent);
+    }
+
+    .result-info h3 {
+      margin: 0 0 0.25rem 0;
+      font-size: 1rem;
+    }
+
+    .result-info .meta {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .serial-badge {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(251, 191, 36, 0.1);
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+    }
+
+    .serial-badge.jersey {
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .owner-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .owner-link:hover {
+      text-decoration: underline;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .chip-common {
+      background: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+    }
+
+    .chip-uncommon {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .chip-rare {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+
+    .chip-legendary {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+
+    .chip-ultimate {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .loading,
+    .empty {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+
     /* Mobile responsive */
     @media (max-width: 900px) {
-      .layout-two-column { grid-template-columns: 1fr; }
-      .filters-card { order: -1; }
+      .layout-two-column {
+        grid-template-columns: 1fr;
+      }
+
+      .filters-card {
+        order: -1;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="app-header"></div>
   <script src="/layout.js"></script>
   <main class="app-main">
     <div class="container">
       <h1>🏆 Serial Number Finder</h1>
-      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Find who owns specific serial numbers across all editions</p>
-      
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Find who owns specific serial numbers across all
+        editions</p>
+
       <div class="layout-two-column">
         <!-- LEFT: Filters -->
         <aside class="filters-card">
           <div class="filters-title">🎚️ Filters</div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Serial Number *</div>
             <input type="number" id="serial-input" class="filter-input" placeholder="e.g., 1" min="1" />
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Player</div>
             <select id="filter-player" class="filter-select">
               <option value="">All players</option>
             </select>
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Team</div>
             <select id="filter-team" class="filter-select">
               <option value="">All teams</option>
             </select>
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Tier</div>
             <div id="filter-tier"></div>
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Series</div>
             <div id="filter-series"></div>
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Set</div>
             <div id="filter-set"></div>
           </div>
-          
+
           <div class="filter-group">
             <div class="filter-label">Position</div>
             <div id="filter-position"></div>
           </div>
-          
+
           <div class="filters-actions">
             <button id="search-btn" class="btn-primary">🔍 Find Serial</button>
             <button id="reset-btn" class="btn-secondary">Reset</button>
           </div>
         </aside>
-        
+
         <!-- RIGHT: Results -->
         <section class="results-card">
           <div class="results-header">
@@ -157,11 +401,11 @@
     const teamSelect = document.getElementById('filter-team');
     const results = document.getElementById('results');
     const summary = document.getElementById('results-summary');
-    
+
     // Initialize multi-select filters
     const tierMultiSelect = new MultiSelect('filter-tier', {
       placeholder: 'All tiers',
-      onChange: () => {}
+      onChange: () => { }
     });
     tierMultiSelect.setItems([
       { value: 'ULTIMATE', label: 'Ultimate' },
@@ -170,33 +414,33 @@
       { value: 'UNCOMMON', label: 'Uncommon' },
       { value: 'COMMON', label: 'Common' }
     ]);
-    
+
     const seriesMultiSelect = new MultiSelect('filter-series', {
       placeholder: 'All series',
-      onChange: () => {}
+      onChange: () => { }
     });
-    
+
     const setMultiSelect = new MultiSelect('filter-set', {
       placeholder: 'All sets',
-      onChange: () => {}
+      onChange: () => { }
     });
-    
+
     const positionMultiSelect = new MultiSelect('filter-position', {
       placeholder: 'All positions',
-      onChange: () => {}
+      onChange: () => { }
     });
-    
+
     // Load filter options from explorer-filters API
     async function loadFilterOptions() {
       try {
         const res = await fetch('/api/explorer-filters');
         const data = await res.json();
-        
+
         if (!data.ok) {
           console.error('Failed to load filters:', data.error);
           return;
         }
-        
+
         // Populate players (single select)
         if (data.players) {
           data.players.forEach(p => {
@@ -209,7 +453,7 @@
             }
           });
         }
-        
+
         // Populate teams (single select)
         if (data.teams) {
           data.teams.forEach(t => {
@@ -221,17 +465,17 @@
             }
           });
         }
-        
+
         // Populate series (multi-select)
         if (data.series) {
           seriesMultiSelect.setItems(data.series.filter(Boolean));
         }
-        
+
         // Populate sets (multi-select)
         if (data.sets) {
           setMultiSelect.setItems(data.sets.filter(Boolean));
         }
-        
+
         // Populate positions (multi-select)
         if (data.positions) {
           positionMultiSelect.setItems(data.positions.filter(Boolean));
@@ -240,12 +484,12 @@
         console.error('Error loading filter options:', err);
       }
     }
-    
+
     // Search functionality
     serialInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchSerial(); });
     document.getElementById('search-btn').addEventListener('click', searchSerial);
     document.getElementById('reset-btn').addEventListener('click', resetFilters);
-    
+
     function resetFilters() {
       serialInput.value = '';
       playerSelect.value = '';
@@ -260,7 +504,7 @@
       document.getElementById('unique-owners').textContent = '-';
       document.getElementById('jersey-matches').textContent = '-';
     }
-    
+
     // Check URL params on page load
     const params = new URLSearchParams(window.location.search);
     if (params.get('serial')) {
@@ -274,24 +518,24 @@
       // Delay search to let filter options load first
       setTimeout(searchSerial, 500);
     }
-    
+
     async function searchSerial() {
       const serial = serialInput.value.trim();
       if (!serial) {
         summary.textContent = 'Please enter a serial number';
         return;
       }
-      
+
       const tiers = tierMultiSelect.getValues();
       const player = playerSelect.value;
       const team = teamSelect.value;
       const seriesList = seriesMultiSelect.getValues();
       const sets = setMultiSelect.getValues();
       const positions = positionMultiSelect.getValues();
-      
+
       results.innerHTML = '<div class="loading">Searching for serial #' + serial + '...</div>';
       summary.textContent = 'Searching...';
-      
+
       try {
         let url = `/api/serial-finder?serial=${serial}`;
         if (tiers.length > 0) url += `&tier=${encodeURIComponent(tiers.join(','))}`;
@@ -300,34 +544,34 @@
         if (seriesList.length > 0) url += `&series=${encodeURIComponent(seriesList.join(','))}`;
         if (sets.length > 0) url += `&set=${encodeURIComponent(sets.join(','))}`;
         if (positions.length > 0) url += `&position=${encodeURIComponent(positions.join(','))}`;
-        
+
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (!data.ok) throw new Error(data.error);
-        
+
         document.getElementById('total-found').textContent = data.count;
         document.getElementById('unique-owners').textContent = data.unique_owners;
         document.getElementById('jersey-matches').textContent = data.jersey_matches;
         summary.textContent = `Found ${data.count} NFT(s) with serial #${serial}`;
-        
+
         renderResults(data);
       } catch (err) {
         results.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
         summary.textContent = 'Error searching';
       }
     }
-    
+
     function tierClass(tier) {
       return 'chip chip-' + (tier || 'common').toLowerCase();
     }
-    
+
     function renderResults(data) {
       if (!data.rows || data.rows.length === 0) {
         results.innerHTML = '<div class="empty">No NFTs found with this serial number</div>';
         return;
       }
-      
+
       results.innerHTML = `
         <div class="results-grid">
           ${data.rows.map(row => `
@@ -354,9 +598,10 @@
         </div>
       `;
     }
-    
+
     // Initialize
     loadFilterOptions();
   </script>
 </body>
+
 </html>

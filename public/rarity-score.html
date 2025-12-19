@@ -1,124 +1,401 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rarity Score | NFL All Day</title>
+  <title>Rarity Score | Chunky Viewer</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
   <style>
-    :root { --bg: #050815; --card: #0b1020; --border: #1b2236; --text: #f8f9ff; --text-muted: #8c95b8; --accent: #a855f7; --gold: #fbbf24; }
-    body { background: radial-gradient(circle at top, #101526 0, #050815 55%); min-height: 100vh; font-family: 'Outfit', sans-serif; color: var(--text); margin: 0; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
-    h1 { font-size: 2rem; background: linear-gradient(135deg, var(--accent), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.5rem; }
-    .search-box { display: flex; gap: 1rem; margin-bottom: 2rem; }
-    .search-box input { flex: 1; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 1rem; }
-    .search-box button { padding: 1rem 2rem; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--accent), var(--gold)); color: white; font-weight: 600; cursor: pointer; flex-shrink: 0; }
-    .score-display { text-align: center; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 3rem; margin-bottom: 2rem; }
-    .score-value { font-size: 5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .score-label { font-size: 1.25rem; color: var(--text-muted); margin-top: 0.5rem; }
-    .score-rank { font-size: 1rem; color: var(--gold); margin-top: 1rem; }
-    .breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .breakdown-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
-    .breakdown-card h3 { margin: 0 0 1rem 0; font-size: 1rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.5rem; }
-    .breakdown-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-    .breakdown-item:last-child { border-bottom: none; }
-    .breakdown-item .label { color: var(--text-muted); }
-    .breakdown-item .value { font-weight: 600; }
-    .breakdown-item .points { color: var(--accent); font-size: 0.85rem; }
-    .top-moments { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
-    .top-moments h3 { margin: 0 0 1rem 0; }
-    .moment-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(168,85,247,0.05); border-radius: 8px; margin-bottom: 0.5rem; }
-    .moment-info { font-size: 0.9rem; }
-    .moment-score { font-weight: 700; color: var(--gold); }
-    .loading, .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
-    .tier-tag { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; margin-left: 0.5rem; }
-    .tier-legendary { background: rgba(168,85,247,0.2); color: #a855f7; }
-    .tier-ultimate { background: rgba(251,191,36,0.2); color: #fbbf24; }
-    .tier-rare { background: rgba(59,130,246,0.2); color: #3b82f6; }
-    
+    :root {
+      --bg: #050815;
+      --card: #0b1020;
+      --border: #1b2236;
+      --text: #f8f9ff;
+      --text-muted: #8c95b8;
+      --accent: #a855f7;
+      --gold: #fbbf24;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #101526 0, #050815 55%);
+      min-height: 100vh;
+      font-family: 'Outfit', sans-serif;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, var(--accent), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .search-box button {
+      padding: 1rem 2rem;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), var(--gold));
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .score-display {
+      text-align: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem;
+      margin-bottom: 2rem;
+    }
+
+    .score-value {
+      font-size: 5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .score-label {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .score-rank {
+      font-size: 1rem;
+      color: var(--gold);
+      margin-top: 1rem;
+    }
+
+    .breakdown {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .breakdown-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .breakdown-card h3 {
+      margin: 0 0 1rem 0;
+      font-size: 1rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .breakdown-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .breakdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .breakdown-item .label {
+      color: var(--text-muted);
+    }
+
+    .breakdown-item .value {
+      font-weight: 600;
+    }
+
+    .breakdown-item .points {
+      color: var(--accent);
+      font-size: 0.85rem;
+    }
+
+    .top-moments {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .top-moments h3 {
+      margin: 0 0 1rem 0;
+    }
+
+    .moment-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem;
+      background: rgba(168, 85, 247, 0.05);
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+    }
+
+    .moment-info {
+      font-size: 0.9rem;
+    }
+
+    .moment-score {
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .loading,
+    .empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .tier-tag {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    .tier-legendary {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+
+    .tier-ultimate {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .tier-rare {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+
     /* Leaderboard styles */
-    .leaderboard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-top: 2rem; }
-    .leaderboard h2 { margin: 0 0 1rem 0; font-size: 1.3rem; display: flex; align-items: center; gap: 0.5rem; }
-    .leaderboard-header { display: grid; grid-template-columns: 60px 1fr 100px 80px 80px 80px; gap: 0.5rem; padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
-    .leaderboard-row { display: grid; grid-template-columns: 60px 1fr 100px 80px 80px 80px; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid rgba(27,34,54,0.5); transition: background 0.2s; cursor: pointer; }
-    .leaderboard-row:hover { background: rgba(168,85,247,0.1); }
-    .leaderboard-row:last-child { border-bottom: none; }
-    .leaderboard-row.top-3 { background: linear-gradient(90deg, rgba(251,191,36,0.1), transparent); }
-    .rank { font-weight: 700; display: flex; align-items: center; gap: 0.25rem; }
-    .rank-1 { color: #fbbf24; }
-    .rank-2 { color: #c0c0c0; }
-    .rank-3 { color: #cd7f32; }
-    .wallet-cell { font-family: monospace; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; }
-    .wallet-cell .name { color: var(--accent); font-family: 'Outfit', sans-serif; }
-    .score-cell { font-weight: 700; color: var(--gold); text-align: right; }
-    .stat-cell { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
-    .cache-info { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
-    .cache-info button { background: var(--border); border: none; padding: 0.25rem 0.5rem; border-radius: 4px; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; }
-    .cache-info button:hover { background: var(--accent); color: white; }
+    .leaderboard {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .leaderboard h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.3rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .leaderboard-header {
+      display: grid;
+      grid-template-columns: 60px 1fr 100px 80px 80px 80px;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .leaderboard-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 100px 80px 80px 80px;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(27, 34, 54, 0.5);
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .leaderboard-row:hover {
+      background: rgba(168, 85, 247, 0.1);
+    }
+
+    .leaderboard-row:last-child {
+      border-bottom: none;
+    }
+
+    .leaderboard-row.top-3 {
+      background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), transparent);
+    }
+
+    .rank {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .rank-1 {
+      color: #fbbf24;
+    }
+
+    .rank-2 {
+      color: #c0c0c0;
+    }
+
+    .rank-3 {
+      color: #cd7f32;
+    }
+
+    .wallet-cell {
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .wallet-cell .name {
+      color: var(--accent);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .score-cell {
+      font-weight: 700;
+      color: var(--gold);
+      text-align: right;
+    }
+
+    .stat-cell {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .cache-info {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cache-info button {
+      background: var(--border);
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.7rem;
+    }
+
+    .cache-info button:hover {
+      background: var(--accent);
+      color: white;
+    }
+
     @media (max-width: 768px) {
-      .leaderboard-header, .leaderboard-row { grid-template-columns: 50px 1fr 80px; }
-      .leaderboard-header > *:nth-child(n+4), .leaderboard-row > *:nth-child(n+4) { display: none; }
+
+      .leaderboard-header,
+      .leaderboard-row {
+        grid-template-columns: 50px 1fr 80px;
+      }
+
+      .leaderboard-header>*:nth-child(n+4),
+      .leaderboard-row>*:nth-child(n+4) {
+        display: none;
+      }
     }
   </style>
 </head>
+
 <body>
   <div id="app-header"></div>
   <script src="/layout.js"></script>
   <main class="app-main">
     <div class="container">
       <h1>📈 Collection Rarity Score</h1>
-      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Calculate how rare your collection is based on serial numbers, tiers, and more</p>
-      
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Calculate how rare your collection is based on serial
+        numbers, tiers, and more</p>
+
       <div class="search-box">
         <input type="text" id="wallet-input" placeholder="Search by name or wallet address..." />
         <button onclick="calculateScore()">Calculate Score</button>
       </div>
       <script src="/wallet-search.js"></script>
-      
+
       <div id="results"></div>
-      
+
       <div id="leaderboard-container"></div>
     </div>
   </main>
   <script>
     const input = document.getElementById('wallet-input');
     const results = document.getElementById('results');
-    
+
     async function calculateScore() {
       // Use data attribute if available (from autocomplete), otherwise use input value
       const wallet = (input.dataset.walletAddress || input.value).trim().toLowerCase();
       if (!wallet || !wallet.startsWith('0x')) return;
-      
+
       results.innerHTML = '<div class="loading">Calculating rarity score...</div>';
-      
+
       try {
         const res = await fetch(`/api/rarity-score?wallet=${wallet}`);
         const data = await res.json();
-        
+
         if (!data.ok) throw new Error(data.error);
         renderScore(data);
       } catch (err) {
         results.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
       }
     }
-    
+
     // Initialize wallet search with autocomplete
     initWalletSearch('wallet-input', (wallet) => {
       calculateScore();
     });
-    
+
     // Check URL params on page load
     const params = new URLSearchParams(window.location.search);
     if (params.get('wallet')) {
       input.value = params.get('wallet');
       calculateScore();
     }
-    
+
     function renderScore(data) {
       const { score, rank, breakdown, top_moments } = data;
-      
+
       results.innerHTML = `
         <div class="score-display">
           <div class="score-value">${score.toLocaleString()}</div>
@@ -192,40 +469,40 @@
         ` : ''}
       `;
     }
-    
+
     // Leaderboard functionality
     const leaderboardContainer = document.getElementById('leaderboard-container');
-    
+
     async function loadLeaderboard(forceRefresh = false) {
       leaderboardContainer.innerHTML = '<div class="loading">Loading leaderboard...</div>';
-      
+
       try {
         const url = forceRefresh ? '/api/rarity-leaderboard?refresh=true' : '/api/rarity-leaderboard';
         const res = await fetch(url);
         const data = await res.json();
-        
+
         if (!data.ok) throw new Error(data.error);
         renderLeaderboard(data);
       } catch (err) {
         leaderboardContainer.innerHTML = `<div class="empty">❌ ${err.message}</div>`;
       }
     }
-    
+
     function renderLeaderboard(data) {
       const { leaderboard, cached, cache_age_minutes } = data;
-      
+
       if (!leaderboard || leaderboard.length === 0) {
         leaderboardContainer.innerHTML = '<div class="leaderboard"><div class="empty">No leaderboard data available</div></div>';
         return;
       }
-      
+
       const getRankIcon = (rank) => {
         if (rank === 1) return '🥇';
         if (rank === 2) return '🥈';
         if (rank === 3) return '🥉';
         return '';
       };
-      
+
       const formatWallet = (entry) => {
         if (entry.displayName) {
           return `<span class="name">${entry.displayName}</span>`;
@@ -233,7 +510,7 @@
         // No display name - show shortened wallet
         return `<span style="opacity: 0.6">${entry.wallet.substring(0, 8)}...${entry.wallet.substring(entry.wallet.length - 4)}</span>`;
       };
-      
+
       leaderboardContainer.innerHTML = `
         <div class="leaderboard">
           <h2>🏆 Top Rarity Collections</h2>
@@ -265,17 +542,17 @@
         </div>
       `;
     }
-    
+
     function viewWallet(wallet) {
       input.value = wallet;
       input.dataset.walletAddress = wallet;
       calculateScore();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    
+
     // Load leaderboard on page load
     loadLeaderboard();
   </script>
 </body>
-</html>
 
+</html>

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pricing - NFL All Day Wallet Viewer</title>
+  <title>Pricing - Chunky Viewer</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="header.css" />
   <style>
@@ -221,9 +222,10 @@
     }
   </style>
 </head>
+
 <body>
   <div id="app-header"></div>
-  
+
   <main class="pricing-container">
     <div class="pricing-header">
       <h1>🏈 Unlock Full Access</h1>
@@ -236,7 +238,7 @@
 
     <div id="already-subscribed" class="already-subscribed" style="display: none;">
       <h2>✅ You're Subscribed!</h2>
-      <p>Thank you for supporting NFL All Day Wallet Viewer</p>
+      <p>Thank you for supporting Chunky Viewer</p>
       <button class="manage-btn" onclick="openBillingPortal()">Manage Subscription</button>
     </div>
 
@@ -373,7 +375,7 @@
       const params = new URLSearchParams(window.location.search);
       const success = params.get('success');
       const sessionId = params.get('session_id');
-      
+
       if (success === 'true' && sessionId) {
         // Show loading state
         document.getElementById('pricing-plans').innerHTML = `
@@ -382,7 +384,7 @@
             <div>Activating your subscription...</div>
           </div>
         `;
-        
+
         try {
           // Verify the checkout session and activate subscription
           const res = await fetch('/api/subscription/verify', {
@@ -391,9 +393,9 @@
             credentials: 'include',
             body: JSON.stringify({ sessionId })
           });
-          
+
           const data = await res.json();
-          
+
           if (data.ok && data.subscribed) {
             // Success! Show confirmation
             document.getElementById('pricing-plans').innerHTML = `
@@ -404,7 +406,7 @@
                 <a href="/" style="display: inline-block; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #6f42c1, #007bff); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Start Exploring →</a>
               </div>
             `;
-            
+
             // Clear URL params
             window.history.replaceState({}, '', '/pricing.html');
           } else {
@@ -422,9 +424,10 @@
         await checkStatus();
       }
     }
-    
+
     // Check status on load (handles Stripe return too)
     handleStripeReturn();
   </script>
 </body>
+
 </html>
