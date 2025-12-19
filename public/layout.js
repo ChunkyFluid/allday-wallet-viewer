@@ -13,9 +13,9 @@
         return `
       <header class="app-header">
         <a href="/" class="brand">
-          <div class="brand-logo">🐱</div>
-          <div class="brand-title desktop-only">CHUNKY'S NFLAD VIEWER</div>
-          <div class="brand-title mobile-only">Chunky Viewer</div>
+          <span style="font-size: 1.8rem;">🐱</span>
+          <div class="brand-title desktop-only">CHUNKY VIEWER</div>
+          <div class="brand-title mobile-only">Chunky</div>
         </a>
 
         <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">☰</button>
