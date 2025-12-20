@@ -1405,9 +1405,9 @@ window.runQuery = async function runQuery(walletRaw) {
         hideLoadingAnimation();
         renderPage(1);
 
-        // STALE-WHILE-REVALIDATE: Fire off background blockchain refresh
-        // This runs silently and updates the UI only if data has changed
-        backgroundRefreshFromBlockchain(wallet);
+        // DISABLED: Background refresh was causing issues with locked NFT counts
+        // due to blockchain rate limiting. Database is kept current by live WebSocket events.
+        // backgroundRefreshFromBlockchain(wallet);
     } catch (err) {
         console.error("runQuery error", err);
         const errorMsg = err.message || String(err);
