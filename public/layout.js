@@ -44,6 +44,12 @@
             <span>unique visits</span>
           </div>
           <span style="opacity: 0.3;">•</span>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.1rem;">📊</span>
+            <span id="total-hits" style="font-weight: 600; color: #fff; font-family: 'JetBrains Mono', monospace;">-</span> 
+            <span>total visits</span>
+          </div>
+          <span style="opacity: 0.3;">•</span>
           <span>Built with ❤️ by Chunky</span>
           <span style="opacity: 0.3;">•</span>
           <span>© 2025 Chunky Viewer</span>
@@ -140,14 +146,18 @@
 
     function initVisitCounter() {
         const counterEl = document.getElementById('visit-count');
-        if (!counterEl) return;
+        const hitsEl = document.getElementById('total-hits');
+        if (!counterEl && !hitsEl) return;
 
         // Record visit and get count
         fetch('/api/visit', { method: 'POST' })
             .then(r => r.json())
             .then(data => {
-                if (data.count) {
+                if (data.count !== undefined && counterEl) {
                     counterEl.textContent = data.count.toLocaleString();
+                }
+                if (data.totalHits !== undefined && hitsEl) {
+                    hitsEl.textContent = data.totalHits.toLocaleString();
                 }
             })
             .catch(() => {
@@ -155,12 +165,16 @@
                 fetch('/api/visit-count')
                     .then(r => r.json())
                     .then(data => {
-                        if (data.count) {
+                        if (data.count !== undefined && counterEl) {
                             counterEl.textContent = data.count.toLocaleString();
+                        }
+                        if (data.totalHits !== undefined && hitsEl) {
+                            hitsEl.textContent = data.totalHits.toLocaleString();
                         }
                     })
                     .catch(() => {
-                        counterEl.textContent = '?';
+                        if (counterEl) counterEl.textContent = '?';
+                        if (hitsEl) hitsEl.textContent = '?';
                     });
             });
     }
