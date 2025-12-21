@@ -77,6 +77,72 @@ function ensureConnected() {
   return ensureSnowflakeConnected();
 }
 
+// ------------------ Wallet Profiles & Display Names ------------------
+
+/**
+ * Get display name for a wallet address, fetching from Dapper if not in DB
+ * @param {string} walletAddress 
+ * @returns {Promise<string|null>}
+ */
+async function getDisplayName(walletAddress) {
+  if (!walletAddress) return null;
+  const address = walletAddress.toLowerCase();
+
+  try {
+    // 1. Check database first
+    const result = await pgQuery(
+      `SELECT display_name, last_checked FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
+      [address]
+    );
+
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    // If we have a name and it was checked recently (last 24h), return it
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      if (row.display_name && (now - new Date(row.last_checked).getTime() < oneDay)) {
+        return row.display_name;
+      }
+
+      // If we checked recently but found no name, don't re-check Dapper too often (wait 1 hour minimum)
+      const oneHour = 60 * 60 * 1000;
+      if (!row.display_name && (now - new Date(row.last_checked).getTime() < oneHour)) {
+        return address;
+      }
+    }
+
+    // 2. Fetch from Dapper if missing or old
+    let displayName = null;
+    try {
+      const res = await fetch(`https://open.meetdapper.com/profile?address=${address}`, {
+        headers: { 'user-agent': 'allday-wallet-viewer/1.0' },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        displayName = data?.displayName || null;
+      }
+    } catch (err) {
+      // Don't log warnings for every 404/timeout, just ignore
+    }
+
+    // 3. Update database
+    await pgQuery(`
+      INSERT INTO wallet_profiles (wallet_address, display_name, source, last_checked)
+      VALUES ($1, $2, 'dapper', NOW())
+      ON CONFLICT (wallet_address) DO UPDATE SET
+        display_name = COALESCE(EXCLUDED.display_name, wallet_profiles.display_name),
+        last_checked = NOW()
+    `, [address, displayName]);
+
+    return displayName || address;
+  } catch (err) {
+    return address;
+  }
+}
+
 // ------------------ Flow WebSocket Stream API for Live Events ------------------
 
 const FLOW_WS_URL = "wss://rest-mainnet.onflow.org/v1/ws";
@@ -4920,7 +4986,9 @@ async function ensureSniperListingsTable() {
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS listed_at TIMESTAMPTZ`,
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS is_sold BOOLEAN NOT NULL DEFAULT FALSE`,
       `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS is_unlisted BOOLEAN NOT NULL DEFAULT FALSE`,
-      `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS buyer_address TEXT`
+      `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS buyer_address TEXT`,
+      `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS seller_addr TEXT`,
+      `ALTER TABLE sniper_listings ADD COLUMN IF NOT EXISTS seller_name TEXT`
     ];
 
     for (const alterStmt of alterStatements) {
@@ -4969,9 +5037,9 @@ async function persistSniperListing(listing) {
     await pgQuery(
       `INSERT INTO sniper_listings (
         nft_id, listing_id, edition_id, listing_data, listed_at, 
-        updated_at, is_sold, is_unlisted, buyer_address
+        updated_at, is_sold, is_unlisted, buyer_address, seller_addr, seller_name
       )
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10)
       ON CONFLICT (nft_id) 
       DO UPDATE SET 
         listing_id = COALESCE($2, sniper_listings.listing_id),
@@ -4979,7 +5047,9 @@ async function persistSniperListing(listing) {
         updated_at = NOW(),
         is_sold = $6,
         is_unlisted = $7,
-        buyer_address = $8`,
+        buyer_address = $8,
+        seller_addr = COALESCE($9, sniper_listings.seller_addr),
+        seller_name = COALESCE($10, sniper_listings.seller_name)`,
       [
         listing.nftId,
         listing.listingId || null,
@@ -4988,7 +5058,9 @@ async function persistSniperListing(listing) {
         listedAt,
         listing.isSold || false,
         listing.isUnlisted || false,
-        listing.buyerAddr || null
+        listing.buyerAddr || null,
+        listing.sellerAddr || listing.sellerAddress || null,
+        listing.sellerName || null
       ]
     );
   } catch (err) {
@@ -5059,18 +5131,7 @@ async function markListingAsSold(nftId, buyerAddr = null) {
   }
 
   // Get buyer name if we have buyer address
-  let buyerName = buyerAddr;
-  if (buyerAddr) {
-    try {
-      const result = await pgQuery(
-        `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
-        [buyerAddr]
-      );
-      buyerName = result.rows[0]?.display_name || buyerAddr;
-    } catch (e) {
-      buyerName = buyerAddr;
-    }
-  }
+  const buyerName = await getDisplayName(buyerAddr);
 
   // Mark existing listings as sold in memory
   for (const listing of sniperListings) {
@@ -5260,16 +5321,7 @@ async function processListingEvent(event) {
     }
 
     // Get seller name
-    let sellerName = sellerAddr;
-    if (sellerAddr) {
-      try {
-        const result = await pgQuery(
-          `SELECT display_name FROM wallet_profiles WHERE wallet_address = $1 LIMIT 1`,
-          [sellerAddr]
-        );
-        sellerName = result.rows[0]?.display_name || sellerAddr;
-      } catch (e) { /* ignore */ }
-    }
+    const sellerName = await getDisplayName(sellerAddr);
 
     // IMPORTANT: A new ListingAvailable event means this NFT is being (re)listed
     // Clear any old sold/unlisted status - this is a FRESH listing
@@ -5300,7 +5352,8 @@ async function processListingEvent(event) {
       position: momentData?.position,
       jerseyNumber: momentData?.jersey_number ? Number(momentData.jersey_number) : null,
       sellerName,
-      sellerAddr,
+      sellerAddress: sellerAddr,
+      sellerAddr, // Keep for backward compatibility
       buyerAddr: null,  // New listing has no buyer
       buyerName: null,
       isLowSerial: momentData?.serial_number && momentData.serial_number <= 100,
@@ -5459,7 +5512,7 @@ async function watchForListings() {
               const nftId = getField('nftID')?.toString();
               const priceStr = getField('price');
               const listingPrice = priceStr ? parseFloat(priceStr) : null;
-              const sellerAddr = getField('storefrontAddress')?.toString()?.toLowerCase();
+              const sellerAddr = (getField('storefrontAddress') || getField('seller') || getField('owner'))?.toString()?.toLowerCase();
 
               if (!nftId || !listingPrice) continue;
 
@@ -6329,7 +6382,7 @@ async function loadRecentListingsFromDB() {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
     const result = await pgQuery(
-      `SELECT listing_data, is_sold, is_unlisted, buyer_address, listed_at, listing_id
+      `SELECT listing_data, is_sold, is_unlisted, buyer_address, listed_at, listing_id, seller_addr, seller_name
        FROM sniper_listings 
        WHERE listed_at >= $1
        ORDER BY listed_at DESC 
@@ -6363,6 +6416,13 @@ async function loadRecentListingsFromDB() {
         }
         if (row.listing_id && !listing.listingId) {
           listing.listingId = row.listing_id;
+        }
+        if (row.seller_name && !listing.sellerName) {
+          listing.sellerName = row.seller_name;
+        }
+        if (row.seller_addr && !listing.sellerAddress) {
+          listing.sellerAddress = row.seller_addr;
+          listing.sellerAddr = row.seller_addr;
         }
 
         // Add to tracking maps
@@ -6851,7 +6911,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         await ensureSniperListingsTable();
         const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
-        let dbQuery = `SELECT listing_data, is_sold, is_unlisted, buyer_address
+        let dbQuery = `SELECT listing_data, is_sold, is_unlisted, buyer_address, seller_addr, seller_name
            FROM sniper_listings 
            WHERE listed_at >= $1`;
         const dbParams = [threeDaysAgo];
@@ -6887,6 +6947,13 @@ app.get("/api/sniper-deals", async (req, res) => {
             listing.isUnlisted = row.is_unlisted || false;
             if (row.buyer_address) {
               listing.buyerAddr = row.buyer_address;
+            }
+            if (row.seller_addr && !listing.sellerAddress) {
+              listing.sellerAddress = row.seller_addr;
+              listing.sellerAddr = row.seller_addr;
+            }
+            if (row.seller_name && !listing.sellerName) {
+              listing.sellerName = row.seller_name;
             }
 
             // Apply status filter when adding from database
@@ -6967,6 +7034,29 @@ app.get("/api/sniper-deals", async (req, res) => {
     const seriesMapByEditionId = new Map();
     const jerseyMapByNftId = new Map();
     const aspMap = new Map();
+    const walletNameMap = new Map();
+
+    // Batch fetch wallet names
+    const allWallets = [...new Set([
+      ...filtered.map(l => l.sellerAddr || l.sellerAddress),
+      ...filtered.map(l => l.buyerAddr)
+    ].filter(Boolean))];
+
+    if (allWallets.length > 0) {
+      try {
+        const profileResult = await pgQuery(
+          `SELECT wallet_address, display_name FROM wallet_profiles WHERE wallet_address = ANY($1::text[])`,
+          [allWallets]
+        );
+        profileResult.rows.forEach(row => {
+          if (row.display_name) {
+            walletNameMap.set(row.wallet_address.toLowerCase(), row.display_name);
+          }
+        });
+      } catch (e) {
+        sniperError("[Sniper] Error fetching wallet names:", e.message);
+      }
+    }
 
     // Batch fetch series names and jersey numbers by nftId
     if (allNftIds.length > 0) {
@@ -7050,6 +7140,21 @@ app.get("/api/sniper-deals", async (req, res) => {
     // Enrich all listings with fetched data
     const enrichedListings = filtered.map(listing => {
       const enriched = { ...listing };
+
+      // Ensure sellerAddress and names are present for frontend
+      if (!enriched.sellerAddress && enriched.sellerAddr) {
+        enriched.sellerAddress = enriched.sellerAddr;
+      }
+
+      const sAddr = (enriched.sellerAddress || enriched.sellerAddr || '').toLowerCase();
+      if (sAddr && walletNameMap.has(sAddr)) {
+        enriched.sellerName = walletNameMap.get(sAddr);
+      }
+
+      const bAddr = (enriched.buyerAddr || '').toLowerCase();
+      if (bAddr && walletNameMap.has(bAddr)) {
+        enriched.buyerName = walletNameMap.get(bAddr);
+      }
 
       // Fill in seriesName if missing - try nftId first, then editionId
       if (!enriched.seriesName) {
