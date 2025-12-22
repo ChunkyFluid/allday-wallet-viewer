@@ -683,6 +683,18 @@ async function fetchAndCacheNFTMetadata(nftId) {
 
       if (rows && rows.length > 0) {
         const row = rows[0];
+
+        // Sanitize integer fields
+        const sanitizeInt = (val) => {
+          if (val === null || val === undefined || val === '' || val === 'null') return null;
+          const parsed = parseInt(val, 10);
+          return isNaN(parsed) ? null : parsed;
+        };
+
+        const serialNumber = sanitizeInt(row.SERIAL_NUMBER || row.serial_number);
+        const maxMintSize = sanitizeInt(row.MAX_MINT_SIZE || row.max_mint_size);
+        const jerseyNumber = sanitizeInt(row.JERSEY_NUMBER || row.jersey_number);
+
         await pgQuery(`
           INSERT INTO nft_core_metadata_v2 (
             nft_id, edition_id, play_id, series_id, set_id, tier,
@@ -706,13 +718,13 @@ async function fetchAndCacheNFTMetadata(nftId) {
           row.SERIES_ID || row.series_id,
           row.SET_ID || row.set_id,
           row.TIER || row.tier,
-          row.SERIAL_NUMBER || row.serial_number,
-          row.MAX_MINT_SIZE || row.max_mint_size,
+          serialNumber,
+          maxMintSize,
           row.FIRST_NAME || row.first_name,
           row.LAST_NAME || row.last_name,
           row.TEAM_NAME || row.team_name,
           row.POSITION || row.position,
-          row.JERSEY_NUMBER || row.jersey_number,
+          jerseyNumber,
           row.SERIES_NAME || row.series_name,
           row.SET_NAME || row.set_name
         ]);
@@ -2431,6 +2443,12 @@ app.get("/api/query", async (req, res) => {
             m.max_mint_size,
             m.first_name,
             m.last_name,
+            COALESCE(
+              NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
+              m.team_name,
+              m.set_name,
+              '(unknown)'
+            ) AS player_name,
             m.team_name,
             m.position,
             m.jersey_number,
@@ -2591,6 +2609,12 @@ app.get("/api/query", async (req, res) => {
         m.max_mint_size,
         m.first_name,
         m.last_name,
+        COALESCE(
+          NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
+          m.team_name,
+          m.set_name,
+          '(unknown)'
+        ) AS player_name,
         m.team_name,
         m.position,
         m.jersey_number,
@@ -4889,6 +4913,52 @@ function sniperLog(...args) {
 function sniperWarn(...args) {
   if (SNIPER_LOGGING_ENABLED) console.warn(...args);
 }
+
+// Calculate a "Real Value Score" that accounts for serial rarity and ASP/Floor discrepancies
+function calculateRealDealScore(listing) {
+  const { listingPrice, floor, avgSale, serialNumber, jerseyNumber, maxMint } = listing;
+
+  if (!listingPrice || listingPrice <= 0) return 0;
+
+  // 1. Determine "Estimated Fair Market Value" (EFMV) for a STANDARD serial
+  let efmv = floor || avgSale || 0;
+
+  // If we have both floor and ASP, detect if floor is an outlier
+  if (floor && avgSale && avgSale > 0) {
+    // If floor is more than 3x the ASP, it's likely an outlier
+    if (floor > avgSale * 3) {
+      efmv = avgSale * 1.5; // Bias towards ASP but give some credit to floor
+    } else {
+      // Otherwise use the lower of floor or ASP for safety (conservative estimation)
+      efmv = Math.min(floor, avgSale);
+    }
+  }
+
+  if (efmv <= 0) return 0;
+
+  // 2. Apply Serial Multipliers
+  let multiplier = 1.0;
+
+  if (serialNumber === 1) {
+    multiplier = 10.0; // #1 is worth 10x floor
+  } else if (jerseyNumber && serialNumber === jerseyNumber) {
+    multiplier = 5.0;  // Jersey match is worth 5x floor
+  } else if (maxMint && serialNumber === maxMint) {
+    multiplier = 2.5;  // Perfect (last) serial
+  } else if (serialNumber <= 10) {
+    multiplier = 3.0;  // Top 10
+  } else if (serialNumber <= 100) {
+    multiplier = 1.5;  // Top 100
+  }
+
+  const estimatedValue = efmv * multiplier;
+
+  // 3. Calculate Deal Score (%)
+  // (EstimatedValue - ListingPrice) / EstimatedValue * 100
+  const score = ((estimatedValue - listingPrice) / estimatedValue) * 100;
+
+  return Math.round(score * 10) / 10;
+}
 function sniperError(...args) {
   if (SNIPER_LOGGING_ENABLED) console.error(...args);
 }
@@ -4979,7 +5049,7 @@ const sniperListings = []; // Array of ALL listings (in-memory cache)
 const seenListingNfts = new Map(); // Track seen nftIds -> timestamp to prevent duplicates
 const soldNfts = new Map(); // Track sold NFTs -> timestamp
 const unlistedNfts = new Map(); // Track delisted NFTs -> timestamp
-const MAX_SNIPER_LISTINGS = 300; // Reduced to save memory
+const MAX_SNIPER_LISTINGS = 1500; // Increased to 1500 (user request)
 const MAX_SEEN_NFTS = 500; // Max tracked seen NFTs (reduced)
 const MAX_SOLD_NFTS = 500; // Max tracked sold NFTs (reduced)
 
@@ -5412,7 +5482,6 @@ async function processListingEvent(event) {
       listingPrice,
       floor: previousFloor,
       avgSale,
-      dealPercent: Math.round(dealPercent * 10) / 10,
       playerName: momentData?.first_name && momentData?.last_name
         ? `${momentData.first_name} ${momentData.last_name}` : null,
       teamName: momentData?.team_name,
@@ -5433,6 +5502,9 @@ async function processListingEvent(event) {
       // Direct moment link for faster buying (one click to buy page)
       listingUrl: `https://nflallday.com/moments/${nftId}`
     };
+
+    // Calculate REAL deal score after we have all the data
+    listing.dealPercent = calculateRealDealScore(listing);
 
     addSniperListing(listing);
 
@@ -6420,7 +6492,7 @@ async function verifyExistingListingsStatus() {
          AND is_unlisted = FALSE
          AND listed_at >= $1
        ORDER BY listed_at DESC
-       LIMIT 200`,
+       LIMIT 1500`,
       [threeDaysAgo]
     );
 
@@ -6517,7 +6589,7 @@ async function loadRecentListingsFromDB() {
        FROM sniper_listings 
        WHERE listed_at >= $1
        ORDER BY listed_at DESC 
-       LIMIT 500`,
+       LIMIT 1500`,
       [threeDaysAgo]
     );
 
@@ -7059,7 +7131,7 @@ app.get("/api/sniper-deals", async (req, res) => {
         }
         // 'all' - no additional WHERE clause
 
-        dbQuery += ` ORDER BY listed_at DESC LIMIT 200`;
+        dbQuery += ` ORDER BY listed_at DESC LIMIT 1500`;
 
         const dbResult = await pgQuery(dbQuery, dbParams);
 
@@ -7137,11 +7209,6 @@ app.get("/api/sniper-deals", async (req, res) => {
       filtered = filtered.filter(l => l.tier === tierUpper);
     }
 
-    if (minDiscount) {
-      const minDisc = parseFloat(minDiscount);
-      filtered = filtered.filter(l => l.dealPercent >= minDisc);
-    }
-
     if (maxPrice) {
       const maxP = parseFloat(maxPrice);
       filtered = filtered.filter(l => l.listingPrice <= maxP);
@@ -7150,10 +7217,6 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (maxSerial) {
       const maxS = parseInt(maxSerial);
       filtered = filtered.filter(l => l.serialNumber && l.serialNumber <= maxS);
-    }
-
-    if (dealsOnly === 'true') {
-      filtered = filtered.filter(l => l.dealPercent > 0);
     }
 
     // Enrich listings with missing ASP and Series data (batch queries for performance)
@@ -7358,13 +7421,25 @@ app.get("/api/sniper-deals", async (req, res) => {
         enriched.floorDelta = ((floor - listPrice) / floor) * 100; // positive = savings
       }
 
-      // Calculate ASP delta (% savings vs average sale price)
       if (listPrice && enriched.avgSale && enriched.avgSale > 0) {
         enriched.aspDelta = ((enriched.avgSale - listPrice) / enriched.avgSale) * 100; // positive = savings
       }
 
+      // RECALCULATE DEAL PERCENT using the new Real Value logic once we have enriched data
+      enriched.dealPercent = calculateRealDealScore(enriched);
+
       return enriched;
     });
+
+    // Apply deal-specific filters AFTER enrichment and recalculation
+    if (minDiscount) {
+      const minDisc = parseFloat(minDiscount);
+      enrichedListings = enrichedListings.filter(l => l.dealPercent >= minDisc);
+    }
+
+    if (dealsOnly === 'true') {
+      enrichedListings = enrichedListings.filter(l => l.dealPercent > 0);
+    }
 
     // Debug: Log enrichment stats
     //if (enrichedListings.length > 0) {
@@ -7893,7 +7968,7 @@ app.get("/api/sniper-active-listings", async (req, res) => {
       try {
         const metaResult = await pgQuery(
           `SELECT nft_id, edition_id, serial_number, first_name, last_name,
-                  team_name, position, tier, set_name
+                  team_name, position, tier, set_name, jersey_number, max_mint_size
            FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
           [nftIds]
         );
@@ -7906,12 +7981,15 @@ app.get("/api/sniper-active-listings", async (req, res) => {
 
         if (editionIds.length > 0) {
           const priceResult = await pgQuery(
-            `SELECT edition_id, lowest_ask_usd FROM edition_price_scrape 
+            `SELECT edition_id, lowest_ask_usd, avg_sale_usd FROM edition_price_scrape 
              WHERE edition_id = ANY($1::text[])`,
             [[...new Set(editionIds)]]
           );
           for (const row of priceResult.rows) {
-            editionPrices[row.edition_id] = Number(row.lowest_ask_usd);
+            editionPrices[row.edition_id] = {
+              floor: Number(row.lowest_ask_usd),
+              avgSale: row.avg_sale_usd ? Number(row.avg_sale_usd) : null
+            };
           }
         }
       } catch (e) {
@@ -7922,27 +8000,32 @@ app.get("/api/sniper-active-listings", async (req, res) => {
     // Enrich listings
     const enrichedListings = activeListings.map(listing => {
       const moment = momentData[listing.nftId] || {};
-      const floorPrice = editionPrices[moment.edition_id];
+      const priceData = editionPrices[moment.edition_id] || {};
+      const floorPrice = priceData.floor;
+      const avgSale = priceData.avgSale;
 
-      let dealPercent = null;
-      if (floorPrice && listing.listingPrice && floorPrice > 0) {
-        dealPercent = ((floorPrice - listing.listingPrice) / floorPrice) * 100;
-      }
-
-      return {
+      const enriched = {
         ...listing,
         editionId: moment.edition_id,
         serialNumber: moment.serial_number,
+        jerseyNumber: moment.jersey_number,
+        maxMint: moment.max_mint_size,
         playerName: moment.first_name && moment.last_name
           ? `${moment.first_name} ${moment.last_name}` : null,
         teamName: moment.team_name,
         tier: moment.tier,
         setName: moment.set_name,
+        floor: floorPrice,
         floorPrice,
-        dealPercent: dealPercent ? Math.round(dealPercent * 10) / 10 : null,
+        avgSale,
+        // Calculate REAL deal score
+        dealPercent: 0,
         // Direct moment link for faster buying (one click to buy page)
         listingUrl: listing.nftId ? `https://nflallday.com/moments/${listing.nftId}` : null
       };
+
+      enriched.dealPercent = calculateRealDealScore(enriched);
+      return enriched;
     });
 
     // Sort by deal %
@@ -11576,7 +11659,9 @@ async function initBundlesTable() {
 app.get("/api/listings", async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size,
+      SELECT l.*, m.first_name, m.last_name, 
+             COALESCE(NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''), m.team_name, m.set_name, '(unknown)') AS player_name,
+             m.team_name, m.tier, m.serial_number, m.max_mint_size,
              p.display_name as seller_name
       FROM listings l
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = l.nft_id
@@ -11607,7 +11692,9 @@ app.get("/api/my-listings", async (req, res) => {
     }
 
     const { rows } = await pool.query(`
-      SELECT l.*, m.first_name, m.last_name, m.team_name, m.tier, m.serial_number, m.max_mint_size
+      SELECT l.*, m.first_name, m.last_name,
+             COALESCE(NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''), m.team_name, m.set_name, '(unknown)') AS player_name,
+             m.team_name, m.tier, m.serial_number, m.max_mint_size
       FROM listings l
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = l.nft_id
       WHERE l.seller_wallet = $1 AND l.status = 'active'

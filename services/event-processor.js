@@ -214,6 +214,7 @@ export async function handleMomentNFTMinted(event, payload) {
     }
 
     try {
+        // Safe check for nfts table
         await pgQuery(`
       INSERT INTO nfts (nft_id, edition_id, serial_number, minted_at)
       VALUES ($1, $2, $3, $4)
@@ -221,7 +222,12 @@ export async function handleMomentNFTMinted(event, payload) {
         edition_id = EXCLUDED.edition_id,
         serial_number = EXCLUDED.serial_number,
         minted_at = COALESCE(nfts.minted_at, EXCLUDED.minted_at)
-    `, [nftId, editionId, serialNumber, mintedAt]);
+    `, [nftId, editionId, serialNumber, mintedAt]).catch(err => {
+            if (!err.message.includes('relation "nfts" does not exist')) {
+                throw err;
+            }
+            // Silently skip if nfts table doesn't exist
+        });
 
         console.log(`[Event] ✅ MomentNFTMinted: NFT ${nftId} (Edition: ${editionId}, Serial: ${serialNumber})`);
     } catch (err) {
@@ -241,16 +247,27 @@ export async function handleMomentNFTBurned(event, payload) {
     }
 
     try {
+        // Safe check for nfts table
         await pgQuery(`
       UPDATE nfts SET burned_at = $1 WHERE nft_id = $2
-    `, [burnedAt, nftId]);
+    `, [burnedAt, nftId]).catch(err => {
+            if (!err.message.includes('relation "nfts" does not exist')) {
+                throw err;
+            }
+            // Silently skip if nfts table doesn't exist
+        });
 
-        // Also remove from holdings
+        // Also remove from holdings (New schema)
         await pgQuery(`
       DELETE FROM holdings WHERE nft_id = $1
     `, [nftId]);
 
-        console.log(`[Event] ✅ MomentNFTBurned: NFT ${nftId}`);
+        // Also remove from wallet_holdings (Legacy schema sync)
+        await pgQuery(`
+      DELETE FROM wallet_holdings WHERE nft_id = $1
+    `, [nftId]);
+
+        console.log(`[Event] ✅ MomentNFTBurned: NFT ${nftId} (Removed from all holdings)`);
     } catch (err) {
         console.error(`[Event] Error handling MomentNFTBurned:`, err.message);
     }

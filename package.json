@@ -27,7 +27,6 @@
     "ws": "^8.18.3"
   },
   "description": "A full‑stack app for exploring NFL ALL DAY wallets, moments, and collections.",
-  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ChunkyFluid/allday-wallet-viewer.git"
