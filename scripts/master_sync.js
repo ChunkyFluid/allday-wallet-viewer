@@ -6,6 +6,7 @@ import * as dotenv from "dotenv";
 import { pgQuery } from "../db.js";
 import { executeSnowflakeWithRetry, createSnowflakeConnection } from "./snowflake-utils.js";
 import * as flowService from "../services/flow-blockchain.js";
+import { syncLeaderboards } from "./sync_leaderboards.js";
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const isFullSync = args.includes('--full');
 const metadataOnly = args.includes('--metadata-only');
 const pricesOnly = args.includes('--prices-only');
 const holdingsOnly = args.includes('--holdings-only');
+const leaderboardsOnly = args.includes('--leaderboards-only');
 const refreshUsernames = args.includes('--refresh-usernames');
 
 // Check for --wallet=ADDRESS flag
@@ -831,6 +833,17 @@ async function main() {
             results.prices = await syncPrices(connection);
         }
 
+        // ============================================================
+        // PHASE 5: Leaderboard Sync
+        // ============================================================
+        if (!metadataOnly && !pricesOnly && !holdingsOnly) {
+            console.log('');
+            console.log('━━━ PHASE 5: Leaderboard Sync ━━━');
+
+            const lbResult = await syncLeaderboards();
+            results.leaderboards = lbResult;
+        }
+
     } finally {
         // Close Snowflake connection
         connection.destroy(() => {
@@ -852,6 +865,7 @@ async function main() {
     console.log(`║  New Accounts:  ${String(results.accounts.count).padStart(6)} found`.padEnd(60) + '║');
     console.log(`║  Usernames:     ${String(results.usernames.count).padStart(6)} processed (${(results.usernames.duration / 1000).toFixed(1)}s)`.padEnd(60) + '║');
     console.log(`║  Prices:        ${String(results.prices?.count || 0).padStart(6)} editions (${((results.prices?.duration || 0) / 1000).toFixed(1)}s)`.padEnd(60) + '║');
+    console.log(`║  Leaderboards:  ${String(results.leaderboards?.topWallets || 0).padStart(6)} wallets (${((results.leaderboards?.elapsed || 0) / 1000).toFixed(1)}s)`.padEnd(60) + '║');
     console.log('╠══════════════════════════════════════════════════════════╣');
     console.log(`║  TOTAL TIME:    ${(totalDuration / 1000).toFixed(1)}s`.padEnd(60) + '║');
     console.log('╚══════════════════════════════════════════════════════════╝');
