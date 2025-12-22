@@ -276,6 +276,14 @@ export async function handleDeposit(event, payload) {
     }
 
     try {
+        // 1. Remove from ANY other wallet (Transfer logic)
+        // This is safer than deleting on Withdraw because it preserves locked NFTs during the lock process.
+        await pgQuery(
+            `DELETE FROM holdings WHERE nft_id = $1 AND wallet_address != $2`,
+            [nftId, toAddr]
+        );
+
+        // 2. Add to NEW owner
         await pgQuery(`
       INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
       VALUES ($1, $2, FALSE, $3)
@@ -284,7 +292,7 @@ export async function handleDeposit(event, payload) {
         acquired_at = COALESCE(holdings.acquired_at, EXCLUDED.acquired_at)
     `, [toAddr, nftId, acquiredAt]);
 
-        console.log(`[Event] ✅ Deposit: NFT ${nftId} → ${toAddr.substring(0, 10)}...`);
+        console.log(`[Event] ✅ Transferred NFT ${nftId} → ${toAddr.substring(0, 10)}...`);
     } catch (err) {
         console.error(`[Event] Error handling Deposit:`, err.message);
     }
@@ -309,11 +317,9 @@ export async function handleWithdraw(event, payload) {
     }
 
     try {
-        await pgQuery(`
-      DELETE FROM holdings WHERE wallet_address = $1 AND nft_id = $2
-    `, [fromAddr, nftId]);
-
-        console.log(`[Event] ✅ Withdraw: NFT ${nftId} ← ${fromAddr.substring(0, 10)}...`);
+        // MODIFIED: We no longer delete on Withdraw to prevent losing locked NFTs.
+        // Ownership is now updated in handleDeposit (Transfer on Deposit).
+        console.log(`[Event] Withdrawal detected for NFT ${nftId} ← ${fromAddr.substring(0, 10)}... (waiting for Deposit to change ownership)`);
     } catch (err) {
         console.error(`[Event] Error handling Withdraw:`, err.message);
     }

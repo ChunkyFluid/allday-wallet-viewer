@@ -1013,6 +1013,7 @@
         display: block;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        font-size: 0.7rem;
       }
 
       .listings-table thead,
@@ -1020,17 +1021,93 @@
       .listings-table tr {
         display: table;
         width: 100%;
-        table-layout: fixed;
-      }
-
-      .listings-table {
-        min-width: 800px;
       }
 
       .listings-table th,
       .listings-table td {
-        padding: 10px 8px;
-        font-size: 0.75rem;
+        padding: 8px 4px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+      }
+
+      /* Hide less important columns on mobile */
+      .listings-table .owned-col,
+      .listings-table .tier-col,
+      .listings-table .floor-col,
+      .listings-table .asp-col,
+      .listings-table .series-col,
+      .listings-table .set-col,
+      .listings-table .seller-col {
+        display: none !important;
+      }
+
+      /* Make price column show stacked prices */
+      .listings-table .price-col {
+        min-width: 85px;
+      }
+
+      /* Reduce padding even more */
+      .listings-table th,
+      .listings-table td {
+        padding: 6px 3px;
+        font-size: 0.65rem;
+      }
+
+      /* Player column - make it wrap */
+      .listings-table th:nth-child(1),
+      .listings-table td:nth-child(1) {
+        min-width: 80px;
+        max-width: 100px;
+        white-space: normal;
+        word-break: break-word;
+      }
+
+      /* Serial column */
+      .listings-table th:nth-child(4),
+      .listings-table td:nth-child(4) {
+        min-width: 40px;
+      }
+
+      /* When column */
+      .listings-table th:nth-child(13),
+      .listings-table td:nth-child(13) {
+        min-width: 50px;
+        font-size: 0.6rem;
+      }
+
+      /* Action column */
+      .listings-table th:nth-child(14),
+      .listings-table td:nth-child(14) {
+        min-width: 50px;
+      }
+
+      /* Stacked price columns */
+      .stacked-prices {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        font-size: 0.65rem;
+        line-height: 1.3;
+      }
+
+      .stacked-prices .price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 3px;
+      }
+
+      .stacked-prices .price-label {
+        color: var(--text-muted);
+        font-size: 0.55rem;
+        text-transform: uppercase;
+        min-width: 24px;
+      }
+
+      .stacked-prices .price-value {
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.65rem;
       }
 
       .listings-grid {
@@ -1440,6 +1517,40 @@
           </div>
         </div>
 
+        <div class="filter-group">
+          <label class="filter-label">Notification Sounds</label>
+          <div class="checkbox-list" id="sound-settings">
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-all" value="all" />
+              <span>🔔 All Listings</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-deal" value="deal" />
+              <span>💰 Deals Listed</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-jersey" value="jersey" />
+              <span>👕 Jersey Match</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-number1" value="number1" />
+              <span>🥇 #1 Serial</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-perfect" value="perfect" />
+              <span>💎 Perfect Serial</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-69" value="69" />
+              <span>😏 #69 Serial</span>
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="sound-420" value="420" />
+              <span>🌿 #420 Serial</span>
+            </label>
+          </div>
+        </div>
+
         <div class="filter-group saved-searches-group">
           <label class="filter-label">
             Saved Searches
@@ -1540,17 +1651,17 @@
           <thead>
             <tr>
               <th data-sort="player">Player</th>
-              <th>Owned</th>
-              <th data-sort="tier">Tier</th>
-              <th data-sort="serial">Serial</th>
-              <th data-sort="price">Listed</th>
-              <th data-sort="floor">Floor</th>
-              <th data-sort="asp">ASP</th>
+              <th class="owned-col">Owned</th>
+              <th data-sort="tier" class="tier-col">Tier</th>
+              <th data-sort="serial" class="serial-col">Serial</th>
+              <th data-sort="price" class="price-col">Listed</th>
+              <th data-sort="floor" class="floor-col">Floor</th>
+              <th data-sort="asp" class="asp-col">ASP</th>
               <th data-sort="deal">vs Floor</th>
-              <th>Series</th>
-              <th>Set</th>
-              <th>Seller</th>
-              <th>Buyer</th>
+              <th class="series-col">Series</th>
+              <th class="set-col">Set</th>
+              <th class="seller-col">Seller</th>
+              <th class="buyer-col">Buyer</th>
               <th data-sort="time">When</th>
               <th>Action</th>
             </tr>
@@ -1599,10 +1710,21 @@
     let ownedCounts = {}; // Map of edition_id -> count for signed-in user
     let userWallet = null; // User's wallet address if signed in
     let isInitialLoad = true; // Track if this is the first load
+    let isFirstListingLoad = true; // Track if this is the first listings load for sounds
     let isLoadingListings = false; // Track if listings are currently being fetched
     let currentPage = 1; // Current page number
     const PAGE_SIZE = 20; // Listings per page
     let pendingRefresh = false; // Track if a refresh is queued
+    let soundedNftIds = new Set();
+    const sounds = {
+      all: new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'),
+      deal: new Audio('https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3'),
+      jersey: new Audio('https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3'),
+      number1: new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'),
+      perfect: new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'),
+      69: new Audio('https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3'),
+      420: new Audio('https://assets.mixkit.co/active_storage/sfx/2021/2021-preview.mp3')
+    };
 
     // Elements
     const listingsGrid = document.getElementById('listings-grid');
@@ -1671,6 +1793,40 @@
       listingsTable.classList.add('active');
       listingsGrid.classList.remove('active');
     });
+
+    // Sound settings persistence and preview
+    function loadSoundSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('sniper_sound_settings') || '{}');
+        Object.keys(saved).forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.checked = saved[id];
+        });
+      } catch (e) { console.warn('Error loading sound settings:', e); }
+    }
+
+    document.getElementById('sound-settings').addEventListener('change', (e) => {
+      // Save all settings
+      const settings = {};
+      document.querySelectorAll('#sound-settings input').forEach(input => {
+        settings[input.id] = input.checked;
+      });
+      localStorage.setItem('sniper_sound_settings', JSON.stringify(settings));
+
+      // Play sample if checked
+      if (e.target.checked) {
+        const soundKey = e.target.value;
+        if (sounds[soundKey]) {
+          sounds[soundKey].currentTime = 0;
+          sounds[soundKey].play().catch(err => {
+            console.warn('[Sniper] Audio playback requires user interaction first.');
+          });
+        }
+      }
+    });
+
+    // Load initial sound settings
+    loadSoundSettings();
 
     // Format helpers
     function formatPrice(val) {
@@ -1904,6 +2060,41 @@
         if (!Array.isArray(listings)) {
           console.error('[Sniper] listings is not an array:', typeof listings, listings);
           listings = [];
+        }
+
+        // Handle notification sounds
+        if (listings.length > 0) {
+          if (isFirstListingLoad) {
+            // First time loading, just mark all as seen
+            listings.forEach(l => soundedNftIds.add(l.nftId));
+            isFirstListingLoad = false;
+          } else {
+            // Check for NEW listings (the API returns most recent first)
+            for (const l of listings) {
+              if (l.nftId && !soundedNftIds.has(l.nftId)) {
+                soundedNftIds.add(l.nftId);
+
+                let soundToPlay = null;
+                if (document.getElementById('sound-number1')?.checked && l.isNumberOne) soundToPlay = 'number1';
+                else if (document.getElementById('sound-perfect')?.checked && l.isPerfectSerial) soundToPlay = 'perfect';
+                else if (document.getElementById('sound-jersey')?.checked && l.isJerseyMatch) soundToPlay = 'jersey';
+                else if (document.getElementById('sound-69')?.checked && l.serialNumber === 69) soundToPlay = '69';
+                else if (document.getElementById('sound-420')?.checked && l.serialNumber === 420) soundToPlay = '420';
+                else if (document.getElementById('sound-deal')?.checked && (l.dealPercent > 0 || l.floorDelta > 0)) soundToPlay = 'deal';
+                else if (document.getElementById('sound-all')?.checked) soundToPlay = 'all';
+
+                if (soundToPlay) {
+                  try {
+                    const audio = sounds[soundToPlay];
+                    if (audio) {
+                      audio.currentTime = 0;
+                      audio.play().catch(e => console.warn('[Sniper] Sound play blocked. Interaction required.', e));
+                    }
+                  } catch (err) { /* ignore */ }
+                }
+              }
+            }
+          }
         }
 
         // Wait for owned counts to finish
@@ -2268,8 +2459,8 @@
 
       // Grid view
       listingsGrid.innerHTML = pageListings.map(l => {
-        // Gold serial only if #1 or matches jersey number
-        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
+        // Gold serial only if #1, matches jersey number, or perfect serial
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber) || l.isPerfectSerial;
         const soldClass = l.isSold ? 'listing-sold' : (l.isUnlisted ? 'listing-unlisted' : '');
         const ownedCount = getOwnedCount(l.editionId);
         const ownedBadge = ownedCount
@@ -2356,8 +2547,8 @@
         const isGoodDeal = l.dealPercent >= 5;
         const isOverpriced = l.dealPercent < 0;
 
-        // Gold serial only if #1 or matches jersey number
-        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
+        // Gold serial only if #1, matches jersey number, or perfect serial
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber) || l.isPerfectSerial;
 
         // Row background
         let rowBg = '';
@@ -2402,17 +2593,17 @@
               <strong>${l.playerName || 'Unknown'}</strong>
               <div style="font-size: 0.75rem; color: #6b7280;">${l.teamName || ''}</div>
             </td>
-            <td style="text-align: center;">${ownedDisplay}</td>
-            <td><span class="tier-badge ${getTierClass(l.tier)}" style="font-size: 0.7rem;">${l.tier || '?'}</span></td>
+            <td class="owned-col" style="text-align: center;">${ownedDisplay}</td>
+            <td class="tier-col"><span class="tier-badge ${getTierClass(l.tier)}" style="font-size: 0.7rem;">${l.tier || '?'}</span></td>
             <td style="font-family: 'JetBrains Mono', monospace; ${isSpecialSerial ? 'color: #fbbf24; font-weight: 600;' : 'color: #9ca3af;'}">#${l.serialNumber || '?'}</td>
-            <td style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#9ca3af'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
-            <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.floor)}</td>
-            <td style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.avgSale)}</td>
+            <td class="price-col" style="font-family: 'JetBrains Mono', monospace; color: ${isDeal ? '#22c55e' : '#9ca3af'}; font-weight: 700;">${formatPrice(l.listingPrice)}</td>
+            <td class="floor-col" style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.floor)}</td>
+            <td class="asp-col" style="font-family: 'JetBrains Mono', monospace; color: #9ca3af;">${formatPrice(l.avgSale)}</td>
             <td style="font-family: 'JetBrains Mono', monospace; color: ${dealColor}; font-weight: 600;">${dealDisplay}</td>
-            <td style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
-            <td style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
-            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || l.sellerAddress || ''}">${l.sellerAddress ? `<a href="/?wallet=${l.sellerAddress}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.sellerName || l.sellerAddress?.substring(0, 8) + '...' || '-'}</a>` : '-'}</td>
-            <td style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerAddr ? `<a href="/?wallet=${l.buyerAddr}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.buyerName || l.buyerAddr?.substring(0, 8) + '...' || '-'}</a>` : '-') : (l.isUnlisted ? '—' : '-')}</td>
+            <td class="series-col" style="font-size: 0.8rem; color: #9ca3af;">${l.seriesName || '-'}</td>
+            <td class="set-col" style="font-size: 0.8rem; color: #9ca3af;">${l.setName || '-'}</td>
+            <td class="seller-col" style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.sellerName || l.sellerAddress || ''}">${l.sellerAddress ? `<a href="/?wallet=${l.sellerAddress}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.sellerName || l.sellerAddress?.substring(0, 8) + '...' || '-'}</a>` : '-'}</td>
+            <td class="buyer-col" style="font-size: 0.8rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${l.buyerName || l.buyerAddr || ''}">${l.isSold ? (l.buyerAddr ? `<a href="/?wallet=${l.buyerAddr}" class="seller-link" style="color: #0dcaf0; text-decoration: none;">${l.buyerName || l.buyerAddr?.substring(0, 8) + '...' || '-'}</a>` : '-') : (l.isUnlisted ? '—' : '-')}</td>
             <td style="color: #6b7280; font-size: 0.85rem;">${formatTimeAgo(l.listedAt)}</td>
             <td>
               <a href="${l.listingUrl || '#'}" target="_blank" 
@@ -2428,8 +2619,8 @@
       mobileListings.innerHTML = pageListings.map(l => {
         const isDeal = l.dealPercent > 0;
         const isHotDeal = l.dealPercent >= 15;
-        // Gold serial only if #1 or matches jersey number
-        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber);
+        // Gold serial only if #1, matches jersey number, or perfect serial
+        const isSpecialSerial = l.serialNumber === 1 || (l.jerseyNumber && l.serialNumber === l.jerseyNumber) || l.isPerfectSerial;
         const tierClass = getTierClass(l.tier);
         const teamAbbrev = getTeamAbbrev(l.teamName);
 

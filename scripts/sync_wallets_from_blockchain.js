@@ -19,7 +19,7 @@ const SYNC_DELAY_MS = 1000; // Delay between batches (1 second)
 async function getAllWalletNFTs(walletAddress) {
   const wallet = walletAddress.toLowerCase();
   const allNFTs = new Map(); // nft_id -> { is_locked, last_event_ts (acquired date) }
-  
+
   // 1. Get UNLOCKED NFTs from blockchain (NFTs currently in wallet)
   console.log(`[Sync] Getting unlocked NFTs from blockchain...`);
   let unlockedIds = [];
@@ -32,12 +32,12 @@ async function getAllWalletNFTs(walletAddress) {
   } catch (err) {
     console.error(`[Sync] Error getting unlocked NFTs:`, err.message);
   }
-  
+
   // 2. Get LOCKED NFTs from Snowflake (NFTs in NFTLocker contract)
   console.log(`[Sync] Getting locked NFTs and acquired dates from Snowflake...`);
   try {
     const conn = await createSnowflakeConnection();
-    
+
     // Query locked NFTs
     const lockedSql = `
       WITH my_locked_events AS (
@@ -69,13 +69,13 @@ async function getAllWalletNFTs(walletAddress) {
       WHERE u.NFT_ID IS NULL
     `;
     const lockedRows = await executeSnowflakeWithRetry(conn, lockedSql, { maxRetries: 2 });
-    
+
     for (const row of lockedRows) {
       const nftId = row.NFT_ID.toString();
       allNFTs.set(nftId, { is_locked: true, last_event_ts: null });
     }
     console.log(`[Sync] Found ${lockedRows.length} locked NFTs`);
-    
+
     // Query ACQUIRED dates (first deposit to wallet) for all NFTs
     const acquiredSql = `
       SELECT 
@@ -89,7 +89,7 @@ async function getAllWalletNFTs(walletAddress) {
       QUALIFY ROW_NUMBER() OVER (PARTITION BY EVENT_DATA:id::STRING ORDER BY BLOCK_HEIGHT ASC) = 1
     `;
     const acquiredRows = await executeSnowflakeWithRetry(conn, acquiredSql, { maxRetries: 2 });
-    
+
     // Update NFTs with their acquired dates
     for (const row of acquiredRows) {
       const nftId = row.NFT_ID.toString();
@@ -100,11 +100,11 @@ async function getAllWalletNFTs(walletAddress) {
       }
     }
     console.log(`[Sync] Got acquired dates for ${acquiredRows.length} NFTs`);
-    
+
   } catch (err) {
     console.error(`[Sync] Error getting locked NFTs:`, err.message);
   }
-  
+
   // Set default date for any NFTs without acquired date
   const now = new Date();
   for (const [nftId, data] of allNFTs.entries()) {
@@ -113,7 +113,7 @@ async function getAllWalletNFTs(walletAddress) {
       allNFTs.set(nftId, data);
     }
   }
-  
+
   return allNFTs;
 }
 
@@ -123,41 +123,66 @@ async function getAllWalletNFTs(walletAddress) {
 async function syncWallet(walletAddress) {
   try {
     console.log(`[Sync] Syncing wallet ${walletAddress.substring(0, 8)}...`);
-    
+
     // Get ALL NFTs - both unlocked (from blockchain) and locked (from Snowflake)
     const allNFTs = await getAllWalletNFTs(walletAddress);
-    
+
     if (allNFTs.size === 0) {
-      // Wallet has no NFTs - remove all holdings
-      const deleteResult = await pgQuery(
-        `DELETE FROM wallet_holdings WHERE wallet_address = $1`,
+      // Wallet appears empty from blockchain/Snowflake - but NEVER delete locked NFTs!
+
+      // Get current locked count
+      const currentLocked = await pgQuery(
+        `SELECT COUNT(*) as count FROM wallet_holdings WHERE wallet_address = $1 AND is_locked = true`,
         [walletAddress.toLowerCase()]
       );
-      
+      const lockedCount = parseInt(currentLocked.rows[0].count);
+
+      // Only delete the UNLOCKED NFTs, keep the locked ones
+      const deleteResult = await pgQuery(
+        `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND (is_locked IS NOT TRUE)`,
+        [walletAddress.toLowerCase()]
+      );
+
       if (deleteResult.rowCount > 0) {
-        console.log(`[Sync] ✅ Removed ${deleteResult.rowCount} holdings for empty wallet ${walletAddress.substring(0, 8)}...`);
+        console.log(`[Sync] ✅ Removed ${deleteResult.rowCount} unlocked holdings for wallet ${walletAddress.substring(0, 8)}..., preserved ${lockedCount} locked`);
+      } else if (lockedCount > 0) {
+        console.log(`[Sync] ⚠️ Wallet ${walletAddress.substring(0, 10)}... appears empty but has ${lockedCount} locked NFTs - preserving them`);
       }
-      return { added: 0, removed: deleteResult.rowCount, current: 0, locked: 0 };
+      return { added: 0, removed: deleteResult.rowCount, current: lockedCount, locked: lockedCount };
     }
-    
+
     const nftIdStrings = Array.from(allNFTs.keys());
     let lockedCount = Array.from(allNFTs.values()).filter(v => v.is_locked).length;
-    
+
     // Get current holdings from database
     const currentResult = await pgQuery(
       `SELECT nft_id, is_locked FROM wallet_holdings WHERE wallet_address = $1`,
       [walletAddress.toLowerCase()]
     );
-    
+
     const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
     const newNftIds = new Set(nftIdStrings);
-    
+
     // Find NFTs to add
     const toAdd = nftIdStrings.filter(id => !currentNftIds.has(id));
-    
-    // Find NFTs to remove
-    const toRemove = Array.from(currentNftIds).filter(id => !newNftIds.has(id));
-    
+
+    // Find NFTs to remove - SAFEGUARD:
+    // Only remove NFTs that are NOT locked. If it's locked, we never delete it
+    // because the Snowflake query might have missed it.
+    const toRemove = Array.from(currentNftIds).filter(id => {
+      const isStillInCollection = newNftIds.has(id);
+      if (isStillInCollection) return false;
+
+      const wasLockedInDb = currentResult.rows.find(r => r.nft_id === id)?.is_locked === true;
+      if (wasLockedInDb) {
+        console.log(`[Sync] ⚠️ Preserving locked NFT ${id} - not in new sync but keeping in DB`);
+        return false;
+      }
+
+      return true; // Safe to remove unlocked NFT that is no longer in collection
+    });
+
+
     // Find NFTs where locked status changed
     const toUpdateLocked = nftIdStrings.filter(id => {
       if (currentNftIds.has(id)) {
@@ -167,16 +192,16 @@ async function syncWallet(walletAddress) {
       }
       return false;
     });
-    
+
     // Add new NFTs with locked status (in batches of 100 to avoid param limit)
     if (toAdd.length > 0) {
       const BATCH_SIZE = 100;
       for (let i = 0; i < toAdd.length; i += BATCH_SIZE) {
         const batch = toAdd.slice(i, i + BATCH_SIZE);
-        const values = batch.map((nftId, idx) => 
+        const values = batch.map((nftId, idx) =>
           `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4})`
         ).join(', ');
-        
+
         const params = batch.flatMap(nftId => {
           const nftData = allNFTs.get(nftId) || { is_locked: false, last_event_ts: new Date() };
           return [
@@ -186,7 +211,7 @@ async function syncWallet(walletAddress) {
             nftData.last_event_ts
           ];
         });
-        
+
         await pgQuery(
           `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts)
            VALUES ${values}
@@ -199,7 +224,7 @@ async function syncWallet(walletAddress) {
         );
       }
     }
-    
+
     // Update locked status for existing NFTs that changed
     if (toUpdateLocked.length > 0) {
       for (const nftId of toUpdateLocked) {
@@ -212,7 +237,7 @@ async function syncWallet(walletAddress) {
         );
       }
     }
-    
+
     // Update last_synced_at for existing NFTs
     const existingNftIds = nftIdStrings.filter(id => currentNftIds.has(id) && !toUpdateLocked.includes(id));
     if (existingNftIds.length > 0) {
@@ -223,22 +248,22 @@ async function syncWallet(walletAddress) {
         [walletAddress.toLowerCase(), existingNftIds]
       );
     }
-    
+
     // Remove NFTs that are no longer in the wallet
     if (toRemove.length > 0) {
       await pgQuery(
         `DELETE FROM wallet_holdings 
-         WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+         WHERE wallet_address = $1 AND nft_id = ANY($2::text[]) AND (is_locked IS NOT TRUE)`,
         [walletAddress.toLowerCase(), toRemove]
       );
     }
-    
+
     if (toAdd.length > 0 || toRemove.length > 0 || toUpdateLocked.length > 0) {
       console.log(`[Sync] ✅ Wallet ${walletAddress.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length}, Locked Updated: ${toUpdateLocked.length}, Current: ${allNFTs.size}, Locked: ${lockedCount}`);
     } else {
       console.log(`[Sync] ✅ Wallet ${walletAddress.substring(0, 8)}... - No changes (${allNFTs.size} NFTs, ${lockedCount} locked)`);
     }
-    
+
     return {
       added: toAdd.length,
       removed: toRemove.length,
@@ -258,7 +283,7 @@ async function syncWallet(walletAddress) {
 async function syncRecentWallets() {
   try {
     console.log("[Sync] Starting sync of recently queried wallets...");
-    
+
     const recentWalletsResult = await pgQuery(
       `SELECT DISTINCT wallet_address, MAX(last_synced_at) as last_synced_at
        FROM wallet_holdings 
@@ -267,14 +292,14 @@ async function syncRecentWallets() {
        ORDER BY MAX(last_synced_at) DESC
        LIMIT 1000`
     );
-    
+
     const wallets = recentWalletsResult.rows.map(r => r.wallet_address);
-    
+
     if (wallets.length === 0) {
       console.log("[Sync] No recent wallets to sync");
       return { synced: 0, total: 0 };
     }
-    
+
     console.log(`[Sync] Found ${wallets.length} recent wallets to sync`);
     return await syncSpecificWallets(wallets);
   } catch (err) {
@@ -288,10 +313,10 @@ async function syncRecentWallets() {
  */
 async function syncSpecificWallets(walletAddresses) {
   console.log(`[Sync] Syncing ${walletAddresses.length} specific wallets...`);
-  
+
   let synced = 0;
   let errors = 0;
-  
+
   for (const wallet of walletAddresses) {
     try {
       await syncWallet(wallet);
@@ -300,11 +325,11 @@ async function syncSpecificWallets(walletAddresses) {
       errors++;
       console.error(`[Sync] Failed to sync wallet ${wallet}:`, err.message);
     }
-    
+
     // Small delay between wallets
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  
+
   console.log(`[Sync] ✅ Completed: ${synced} wallets synced, ${errors} errors`);
   return { synced, errors };
 }
@@ -315,7 +340,7 @@ async function syncSpecificWallets(walletAddresses) {
 async function syncStaleWallets() {
   try {
     console.log("[Sync] Starting sync of stale wallets...");
-    
+
     const staleWalletsResult = await pgQuery(
       `SELECT DISTINCT wallet_address, MIN(last_synced_at) as last_synced_at
        FROM wallet_holdings 
@@ -325,14 +350,14 @@ async function syncStaleWallets() {
        ORDER BY MIN(last_synced_at) NULLS FIRST
        LIMIT 500`
     );
-    
+
     const wallets = staleWalletsResult.rows.map(r => r.wallet_address);
-    
+
     if (wallets.length === 0) {
       console.log("[Sync] No stale wallets to sync");
       return { synced: 0, total: 0 };
     }
-    
+
     console.log(`[Sync] Found ${wallets.length} stale wallets to sync`);
     return await syncSpecificWallets(wallets);
   } catch (err) {
@@ -344,7 +369,7 @@ async function syncStaleWallets() {
 // Main execution
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.length > 0 && !args[0].startsWith('--')) {
     // Sync specific wallets from command line
     await syncSpecificWallets(args);
@@ -358,7 +383,12 @@ async function main() {
 }
 
 // Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (isMain) {
   main()
     .then(() => {
       console.log("[Sync] ✅ Sync complete");

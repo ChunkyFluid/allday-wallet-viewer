@@ -66,9 +66,7 @@ async function batchSync() {
                     ...lockedIds.map(id => ({ nft_id: id, is_locked: true }))
                 ];
 
-                // Clear and re-insert wallet_holdings
-                await pgQuery(`DELETE FROM wallet_holdings WHERE wallet_address = $1`, [wallet]);
-
+                // Upsert wallet_holdings
                 if (allNftIds.length > 0) {
                     const BATCH_SIZE = 500;
                     for (let i = 0; i < allNftIds.length; i += BATCH_SIZE) {

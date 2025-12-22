@@ -29,7 +29,7 @@ async function getEditionIdsToUpdate() {
     const sql = `
     SELECT DISTINCT m.edition_id
     FROM wallet_holdings w
-    JOIN nft_core_metadata m ON m.nft_id = w.nft_id
+    JOIN nft_core_metadata_v2 m ON m.nft_id = w.nft_id
     WHERE m.edition_id IS NOT NULL
     ORDER BY m.edition_id;
   `;
@@ -231,8 +231,7 @@ async function main() {
     await browser.close();
 
     console.log(
-        `✅ Finished scraping. Processed ${processed}/${total}, wrote ~${found} priced editions in ${
-            ((Date.now() - start) / 1000).toFixed(1)
+        `✅ Finished scraping. Processed ${processed}/${total}, wrote ~${found} priced editions in ${((Date.now() - start) / 1000).toFixed(1)
         }s`
     );
     process.exit(0);

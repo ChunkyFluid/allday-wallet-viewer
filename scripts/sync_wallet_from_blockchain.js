@@ -49,9 +49,8 @@ async function syncWallet() {
 
     console.log(`\n3. Total NFTs: ${allNftIds.length} (${unlockedIds.length} unlocked + ${lockedIds.length} locked)`);
 
-    // Clear existing wallet_holdings for this wallet
-    console.log('\n4. Updating wallet_holdings...');
-    await pgQuery(`DELETE FROM wallet_holdings WHERE wallet_address = $1`, [WALLET]);
+    // UPSERT wallet_holdings (never delete!)
+    console.log('\n4. Upserting wallet_holdings (preserving existing locked status)...');
 
     // Insert all NFTs
     if (allNftIds.length > 0) {
@@ -86,12 +85,11 @@ async function syncWallet() {
                 batchParams
             );
         }
-        console.log(`   ✅ Inserted ${allNftIds.length} NFTs`);
+        console.log(`   ✅ Upserted ${allNftIds.length} NFTs`);
     }
 
-    // Also update holdings table
-    console.log('\n5. Updating holdings table...');
-    await pgQuery(`DELETE FROM holdings WHERE wallet_address = $1`, [WALLET]);
+    // Also upsert holdings table (never delete!)
+    console.log('\n5. Upserting holdings table (preserving existing locked status)...');
 
     if (allNftIds.length > 0) {
         const BATCH_SIZE = 500;
@@ -114,7 +112,7 @@ async function syncWallet() {
                 batchParams
             );
         }
-        console.log(`   ✅ Inserted ${allNftIds.length} NFTs into holdings`);
+        console.log(`   ✅ Upserted ${allNftIds.length} NFTs into holdings`);
     }
 
     // Verify

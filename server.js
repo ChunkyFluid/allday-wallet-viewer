@@ -14,6 +14,7 @@ import session from "express-session";
 import bcrypt from "bcrypt";
 import WebSocket from "ws";
 import * as eventProcessor from "./services/event-processor.js";
+import { syncLeaderboards } from "./scripts/sync_leaderboards.js";
 import crypto from 'crypto';
 
 dotenv.config();
@@ -582,16 +583,32 @@ async function processFlowEvent(event) {
   }
 }
 
+const NFTLOCKER_CONTRACT = '0xb6f2481eba4df97b';
+
 // Update wallet holdings in real-time when we see Deposit events
 async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blockHeight) {
   try {
     if (!walletAddress || !nftId) return;
 
     const walletAddr = walletAddress.toLowerCase();
+
+    // SAFEGUARD: If depositing to the NFTLocker, don't update ownership.
+    // The NFT still "belongs" to the original owner, just with is_locked=true (handled by NFTLocked event).
+    if (walletAddr === NFTLOCKER_CONTRACT) {
+      console.log(`[Wallet Sync] Deposit to Locker for NFT ${nftId} - skipping ownership change`);
+      return;
+    }
+
     const ts = timestamp ? new Date(timestamp) : new Date();
 
-    // Upsert: add NFT to wallet holdings (or update timestamp if already exists)
-    // Only update if the new timestamp is newer (avoid overwriting with old data)
+    // 1. Remove from ANY other wallet (Transfer logic)
+    // This is safer than deleting on Withdraw because it preserves locked NFTs during the lock process.
+    await pgQuery(
+      `DELETE FROM wallet_holdings WHERE nft_id = $1 AND wallet_address != $2`,
+      [nftId.toString(), walletAddr]
+    );
+
+    // 2. Upsert: add NFT to new wallet holdings
     await pgQuery(
       `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
        VALUES ($1, $2, $3, $4, NOW())
@@ -607,7 +624,7 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
       [walletAddr, nftId.toString(), false, ts]
     );
 
-    console.log(`[Wallet Sync] ✅ Added NFT ${nftId} to wallet ${walletAddr.substring(0, 8)}...`);
+    console.log(`[Wallet Sync] ✅ Transferred NFT ${nftId} to wallet ${walletAddr.substring(0, 8)}...`);
 
     // NEW: Fetch metadata for this NFT if not already in database
     await fetchAndCacheNFTMetadata(nftId.toString());
@@ -729,22 +746,16 @@ async function executeSnowflakeQuery(sql) {
 }
 
 // Remove wallet holding when we see Withdraw events
+// MODIFIED: We no longer delete on Withdraw to prevent losing locked NFTs.
+// Ownership is now updated in handleDeposit (Transfer on Deposit).
 async function updateWalletHoldingOnWithdraw(walletAddress, nftId) {
   try {
     if (!walletAddress || !nftId) return;
-
     const walletAddr = walletAddress.toLowerCase();
-
-    // Delete the NFT from wallet holdings
-    const result = await pgQuery(
-      `DELETE FROM wallet_holdings 
-       WHERE wallet_address = $1 AND nft_id = $2`,
-      [walletAddr, nftId.toString()]
-    );
-
-    if (result.rowCount > 0) {
-      console.log(`[Wallet Sync] ✅ Removed NFT ${nftId} from wallet ${walletAddr.substring(0, 8)}...`);
-    }
+    // We just log it for debug, but don't delete. 
+    // If it's a sale, the Deposit to the buyer will handle the removal.
+    // If it's a lock, it stays in the wallet (correctly).
+    console.log(`[Wallet Sync] Withdrawal detected for NFT ${nftId} from ${walletAddr.substring(0, 8)}... (waiting for Deposit to change ownership)`);
   } catch (err) {
     console.error(`[Wallet Sync] Error updating wallet holding for Withdraw:`, err.message);
   }
@@ -3096,6 +3107,10 @@ app.post("/api/insights/refresh", async (req, res) => {
     console.log("Refreshing insights snapshot...");
     const startTime = Date.now();
 
+    // 1. Sync leaderboards first (prerequisite for insights)
+    console.log("[Insights] Syncing leaderboards before snapshot...");
+    await syncLeaderboards();
+
     // Run all queries in parallel for speed
     const [
       statsResult,
@@ -4865,7 +4880,7 @@ app.get("/api/flow-latest-block", async (req, res) => {
 // ============================================================
 
 // Enable/disable sniper logging (disabled by default to reduce console spam)
-const SNIPER_LOGGING_ENABLED = false;
+const SNIPER_LOGGING_ENABLED = true;
 
 // Helper to conditionally log sniper messages
 function sniperLog(...args) {
@@ -5134,6 +5149,59 @@ async function markListingAsSold(nftId, buyerAddr = null) {
   // Get buyer name if we have buyer address
   const buyerName = await getDisplayName(buyerAddr);
 
+  // Find the seller address from the listing
+  let sellerAddr = null;
+  for (const listing of sniperListings) {
+    if (listing.nftId === nftId) {
+      sellerAddr = listing.sellerAddr || listing.sellerAddress;
+      break;
+    }
+  }
+
+  // If we don't have seller in memory, try to get it from DB
+  if (!sellerAddr && nftId) {
+    try {
+      const dbListing = await pgQuery(
+        `SELECT seller_addr FROM sniper_listings WHERE nft_id = $1 LIMIT 1`,
+        [nftId]
+      );
+      if (dbListing.rows.length > 0) {
+        sellerAddr = dbListing.rows[0].seller_addr;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  // Update wallet_holdings if we have both buyer and seller
+  if (sellerAddr && buyerAddr && nftId) {
+    try {
+      sniperLog(`[Sniper] 💼 Updating wallet holdings: ${sellerAddr} → ${buyerAddr} (NFT ${nftId})`);
+
+      // Remove from seller
+      await pgQuery(
+        `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND nft_id = $2`,
+        [sellerAddr.toLowerCase(), nftId]
+      );
+      sniperLog(`[Sniper] 💼 Removed NFT ${nftId} from seller ${sellerAddr}`);
+
+      // Add to buyer (with current timestamp as last_event_ts)
+      await pgQuery(`
+        INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+        VALUES ($1, $2, FALSE, NOW(), NOW())
+        ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
+          last_event_ts = NOW(),
+          last_synced_at = NOW()
+      `, [buyerAddr.toLowerCase(), nftId]);
+      sniperLog(`[Sniper] 💼 Added NFT ${nftId} to buyer ${buyerAddr}`);
+    } catch (err) {
+      sniperError(`[Sniper] ⚠️ Error updating wallet_holdings:`, err.message);
+    }
+  } else {
+    if (!sellerAddr) sniperLog(`[Sniper] ⚠️ Cannot update wallet_holdings - missing seller address`);
+    if (!buyerAddr) sniperLog(`[Sniper] ⚠️ Cannot update wallet_holdings - missing buyer address`);
+  }
+
   // Mark existing listings as sold in memory
   for (const listing of sniperListings) {
     if (listing.nftId === nftId) {
@@ -5255,7 +5323,7 @@ async function processListingEvent(event) {
     if (!editionId) {
       try {
         const result = await pgQuery(
-          `SELECT edition_id, serial_number, first_name, last_name, team_name, tier, set_name, series_name, jersey_number
+          `SELECT edition_id, serial_number, max_mint_size, first_name, last_name, team_name, tier, set_name, series_name, jersey_number
            FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
@@ -5294,7 +5362,7 @@ async function processListingEvent(event) {
     if (!momentData || !momentData.series_name) {
       try {
         const result = await pgQuery(
-          `SELECT serial_number, first_name, last_name, team_name, tier, set_name, series_name, position, jersey_number
+          `SELECT serial_number, max_mint_size, first_name, last_name, team_name, tier, set_name, series_name, position, jersey_number
            FROM nft_core_metadata_v2 WHERE nft_id = $1 LIMIT 1`,
           [nftId]
         );
@@ -5340,6 +5408,7 @@ async function processListingEvent(event) {
       listingId,
       editionId,
       serialNumber: momentData?.serial_number,
+      maxMint: momentData?.max_mint_size ? Number(momentData.max_mint_size) : null,
       listingPrice,
       floor: previousFloor,
       avgSale,
@@ -5671,11 +5740,72 @@ async function watchForListings() {
                 }
               }
 
-              // If we don't have a listingResourceId match, we CANNOT reliably mark as sold
-              // (an NFT could have been sold and relisted, so matching by nftId alone is unsafe)
+              // If we don't have a listingResourceId match, log it as an untracked sale
+              // This can happen if the listing was created before we started watching
               if (!existingListing) {
-                sniperLog(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system - skipping`);
-                continue;
+                sniperLog(`[Sniper] ⚠️  ListingCompleted event for ${targetNftId} (listingId: ${listingResourceId || 'none'}) but no matching listing found in our system`);
+
+                // Still log it as an untracked sale so we don't lose the data
+                if (wasPurchased && targetNftId) {
+                  try {
+                    await pgQuery(`
+                      CREATE TABLE IF NOT EXISTS untracked_sales (
+                        nft_id TEXT NOT NULL,
+                        listing_id TEXT,
+                        buyer_addr TEXT,
+                        block_height BIGINT,
+                        sale_timestamp TIMESTAMPTZ DEFAULT NOW(),
+                        logged_at TIMESTAMPTZ DEFAULT NOW(),
+                        PRIMARY KEY (nft_id, logged_at)
+                      )
+                    `);
+
+                    await pgQuery(`
+                      INSERT INTO untracked_sales (nft_id, listing_id, buyer_addr, block_height)
+                      VALUES ($1, $2, $3, $4)
+                      ON CONFLICT DO NOTHING
+                    `, [targetNftId, listingResourceId, buyerAddr, block.block_height]);
+
+                    sniperLog(`[Sniper] 📝 Logged untracked sale for NFT ${targetNftId}`);
+
+                    // Also try to update wallet holdings if we extracted buyer address
+                    // We'll need to query current owner from wallet_holdings as the seller
+                    if (buyerAddr && targetNftId) {
+                      try {
+                        const currentOwner = await pgQuery(
+                          `SELECT wallet_address FROM wallet_holdings WHERE nft_id = $1 LIMIT 1`,
+                          [targetNftId]
+                        );
+
+                        if (currentOwner.rows.length > 0) {
+                          const sellerAddr = currentOwner.rows[0].wallet_address;
+                          sniperLog(`[Sniper] 💼 Untracked sale: updating wallet holdings ${sellerAddr} → ${buyerAddr}`);
+
+                          await pgQuery(
+                            `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND nft_id = $2`,
+                            [sellerAddr, targetNftId]
+                          );
+
+                          await pgQuery(`
+                            INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+                            VALUES ($1, $2, FALSE, NOW(), NOW())
+                            ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
+                              last_event_ts = NOW(),
+                              last_synced_at = NOW()
+                          `, [buyerAddr.toLowerCase(), targetNftId]);
+
+                          sniperLog(`[Sniper] 💼 Wallet holdings updated for untracked sale`);
+                        }
+                      } catch (whErr) {
+                        sniperError(`[Sniper] ⚠️ Error updating wallet holdings for untracked sale:`, whErr.message);
+                      }
+                    }
+                  } catch (err) {
+                    sniperError(`[Sniper] ⚠️ Error logging untracked sale:`, err.message);
+                  }
+                }
+
+                continue; // Skip marking in sniper_listings since we don't have the listing
               }
 
               // If already marked as sold, skip
@@ -7034,6 +7164,8 @@ app.get("/api/sniper-deals", async (req, res) => {
     const seriesMapByNftId = new Map();
     const seriesMapByEditionId = new Map();
     const jerseyMapByNftId = new Map();
+    const maxMintMapByNftId = new Map();
+    const maxMintMapByEditionId = new Map();
     const aspMap = new Map();
     const walletNameMap = new Map();
 
@@ -7063,7 +7195,7 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (allNftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT nft_id, series_name, jersey_number FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
+          `SELECT nft_id, series_name, jersey_number, max_mint_size FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
           [allNftIds]
         );
         metaResult.rows.forEach(row => {
@@ -7072,6 +7204,9 @@ app.get("/api/sniper-deals", async (req, res) => {
           }
           if (row.jersey_number) {
             jerseyMapByNftId.set(row.nft_id, Number(row.jersey_number));
+          }
+          if (row.max_mint_size) {
+            maxMintMapByNftId.set(row.nft_id, Number(row.max_mint_size));
           }
         });
       } catch (e) {
@@ -7083,16 +7218,19 @@ app.get("/api/sniper-deals", async (req, res) => {
     if (allEditionIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT edition_id, series_name FROM nft_core_metadata_v2 WHERE edition_id = ANY($1::text[]) AND series_name IS NOT NULL`,
+          `SELECT edition_id, series_name, max_mint_size FROM nft_core_metadata_v2 WHERE edition_id = ANY($1::text[]) AND series_name IS NOT NULL`,
           [allEditionIds]
         );
         metaResult.rows.forEach(row => {
           if (row.series_name) {
             seriesMapByEditionId.set(row.edition_id, row.series_name);
           }
+          if (row.max_mint_size) {
+            maxMintMapByEditionId.set(row.edition_id, Number(row.max_mint_size));
+          }
         });
       } catch (e) {
-        sniperError("[Sniper] Error fetching series names by editionId:", e.message);
+        sniperError("[Sniper] Error fetching metadata by editionId:", e.message);
       }
     }
 
@@ -7166,9 +7304,17 @@ app.get("/api/sniper-deals", async (req, res) => {
         }
       }
 
-      // Fill in jerseyNumber if missing
       if (!enriched.jerseyNumber && enriched.nftId && jerseyMapByNftId.has(enriched.nftId)) {
         enriched.jerseyNumber = jerseyMapByNftId.get(enriched.nftId);
+      }
+
+      // Fill in maxMint if missing
+      if (!enriched.maxMint) {
+        if (enriched.nftId && maxMintMapByNftId.has(enriched.nftId)) {
+          enriched.maxMint = maxMintMapByNftId.get(enriched.nftId);
+        } else if (enriched.editionId && maxMintMapByEditionId.has(enriched.editionId)) {
+          enriched.maxMint = maxMintMapByEditionId.get(enriched.editionId);
+        }
       }
 
       // Always try to fill in avgSale if we have an editionId (even if it was previously null)
@@ -7197,6 +7343,9 @@ app.get("/api/sniper-deals", async (req, res) => {
 
       // Is jersey match (serial equals player's jersey number)
       enriched.isJerseyMatch = jersey && serial && serial === jersey;
+
+      // Is perfect serial (serial equals max mint size)
+      enriched.isPerfectSerial = enriched.maxMint && serial && serial === enriched.maxMint;
 
       // Low serial classifications
       enriched.isTop10 = serial && serial <= 10;

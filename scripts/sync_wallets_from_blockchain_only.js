@@ -105,31 +105,18 @@ async function syncWallet(walletAddress) {
       // They might still be locked, we just can't query them from the blockchain.
       const lockedCount = Array.from(existingLockedStatus.values()).filter(v => v === true).length;
 
-      if (lockedCount > 0) {
-        console.log(`[Blockchain Sync] ⚠️ Blockchain returned 0 NFTs but wallet has ${lockedCount} locked - preserving locked NFTs`);
-
-        // Only delete the UNLOCKED NFTs, keep the locked ones
-        const unlockedNftIds = currentResult.rows.filter(r => !r.is_locked).map(r => r.nft_id);
-        if (unlockedNftIds.length > 0) {
-          await pgQuery(
-            `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
-            [walletLower, unlockedNftIds]
-          );
-          console.log(`[Blockchain Sync] ✅ Removed ${unlockedNftIds.length} unlocked holdings, preserved ${lockedCount} locked`);
-        }
-        return { added: 0, removed: unlockedNftIds.length, current: lockedCount };
-      }
-
-      // Wallet truly has no NFTs (no locked ones either) - safe to delete all
+      // Only delete the UNLOCKED NFTs, keep the locked ones
       const deleteResult = await pgQuery(
-        `DELETE FROM wallet_holdings WHERE wallet_address = $1`,
+        `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND (is_locked IS NOT TRUE)`,
         [walletLower]
       );
 
       if (deleteResult.rowCount > 0) {
-        console.log(`[Blockchain Sync] ✅ Removed ${deleteResult.rowCount} holdings for empty wallet`);
+        console.log(`[Blockchain Sync] ✅ Removed ${deleteResult.rowCount} unlocked holdings, preserved ${lockedCount} locked`);
+      } else if (lockedCount > 0) {
+        console.log(`[Blockchain Sync] ⚠️ Wallet ${walletAddress.substring(0, 10)}... appears empty but has ${lockedCount} locked NFTs - preserving them`);
       }
-      return { added: 0, removed: deleteResult.rowCount || 0, current: 0 };
+      return { added: 0, removed: deleteResult.rowCount || 0, current: lockedCount };
     }
 
     const nftIdStrings = Array.from(allNFTs.keys());
@@ -176,7 +163,7 @@ async function syncWallet(walletAddress) {
       for (let i = 0; i < toAdd.length; i += BATCH_SIZE) {
         const batch = toAdd.slice(i, i + BATCH_SIZE);
         const values = batch.map((_, idx) =>
-          `($${idx * 3 + 1}, $${idx * 3 + 2}, $${idx * 3 + 3}, NOW())`
+          `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, NOW(), NOW())`
         ).join(', ');
 
         const params = batch.flatMap(nftId => {
@@ -185,11 +172,12 @@ async function syncWallet(walletAddress) {
         });
 
         await pgQuery(
-          `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_synced_at)
+          `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
            VALUES ${values}
            ON CONFLICT (wallet_address, nft_id) 
            DO UPDATE SET 
              is_locked = EXCLUDED.is_locked,
+             last_event_ts = COALESCE(wallet_holdings.last_event_ts, EXCLUDED.last_event_ts),
              last_synced_at = NOW()`,
           params
         );
@@ -226,7 +214,7 @@ async function syncWallet(walletAddress) {
     if (toRemove.length > 0) {
       await pgQuery(
         `DELETE FROM wallet_holdings 
-         WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+         WHERE wallet_address = $1 AND nft_id = ANY($2::text[]) AND (is_locked IS NOT TRUE)`,
         [walletLower, toRemove]
       );
     }
