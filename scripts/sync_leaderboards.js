@@ -14,11 +14,11 @@ async function syncLeaderboards() {
   const startedAt = Date.now();
   console.log("[Leaderboards] Starting sync...");
   const startTime = Date.now();
-  
+
   try {
     // 1. SYNC TOP_WALLETS_SNAPSHOT - Main leaderboard
     console.log("[Leaderboards] Syncing top_wallets_snapshot...");
-    
+
     await pgQuery(`
       CREATE TABLE IF NOT EXISTS top_wallets_snapshot (
         wallet_address TEXT PRIMARY KEY,
@@ -34,10 +34,10 @@ async function syncLeaderboards() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
-    
+
     // Truncate and repopulate
     await pgQuery(`TRUNCATE top_wallets_snapshot`);
-    
+
     await pgQuery(`
       INSERT INTO top_wallets_snapshot (
         wallet_address, display_name, total_moments, unlocked_moments, locked_moments,
@@ -56,18 +56,18 @@ async function syncLeaderboards() {
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
         NOW()
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       GROUP BY h.wallet_address, p.display_name
       HAVING COUNT(*) > 0
     `);
-    
+
     const topWalletsCount = await pgQuery(`SELECT COUNT(*)::int as cnt FROM top_wallets_snapshot`);
     console.log(`[Leaderboards] ✅ top_wallets_snapshot: ${topWalletsCount.rows[0].cnt} wallets`);
-    
+
     // 2. SYNC TOP_WALLETS_BY_TEAM_SNAPSHOT
     console.log("[Leaderboards] Syncing top_wallets_by_team_snapshot...");
-    
+
     await pgQuery(`
       CREATE TABLE IF NOT EXISTS top_wallets_by_team_snapshot (
         wallet_address TEXT,
@@ -83,9 +83,9 @@ async function syncLeaderboards() {
         PRIMARY KEY (wallet_address, team_name)
       )
     `);
-    
+
     await pgQuery(`TRUNCATE top_wallets_by_team_snapshot`);
-    
+
     await pgQuery(`
       INSERT INTO top_wallets_by_team_snapshot (
         wallet_address, team_name, display_name, total_moments,
@@ -103,19 +103,19 @@ async function syncLeaderboards() {
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
         NOW()
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE m.team_name IS NOT NULL AND m.team_name != ''
       GROUP BY h.wallet_address, m.team_name, p.display_name
       HAVING COUNT(*) > 0
     `);
-    
+
     const byTeamCount = await pgQuery(`SELECT COUNT(*)::int as cnt FROM top_wallets_by_team_snapshot`);
     console.log(`[Leaderboards] ✅ top_wallets_by_team_snapshot: ${byTeamCount.rows[0].cnt} entries`);
-    
+
     // 3. SYNC TOP_WALLETS_BY_TIER_SNAPSHOT
     console.log("[Leaderboards] Syncing top_wallets_by_tier_snapshot...");
-    
+
     await pgQuery(`
       CREATE TABLE IF NOT EXISTS top_wallets_by_tier_snapshot (
         wallet_address TEXT,
@@ -131,9 +131,9 @@ async function syncLeaderboards() {
         PRIMARY KEY (wallet_address, tier)
       )
     `);
-    
+
     await pgQuery(`TRUNCATE top_wallets_by_tier_snapshot`);
-    
+
     await pgQuery(`
       INSERT INTO top_wallets_by_tier_snapshot (
         wallet_address, tier, display_name, total_moments,
@@ -151,18 +151,18 @@ async function syncLeaderboards() {
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
         NOW()
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       GROUP BY h.wallet_address, LOWER(COALESCE(m.tier, 'unknown')), p.display_name
       HAVING COUNT(*) > 0
     `);
-    
+
     const byTierCount = await pgQuery(`SELECT COUNT(*)::int as cnt FROM top_wallets_by_tier_snapshot`);
     console.log(`[Leaderboards] ✅ top_wallets_by_tier_snapshot: ${byTierCount.rows[0].cnt} entries`);
-    
+
     // 4. SYNC TOP_WALLETS_BY_VALUE_SNAPSHOT
     console.log("[Leaderboards] Syncing top_wallets_by_value_snapshot...");
-    
+
     await pgQuery(`
       CREATE TABLE IF NOT EXISTS top_wallets_by_value_snapshot (
         wallet_address TEXT PRIMARY KEY,
@@ -178,9 +178,9 @@ async function syncLeaderboards() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
-    
+
     await pgQuery(`TRUNCATE top_wallets_by_value_snapshot`);
-    
+
     await pgQuery(`
       INSERT INTO top_wallets_by_value_snapshot (
         wallet_address, display_name, total_moments,
@@ -200,19 +200,19 @@ async function syncLeaderboards() {
         COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric as asp_value,
         NOW()
       FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id
       GROUP BY h.wallet_address, p.display_name
       HAVING COUNT(*) > 0
     `);
-    
+
     const byValueCount = await pgQuery(`SELECT COUNT(*)::int as cnt FROM top_wallets_by_value_snapshot`);
     console.log(`[Leaderboards] ✅ top_wallets_by_value_snapshot: ${byValueCount.rows[0].cnt} wallets`);
-    
+
     const elapsed = Date.now() - startTime;
     console.log(`[Leaderboards] ✅ Sync completed in ${elapsed}ms`);
-    
+
     return {
       topWallets: topWalletsCount.rows[0].cnt,
       byTeam: byTeamCount.rows[0].cnt,
@@ -220,7 +220,7 @@ async function syncLeaderboards() {
       byValue: byValueCount.rows[0].cnt,
       elapsed
     };
-    
+
   } catch (err) {
     console.error("[Leaderboards] ❌ Error:", err.message);
     throw err;
