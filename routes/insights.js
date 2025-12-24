@@ -248,7 +248,7 @@ export async function refreshInsightsSnapshot() {
           COALESCE(t.display_name, h.wallet_address) AS name,
           COUNT(*)::bigint AS moment_count,
           ROUND(SUM(COALESCE(e.lowest_ask_usd, 0))::numeric, 2) AS floor_value
-        FROM wallet_holdings h
+        FROM holdings h
         JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         LEFT JOIN edition_price_scrape e ON e.edition_id = m.edition_id
         LEFT JOIN top_wallets_snapshot t ON t.wallet_address = h.wallet_address

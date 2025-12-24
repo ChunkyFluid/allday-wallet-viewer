@@ -39,17 +39,15 @@ async function upload() {
     const nftIds = myRecords.map(r => r.NFT_ID || r.nft_id || r.id);
 
     console.log('[3/5] Resetting YOUR wallet locked status...');
-    await pgQuery('UPDATE wallet_holdings SET is_locked = false WHERE wallet_address = $1', [walletLower]);
     await pgQuery('UPDATE holdings SET is_locked = false WHERE wallet_address = $1', [walletLower]);
     console.log('      ✅ Reset complete\n');
 
     console.log('[4/5] Setting locked status for your NFTs...');
-    await pgQuery('UPDATE wallet_holdings SET is_locked = true WHERE wallet_address = $1 AND nft_id = ANY($2)', [walletLower, nftIds]);
     await pgQuery('UPDATE holdings SET is_locked = true WHERE wallet_address = $1 AND nft_id = ANY($2)', [walletLower, nftIds]);
     console.log('      ✅ Updated\n');
 
     console.log('[5/5] Verification...');
-    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM wallet_holdings WHERE wallet_address = $1', [walletLower]);
+    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM holdings WHERE wallet_address = $1', [walletLower]);
     console.log(`      ✅ Your wallet has ${check.rows[0].locked} locked NFTs\n`);
 
     console.log('=== COMPLETE ===\n');

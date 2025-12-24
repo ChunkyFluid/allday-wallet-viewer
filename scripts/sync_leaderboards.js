@@ -55,7 +55,7 @@ async function syncLeaderboards() {
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int as tier_legendary,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
         NOW()
-      FROM wallet_holdings h
+      FROM holdings h
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE h.wallet_address NOT IN (
@@ -106,7 +106,7 @@ async function syncLeaderboards() {
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int as tier_legendary,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
         NOW()
-      FROM wallet_holdings h
+      FROM holdings h
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE m.team_name IS NOT NULL AND m.team_name != ''
@@ -277,7 +277,7 @@ async function syncLeaderboards() {
         COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric as floor_value,
         COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric as asp_value,
         NOW()
-      FROM wallet_holdings h
+      FROM holdings h
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id

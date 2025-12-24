@@ -136,7 +136,7 @@ export function registerSetRoutes(app) {
           COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'RARE' THEN m.edition_id END) as rare,
           COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'LEGENDARY' THEN m.edition_id END) as legendary,
           COUNT(DISTINCT CASE WHEN UPPER(m.tier) = 'ULTIMATE' THEN m.edition_id END) as ultimate
-        FROM wallet_holdings h
+        FROM holdings h
         JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         WHERE h.wallet_address = $1 AND m.set_name IS NOT NULL
         GROUP BY m.set_name
@@ -151,7 +151,7 @@ export function registerSetRoutes(app) {
                 `
         WITH owned AS (
           SELECT DISTINCT m.edition_id
-          FROM wallet_holdings h
+          FROM holdings h
           JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
           WHERE h.wallet_address = $1
         ),
@@ -209,7 +209,7 @@ export function registerSetRoutes(app) {
             const teamOwnedRes = await pgQuery(
                 `
         SELECT m.team_name, COUNT(DISTINCT m.edition_id) AS owned_editions
-        FROM wallet_holdings h
+        FROM holdings h
         JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         WHERE h.wallet_address = $1 AND m.team_name IS NOT NULL AND m.team_name <> ''
         GROUP BY m.team_name;

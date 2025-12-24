@@ -86,14 +86,14 @@ async function syncNewNFTMetadata(connection) {
     const db = process.env.SNOWFLAKE_DATABASE;
     const schema = process.env.SNOWFLAKE_SCHEMA;
 
-    // Strategy: Find NFT IDs in wallet_holdings that don't have metadata yet
+    // Strategy: Find NFT IDs in holdings that don't have metadata yet
     // This is smarter than full table scan - only sync what we need
     console.log(`[NFT Metadata] Finding NFTs missing metadata...`);
 
     const missingResult = await pgQuery(`
-    SELECT DISTINCT wh.nft_id
-    FROM wallet_holdings wh
-    LEFT JOIN nft_core_metadata m ON m.nft_id = wh.nft_id
+    SELECT DISTINCT h.nft_id
+    FROM holdings h
+    LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
     WHERE m.nft_id IS NULL
     LIMIT ${BATCH_SIZE}
   `);
@@ -235,7 +235,7 @@ async function syncHoldingsChanges(connection) {
 
     if (rows.length === 0) {
         const duration = Date.now() - startTime;
-        await updateSyncStatus('wallet_holdings', null, 0, duration);
+        await updateSyncStatus('holdings', null, 0, duration);
         return { count: 0, duration };
     }
 
@@ -274,11 +274,11 @@ async function syncHoldingsChanges(connection) {
         if (valueLiterals.length === 0) continue;
 
         const insertSql = `
-      INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts)
+      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
       VALUES ${valueLiterals.join(',')}
       ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
         is_locked = EXCLUDED.is_locked,
-        last_event_ts = COALESCE(EXCLUDED.last_event_ts, wallet_holdings.last_event_ts),
+        acquired_at = COALESCE(EXCLUDED.acquired_at, holdings.acquired_at),
         last_synced_at = NOW()
     `;
 
@@ -291,7 +291,7 @@ async function syncHoldingsChanges(connection) {
     }
 
     const duration = Date.now() - startTime;
-    await updateSyncStatus('wallet_holdings', null, inserted, duration);
+    await updateSyncStatus('holdings', null, inserted, duration);
 
     console.log(`[Holdings] ✅ Synced ${inserted} records in ${(duration / 1000).toFixed(1)}s`);
     return { count: inserted, duration };
@@ -306,9 +306,9 @@ async function syncNewAccounts(connection) {
     let query;
     if (refreshUsernames) {
         query = `
-      SELECT DISTINCT wh.wallet_address
-      FROM wallet_holdings wh
-      LEFT JOIN wallet_profiles wp ON wp.wallet_address = wh.wallet_address
+      SELECT DISTINCT h.wallet_address
+      FROM holdings h
+      LEFT JOIN wallet_profiles wp ON wp.wallet_address = h.wallet_address
       WHERE wp.wallet_address IS NULL
          OR wp.display_name IS NULL
       LIMIT 1000
@@ -316,9 +316,9 @@ async function syncNewAccounts(connection) {
         console.log(`[Accounts] Including wallets with NULL usernames (--refresh-usernames)`);
     } else {
         query = `
-      SELECT DISTINCT wh.wallet_address
-      FROM wallet_holdings wh
-      LEFT JOIN wallet_profiles wp ON wp.wallet_address = wh.wallet_address
+      SELECT DISTINCT h.wallet_address
+      FROM holdings h
+      LEFT JOIN wallet_profiles wp ON wp.wallet_address = h.wallet_address
       WHERE wp.wallet_address IS NULL
       LIMIT 1000
     `;
@@ -359,19 +359,19 @@ async function syncSingleWallet(walletAddress, connection) {
     }
 
     // 2. Insert/update holdings in database
-    console.log(`[Wallet Sync] Updating wallet_holdings table...`);
+    console.log(`[Wallet Sync] Updating holdings table...`);
     let holdingsInserted = 0;
 
     const nftIdStrings = nftIds.map(id => id.toString());
     const valueLiterals = nftIdStrings.map(nftId => {
         const waLit = `'${wallet.replace(/'/g, "''")}'`;
         const nftLit = `'${nftId.replace(/'/g, "''")}'`;
-        return `(${waLit}, ${nftLit}, FALSE, NOW())`;
+        return `(${waLit}, ${nftLit}, FALSE, NOW(), NOW())`;
     });
 
     if (valueLiterals.length > 0) {
         const insertSql = `
-      INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts)
+      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
       VALUES ${valueLiterals.join(',')}
       ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
         last_synced_at = NOW()
@@ -535,11 +535,11 @@ async function syncPrices(connection) {
     );
   `);
 
-    // Get edition IDs from wallet holdings that need prices
+    // Get edition IDs from holdings that need prices
     const editionsResult = await pgQuery(`
     SELECT DISTINCT m.edition_id
-    FROM wallet_holdings w
-    JOIN nft_core_metadata m ON m.nft_id = w.nft_id
+    FROM holdings h
+    JOIN nft_core_metadata m ON m.nft_id = h.nft_id
     WHERE m.edition_id IS NOT NULL
     AND m.edition_id ~ '^[0-9]+$'
   `);

@@ -32,7 +32,7 @@ async function computeRarityScore(walletAddress) {
         `SELECT 
       h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
       m.first_name, m.last_name, m.edition_id
-    FROM wallet_holdings h
+    FROM holdings h
     JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
     WHERE h.wallet_address = $1`,
         [walletAddress]
@@ -126,7 +126,7 @@ export function registerRarityRoutes(app) {
             // Exclude known contract/holding addresses
             const walletsResult = await pgQuery(`
         SELECT wallet_address, COUNT(*) as moment_count
-        FROM wallet_holdings
+        FROM holdings
         WHERE wallet_address NOT IN (${EXCLUDED_LEADERBOARD_WALLETS.map((_, i) => `$${i + 1}`).join(', ')})
         GROUP BY wallet_address
         HAVING COUNT(*) >= 10
@@ -169,7 +169,7 @@ export function registerRarityRoutes(app) {
                 if (missingWallets.length > 0) {
                     const holdingsNames = await pgQuery(`
             SELECT DISTINCT ON (wallet_address) wallet_address, display_name 
-            FROM wallet_holdings 
+            FROM holdings 
             WHERE wallet_address = ANY($1) AND display_name IS NOT NULL AND display_name != ''
           `, [missingWallets]);
                     for (const r of holdingsNames.rows) {
@@ -223,7 +223,7 @@ export function registerRarityRoutes(app) {
                 `SELECT 
           h.nft_id, m.serial_number, m.jersey_number, m.tier, m.max_mint_size,
           m.first_name, m.last_name
-        FROM wallet_holdings h
+        FROM holdings h
         JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         WHERE h.wallet_address = $1`,
                 [wallet]

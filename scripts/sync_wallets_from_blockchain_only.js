@@ -87,7 +87,7 @@ async function syncWallet(walletAddress) {
 
     // Get current holdings from database first (to preserve locked status if needed)
     const currentResult = await pgQuery(
-      `SELECT nft_id, is_locked FROM wallet_holdings WHERE wallet_address = $1`,
+      `SELECT nft_id, is_locked FROM holdings WHERE wallet_address = $1`,
       [walletLower]
     );
 
@@ -107,7 +107,7 @@ async function syncWallet(walletAddress) {
 
       // Only delete the UNLOCKED NFTs, keep the locked ones
       const deleteResult = await pgQuery(
-        `DELETE FROM wallet_holdings WHERE wallet_address = $1 AND (is_locked IS NOT TRUE)`,
+        `DELETE FROM holdings WHERE wallet_address = $1 AND (is_locked IS NOT TRUE)`,
         [walletLower]
       );
 
@@ -172,12 +172,11 @@ async function syncWallet(walletAddress) {
         });
 
         await pgQuery(
-          `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+          `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
            VALUES ${values}
            ON CONFLICT (wallet_address, nft_id) 
            DO UPDATE SET 
              is_locked = EXCLUDED.is_locked,
-             last_event_ts = COALESCE(wallet_holdings.last_event_ts, EXCLUDED.last_event_ts),
              last_synced_at = NOW()`,
           params
         );
@@ -189,7 +188,7 @@ async function syncWallet(walletAddress) {
       for (const nftId of toUpdateLocked) {
         const nftData = allNFTs.get(nftId) || { is_locked: false };
         await pgQuery(
-          `UPDATE wallet_holdings 
+          `UPDATE holdings 
            SET is_locked = $1, last_synced_at = NOW()
            WHERE wallet_address = $2 AND nft_id = $3`,
           [nftData.is_locked, walletLower, nftId]
@@ -203,7 +202,7 @@ async function syncWallet(walletAddress) {
     );
     if (unchanged.length > 0) {
       await pgQuery(
-        `UPDATE wallet_holdings 
+        `UPDATE holdings 
          SET last_synced_at = NOW()
          WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
         [walletLower, unchanged]
@@ -213,7 +212,7 @@ async function syncWallet(walletAddress) {
     // Remove NFTs no longer in wallet
     if (toRemove.length > 0) {
       await pgQuery(
-        `DELETE FROM wallet_holdings 
+        `DELETE FROM holdings 
          WHERE wallet_address = $1 AND nft_id = ANY($2::text[]) AND (is_locked IS NOT TRUE)`,
         [walletLower, toRemove]
       );
@@ -296,7 +295,7 @@ async function syncRecentWallets() {
 
   const result = await pgQuery(
     `SELECT DISTINCT wallet_address 
-     FROM wallet_holdings 
+     FROM holdings 
      WHERE last_synced_at > NOW() - INTERVAL '24 hours'
      ORDER BY wallet_address
      LIMIT 500`
@@ -321,7 +320,7 @@ async function syncStaleWallets() {
 
   const result = await pgQuery(
     `SELECT wallet_address, MIN(last_synced_at) as oldest_sync
-     FROM wallet_holdings 
+     FROM holdings 
      WHERE last_synced_at < NOW() - INTERVAL '1 hour'
         OR last_synced_at IS NULL
      GROUP BY wallet_address
@@ -347,7 +346,7 @@ async function syncAllWallets() {
   console.log("[Blockchain Sync] Getting all wallets from database...");
 
   const result = await pgQuery(
-    `SELECT DISTINCT wallet_address FROM wallet_holdings ORDER BY wallet_address`
+    `SELECT DISTINCT wallet_address FROM holdings ORDER BY wallet_address`
   );
 
   const wallets = result.rows.map(r => r.wallet_address);

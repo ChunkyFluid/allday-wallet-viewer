@@ -257,14 +257,9 @@ export async function handleMomentNFTBurned(event, payload) {
             // Silently skip if nfts table doesn't exist
         });
 
-        // Also remove from holdings (New schema)
+        // Also remove from holdings
         await pgQuery(`
       DELETE FROM holdings WHERE nft_id = $1
-    `, [nftId]);
-
-        // Also remove from wallet_holdings (Legacy schema sync)
-        await pgQuery(`
-      DELETE FROM wallet_holdings WHERE nft_id = $1
     `, [nftId]);
 
         console.log(`[Event] ✅ MomentNFTBurned: NFT ${nftId} (Removed from all holdings)`);
@@ -353,9 +348,8 @@ export async function handleNFTLocked(event, payload) {
     }
 
     try {
-        // Update is_locked in both tables (new and legacy)
+        // Update is_locked in holdings table
         await pgQuery(`UPDATE holdings SET is_locked = TRUE WHERE nft_id = $1`, [nftId]);
-        await pgQuery(`UPDATE wallet_holdings SET is_locked = TRUE WHERE nft_id = $1`, [nftId]);
 
         console.log(`[Event] ✅ NFTLocked: NFT ${nftId}`);
     } catch (err) {
@@ -374,9 +368,8 @@ export async function handleNFTUnlocked(event, payload) {
     }
 
     try {
-        // Update is_locked in both tables (new and legacy)
+        // Update is_locked in holdings table
         await pgQuery(`UPDATE holdings SET is_locked = FALSE WHERE nft_id = $1`, [nftId]);
-        await pgQuery(`UPDATE wallet_holdings SET is_locked = FALSE WHERE nft_id = $1`, [nftId]);
 
         console.log(`[Event] ✅ NFTUnlocked: NFT ${nftId}`);
     } catch (err) {

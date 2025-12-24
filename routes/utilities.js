@@ -30,7 +30,7 @@ export function registerUtilityRoutes(app) {
           m.nft_id, m.first_name, m.last_name, m.team_name, m.tier, m.set_name,
           m.serial_number, m.jersey_number, m.series_name, m.position,
           p.display_name
-        FROM wallet_holdings h
+        FROM holdings h
         JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
         WHERE m.serial_number = $1
@@ -123,7 +123,7 @@ export function registerUtilityRoutes(app) {
           COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int as legendary,
           COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int as ultimate,
           COALESCE(SUM(eps.lowest_ask_usd), 0)::numeric as floor_value
-        FROM wallet_holdings h
+        FROM holdings h
         LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
         LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
         LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id
@@ -143,11 +143,11 @@ export function registerUtilityRoutes(app) {
             const sharedResult = await pgQuery(
                 `SELECT COUNT(DISTINCT m1.edition_id)::int as shared_editions,
                 COUNT(DISTINCT CONCAT(m1.first_name, m1.last_name))::int as shared_players
-         FROM wallet_holdings h1
+         FROM holdings h1
          JOIN nft_core_metadata_v2 m1 ON m1.nft_id = h1.nft_id
          WHERE h1.wallet_address = $1
            AND m1.edition_id IN (
-             SELECT m2.edition_id FROM wallet_holdings h2
+             SELECT m2.edition_id FROM holdings h2
              JOIN nft_core_metadata_v2 m2 ON m2.nft_id = h2.nft_id
              WHERE h2.wallet_address = $2
            )`,

@@ -772,6 +772,7 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
                 ${isDefault ? '✓ Default' : '⭐ Set Default'}
               </button>
             ` : ''}
+            <!-- DISABLED: Refresh button removed due to data corruption issues
             <button id="btn-refresh-wallet" 
                     type="button"
                     class="btn-secondary" 
@@ -779,6 +780,7 @@ window.fetchWalletSummary = async function fetchWalletSummary(wallet) {
                     title="Refresh wallet holdings from blockchain">
               🔄 Refresh
             </button>
+            -->
           </div>
         </div>
         <div class="wallet-summary-chips mobile-hidden" style="margin-top: 0.5rem; text-align: left;">

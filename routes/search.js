@@ -67,7 +67,7 @@ export function registerSearchRoutes(app) {
           m.jersey_number,
           h.wallet_address, p.display_name as owner_name
         FROM nft_core_metadata_v2 m
-        LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
+        LEFT JOIN holdings h ON h.nft_id = m.nft_id
         LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
         WHERE ${whereClause}
         ORDER BY 
@@ -114,7 +114,7 @@ export function registerSearchRoutes(app) {
           m.jersey_number,
           h.wallet_address, p.display_name as owner_name
         FROM nft_core_metadata_v2 m
-        LEFT JOIN wallet_holdings h ON h.nft_id = m.nft_id
+        LEFT JOIN holdings h ON h.nft_id = m.nft_id
         LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
         WHERE 
           CONCAT(COALESCE(m.first_name,''), ' ', COALESCE(m.last_name,'')) ILIKE $1

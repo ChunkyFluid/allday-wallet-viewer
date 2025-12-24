@@ -22,7 +22,7 @@ import { registerRarityRoutes } from "./routes/rarity.js";
 import { registerSetRoutes } from "./routes/sets.js";
 import { registerUtilityRoutes } from "./routes/utilities.js";
 import { registerAnalyticsRoutes, initVisitCounterTable } from "./routes/analytics.js";
-import { registerInsightsRoutes } from "./routes/insights.js";
+import { registerInsightsRoutes, ensureInsightsSnapshotTable } from "./routes/insights.js";
 
 
 
@@ -511,7 +511,7 @@ async function processFlowEvent(event) {
     // Process event for new normalized tables (series, sets, plays, editions, nfts, holdings)
     await eventProcessor.processBlockchainEvent(event);
 
-    // Update legacy wallet_holdings table in real-time (keep for backward compatibility)
+    // Update holdings table in real-time
     if (nftId && eventType === 'Deposit' && toAddr) {
       await updateWalletHoldingOnDeposit(toAddr, nftId, timestamp, blockHeight);
     } else if (nftId && eventType === 'Withdraw' && fromAddr) {
@@ -588,23 +588,22 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
     // 1. Remove from ANY other wallet (Transfer logic)
     // This is safer than deleting on Withdraw because it preserves locked NFTs during the lock process.
     await pgQuery(
-      `DELETE FROM wallet_holdings WHERE nft_id = $1 AND wallet_address != $2`,
+      `DELETE FROM holdings WHERE nft_id = $1 AND wallet_address != $2`,
       [nftId.toString(), walletAddr]
     );
 
     // 2. Upsert: add NFT to new wallet holdings
     await pgQuery(
-      `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
-       VALUES ($1, $2, $3, $4, NOW())
+      `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (wallet_address, nft_id) 
        DO UPDATE SET 
          is_locked = FALSE,
-         last_event_ts = CASE 
-           WHEN wallet_holdings.last_event_ts IS NULL OR wallet_holdings.last_event_ts < EXCLUDED.last_event_ts 
-           THEN EXCLUDED.last_event_ts 
-           ELSE wallet_holdings.last_event_ts 
-         END,
-         last_synced_at = NOW()`,
+         acquired_at = CASE 
+           WHEN holdings.acquired_at IS NULL OR holdings.acquired_at < EXCLUDED.acquired_at 
+           THEN EXCLUDED.acquired_at 
+           ELSE holdings.acquired_at 
+         END`,
       [walletAddr, nftId.toString(), false, ts]
     );
 
@@ -814,7 +813,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
     if (!nftIds || nftIds.length === 0) {
       // Wallet has no NFTs - remove all holdings
       const deleteResult = await pgQuery(
-        `DELETE FROM wallet_holdings WHERE wallet_address = $1`,
+        `DELETE FROM holdings WHERE wallet_address = $1`,
         [walletAddr]
       );
 
@@ -830,7 +829,7 @@ app.post("/api/wallet/refresh", async (req, res) => {
 
     // Get current holdings from database
     const currentResult = await pgQuery(
-      `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1`,
+      `SELECT nft_id FROM holdings WHERE wallet_address = $1`,
       [walletAddr]
     );
     const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
@@ -853,13 +852,12 @@ app.post("/api/wallet/refresh", async (req, res) => {
       const params = toAdd.flatMap(nftId => [walletAddr, nftId.toString(), false, now]);
 
       await pgQuery(
-        `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+        `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
          VALUES ${values}
          ON CONFLICT (wallet_address, nft_id) 
          DO UPDATE SET 
            is_locked = FALSE,
-           last_event_ts = EXCLUDED.last_event_ts,
-           last_synced_at = NOW()`,
+           acquired_at = EXCLUDED.acquired_at`,
         params
       );
       added = toAdd.length;
@@ -869,8 +867,8 @@ app.post("/api/wallet/refresh", async (req, res) => {
     let removed = 0;
     if (toRemove.length > 0) {
       const result = await pgQuery(
-        `DELETE FROM wallet_holdings 
-         WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+        `DELETE FROM holdings 
+         WHERE wallet_address = $1 AND nft_id = ANY($2:: text[])`,
         [walletAddr, toRemove]
       );
       removed = result.rowCount;
@@ -884,14 +882,14 @@ app.post("/api/wallet/refresh", async (req, res) => {
 
     // Check which NFTs are missing metadata
     const metadataCheck = await pgQuery(
-      `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
+      `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1:: text[])`,
       [nftIdsArray]
     );
     const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
     const missingMetadata = nftIdsArray.filter(id => !existingMetadata.has(id));
 
     if (missingMetadata.length > 0) {
-      console.log(`[Wallet Refresh] Fetching metadata for ${missingMetadata.length} NFTs missing metadata...`);
+      console.log(`[Wallet Refresh]Fetching metadata for ${missingMetadata.length} NFTs missing metadata...`);
 
       // Fetch in parallel but limit concurrency
       const BATCH_SIZE = 10;
@@ -990,13 +988,14 @@ app.post("/api/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    // const passwordHash = "DISABLED_BCRYPT_MISSING";
 
     const insertSql = `
-      INSERT INTO public.users (email, password_hash)
-      VALUES ($1, $2)
-      ON CONFLICT (email) DO NOTHING
+      INSERT INTO public.users(email, password_hash)
+VALUES($1, $2)
+      ON CONFLICT(email) DO NOTHING
       RETURNING id, email, created_at;
-    `;
+`;
     const { rows } = await pool.query(insertSql, [email.toLowerCase(), passwordHash]);
 
     if (!rows.length) {
@@ -1039,7 +1038,7 @@ app.post("/api/login", async (req, res) => {
       FROM public.users
       WHERE email = $1
       LIMIT 1;
-    `;
+`;
     const { rows } = await pool.query(selectSql, [email.toLowerCase()]);
 
     if (!rows.length) {
@@ -1049,6 +1048,7 @@ app.post("/api/login", async (req, res) => {
     const user = rows[0];
 
     const match = await bcrypt.compare(password, user.password_hash);
+    // const match = false; console.error("Login disabled: bcrypt missing");
     if (!match) {
       return res.status(401).json({ ok: false, error: "Invalid email or password." });
     }
@@ -1120,7 +1120,7 @@ app.post("/api/me/wallet", async (req, res) => {
       SET default_wallet_address = $1
       WHERE id = $2
       RETURNING id, email, default_wallet_address;
-      `,
+`,
       [wallet_address, sessUser.id]
     );
 
@@ -1169,7 +1169,7 @@ app.post("/api/me/name", async (req, res) => {
       SET display_name = $1
       WHERE id = $2
       RETURNING id, email, display_name, default_wallet_address;
-      `,
+`,
       [display_name, sessUser.id]
     );
 
@@ -1225,12 +1225,14 @@ app.post("/api/me/password", async (req, res) => {
     // Verify current password
     const bcrypt = require("bcrypt");
     const valid = await bcrypt.compare(current_password, userRows[0].password_hash);
+    // const valid = false;
     if (!valid) {
       return res.status(400).json({ ok: false, error: "Current password is incorrect" });
     }
 
     // Hash new password and update
     const newHash = await bcrypt.hash(new_password, 10);
+    // const newHash = "DISABLED";
     await pool.query(
       `UPDATE public.users SET password_hash = $1 WHERE id = $2`,
       [newHash, sessUser.id]
@@ -1285,7 +1287,7 @@ app.get("/api/wallet-profile", async (req, res) => {
       SELECT wallet_address, display_name
       FROM wallet_profiles
       WHERE wallet_address = $1
-      `,
+  `,
       [wallet]
     );
 
@@ -1314,7 +1316,7 @@ app.get("/api/search-profiles", async (req, res) => {
     }
 
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    const pattern = `%${qRaw}%`;
+    const pattern = `% ${qRaw}% `;
     const result = await pgQuery(
       `
       SELECT wallet_address, display_name
@@ -1322,7 +1324,7 @@ app.get("/api/search-profiles", async (req, res) => {
       WHERE display_name ILIKE $1
       ORDER BY display_name ASC, wallet_address ASC
       LIMIT $2;
-      `,
+`,
       [pattern, limit]
     );
 
@@ -1365,7 +1367,7 @@ app.get("/api/search-editions", async (req, res) => {
     if (player) {
       conditionsSnapshot.push(`LOWER(first_name || ' ' || last_name) LIKE LOWER($${idx})`);
       conditionsLive.push(`LOWER(e.first_name || ' ' || e.last_name) LIKE LOWER($${idx})`);
-      params.push(`%${player}%`);
+      params.push(`% ${player}% `);
       idx++;
     }
 
@@ -1378,66 +1380,66 @@ app.get("/api/search-editions", async (req, res) => {
 
     // Tier filter (multi-select)
     if (tiers.length > 0) {
-      const placeholders = tiers.map((_, i) => `$${idx + i}`).join(', ');
-      conditionsSnapshot.push(`LOWER(tier) IN (${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
-      conditionsLive.push(`LOWER(e.tier) IN (${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
+      const placeholders = tiers.map((_, i) => `$${idx + i} `).join(', ');
+      conditionsSnapshot.push(`LOWER(tier) IN(${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
+      conditionsLive.push(`LOWER(e.tier) IN(${placeholders.split(', ').map(p => `LOWER(${p})`).join(', ')})`);
       params.push(...tiers);
       idx += tiers.length;
     }
 
     // Series filter (multi-select)
     if (seriesList.length > 0) {
-      const placeholders = seriesList.map((_, i) => `$${idx + i}`).join(', ');
-      conditionsSnapshot.push(`series_name IN (${placeholders})`);
-      conditionsLive.push(`e.series_name IN (${placeholders})`);
+      const placeholders = seriesList.map((_, i) => `$${idx + i} `).join(', ');
+      conditionsSnapshot.push(`series_name IN(${placeholders})`);
+      conditionsLive.push(`e.series_name IN(${placeholders})`);
       params.push(...seriesList);
       idx += seriesList.length;
     }
 
     // Set filter (multi-select)
     if (sets.length > 0) {
-      const placeholders = sets.map((_, i) => `$${idx + i}`).join(', ');
-      conditionsSnapshot.push(`set_name IN (${placeholders})`);
-      conditionsLive.push(`e.set_name IN (${placeholders})`);
+      const placeholders = sets.map((_, i) => `$${idx + i} `).join(', ');
+      conditionsSnapshot.push(`set_name IN(${placeholders})`);
+      conditionsLive.push(`e.set_name IN(${placeholders})`);
       params.push(...sets);
       idx += sets.length;
     }
 
     // Position filter (multi-select)
     if (positions.length > 0) {
-      const placeholders = positions.map((_, i) => `$${idx + i}`).join(', ');
-      conditionsSnapshot.push(`position IN (${placeholders})`);
-      conditionsLive.push(`e.position IN (${placeholders})`);
+      const placeholders = positions.map((_, i) => `$${idx + i} `).join(', ');
+      conditionsSnapshot.push(`position IN(${placeholders})`);
+      conditionsLive.push(`e.position IN(${placeholders})`);
       params.push(...positions);
       idx += positions.length;
     }
 
-    const whereClauseSnapshot = conditionsSnapshot.length ? `WHERE ${conditionsSnapshot.join(" AND ")}` : "";
-    const whereClauseLive = conditionsLive.length ? `WHERE ${conditionsLive.join(" AND ")}` : "";
+    const whereClauseSnapshot = conditionsSnapshot.length ? `WHERE ${conditionsSnapshot.join(" AND ")} ` : "";
+    const whereClauseLive = conditionsLive.length ? `WHERE ${conditionsLive.join(" AND ")} ` : "";
 
     // Try snapshot table first, fall back to live query if it doesn't exist
     let sql = `
-      SELECT
-        edition_id,
-        first_name,
-        last_name,
-        team_name,
-        position,
-        tier,
-        series_name,
-        set_name,
-        max_mint_size,
-        total_moments,
-        min_serial,
-        max_serial,
-        lowest_ask_usd,
-        avg_sale_usd,
-        top_sale_usd
+SELECT
+edition_id,
+  first_name,
+  last_name,
+  team_name,
+  position,
+  tier,
+  series_name,
+  set_name,
+  max_mint_size,
+  total_moments,
+  min_serial,
+  max_serial,
+  lowest_ask_usd,
+  avg_sale_usd,
+  top_sale_usd
       FROM editions_snapshot
       ${whereClauseSnapshot}
       ORDER BY last_name NULLS LAST, first_name NULLS LAST, edition_id
       LIMIT $${idx};
-    `;
+`;
 
     params.push(safeLimit);
 
@@ -1454,29 +1456,29 @@ app.get("/api/search-editions", async (req, res) => {
 
         // Use live query with GROUP BY
         sql = `
-          SELECT
-            e.edition_id,
-            MAX(e.first_name) AS first_name,
-            MAX(e.last_name) AS last_name,
-            MAX(e.team_name) AS team_name,
-            MAX(e.position) AS position,
-            MAX(e.tier) AS tier,
+SELECT
+e.edition_id,
+  MAX(e.first_name) AS first_name,
+    MAX(e.last_name) AS last_name,
+      MAX(e.team_name) AS team_name,
+        MAX(e.position) AS position,
+          MAX(e.tier) AS tier,
             MAX(e.series_name) AS series_name,
-            MAX(e.set_name) AS set_name,
-            MAX(e.max_mint_size) AS max_mint_size,
-            COUNT(*) AS total_moments,
-            MIN(e.serial_number) AS min_serial,
-            MAX(e.serial_number) AS max_serial,
-            eps.lowest_ask_usd,
-            eps.avg_sale_usd,
-            eps.top_sale_usd
+              MAX(e.set_name) AS set_name,
+                MAX(e.max_mint_size) AS max_mint_size,
+                  COUNT(*) AS total_moments,
+                    MIN(e.serial_number) AS min_serial,
+                      MAX(e.serial_number) AS max_serial,
+                        eps.lowest_ask_usd,
+                        eps.avg_sale_usd,
+                        eps.top_sale_usd
           FROM nft_core_metadata_v2 e
           LEFT JOIN public.edition_price_scrape eps ON eps.edition_id = e.edition_id
           ${whereClauseLive}
           GROUP BY e.edition_id, eps.lowest_ask_usd, eps.avg_sale_usd, eps.top_sale_usd
           ORDER BY MAX(e.last_name) NULLS LAST, MAX(e.first_name) NULLS LAST, e.edition_id
           LIMIT $${idx};
-        `;
+`;
 
         params.push(safeLimit);
         result = await pgQuery(sql, params);
@@ -1508,23 +1510,23 @@ app.get("/api/edition-moments", async (req, res) => {
     }
 
     const sql = `
-      SELECT
-        nft_id,
-        edition_id,
-        serial_number,
-        max_mint_size,
-        first_name,
-        last_name,
-        team_name,
-        position,
-        tier,
-        series_name,
-        set_name
+SELECT
+nft_id,
+  edition_id,
+  serial_number,
+  max_mint_size,
+  first_name,
+  last_name,
+  team_name,
+  position,
+  tier,
+  series_name,
+  set_name
       FROM nft_core_metadata_v2
       WHERE edition_id = $1
       ORDER BY serial_number NULLS LAST, nft_id
       LIMIT 1000;
-    `;
+`;
 
     const result = await pgQuery(sql, [editionId]);
 
@@ -1556,11 +1558,11 @@ app.get("/api/search-moments", async (req, res) => {
 
     if (player) {
       conditions.push(`LOWER(first_name || ' ' || last_name) LIKE LOWER($${idx++})`);
-      params.push(`%${player}%`);
+      params.push(`% ${player}% `);
     }
 
     if (team) {
-      conditions.push(`team_name = $${idx++}`);
+      conditions.push(`team_name = $${idx++} `);
       params.push(team);
     }
 
@@ -1570,41 +1572,41 @@ app.get("/api/search-moments", async (req, res) => {
     }
 
     if (series) {
-      conditions.push(`series_name = $${idx++}`);
+      conditions.push(`series_name = $${idx++} `);
       params.push(series);
     }
 
     if (set) {
-      conditions.push(`set_name = $${idx++}`);
+      conditions.push(`set_name = $${idx++} `);
       params.push(set);
     }
 
     if (position) {
-      conditions.push(`position = $${idx++}`);
+      conditions.push(`position = $${idx++} `);
       params.push(position);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")} ` : "";
 
     const sql = `
-      SELECT
-        nft_id,
-        edition_id,
-        play_id,
-        serial_number,
-        max_mint_size,
-        first_name,
-        last_name,
-        team_name,
-        position,
-        tier,
-        series_name,
-        set_name
+SELECT
+nft_id,
+  edition_id,
+  play_id,
+  serial_number,
+  max_mint_size,
+  first_name,
+  last_name,
+  team_name,
+  position,
+  tier,
+  series_name,
+  set_name
       FROM nft_core_metadata_v2
       ${whereClause}
       ORDER BY last_name NULLS LAST, first_name NULLS LAST, nft_id
       LIMIT $${idx};
-    `;
+`;
 
     params.push(safeLimit);
 
@@ -1632,18 +1634,18 @@ app.get("/api/explorer-filters", async (req, res) => {
     // 1) Fast path: snapshot table
     const snapRes = await pgQuery(
       `
-      SELECT
-        players,
-        teams,
-        series,
-        sets,
-        positions,
-        tiers,
-        updated_at
+SELECT
+players,
+  teams,
+  series,
+  sets,
+  positions,
+  tiers,
+  updated_at
       FROM explorer_filters_snapshot
       WHERE id = 1
       LIMIT 1;
-      `
+`
     );
 
     if (snapRes.rowCount > 0) {
@@ -1668,8 +1670,8 @@ app.get("/api/explorer-filters", async (req, res) => {
     const [playersRes, teamsRes, seriesRes, setsRes, positionsRes, tiersRes] = await Promise.all([
       pgQuery(`
         SELECT DISTINCT
-          COALESCE(first_name, '') AS first_name,
-          COALESCE(last_name, '')  AS last_name
+COALESCE(first_name, '') AS first_name,
+  COALESCE(last_name, '')  AS last_name
         FROM nft_core_metadata_v2
         WHERE first_name IS NOT NULL
           AND first_name <> ''
@@ -1677,7 +1679,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND last_name <> ''
         ORDER BY last_name, first_name
         LIMIT 5000;
-      `),
+`),
       pgQuery(`
         SELECT DISTINCT team_name
         FROM nft_core_metadata_v2
@@ -1685,7 +1687,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND team_name <> ''
         ORDER BY team_name
         LIMIT 1000;
-      `),
+`),
       pgQuery(`
         SELECT DISTINCT series_name
         FROM nft_core_metadata_v2
@@ -1693,7 +1695,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND series_name <> ''
         ORDER BY series_name
         LIMIT 1000;
-      `),
+`),
       pgQuery(`
         SELECT DISTINCT set_name
         FROM nft_core_metadata_v2
@@ -1701,7 +1703,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND set_name <> ''
         ORDER BY set_name
         LIMIT 2000;
-      `),
+`),
       pgQuery(`
         SELECT DISTINCT position
         FROM nft_core_metadata_v2
@@ -1709,7 +1711,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND position <> ''
         ORDER BY position
         LIMIT 100;
-      `),
+`),
       pgQuery(`
         SELECT DISTINCT tier
         FROM nft_core_metadata_v2
@@ -1717,7 +1719,7 @@ app.get("/api/explorer-filters", async (req, res) => {
           AND tier <> ''
         ORDER BY tier
         LIMIT 20;
-      `)
+`)
     ]);
 
     console.log("Explorer filters row counts (live):", {
@@ -1774,16 +1776,16 @@ import NonFungibleToken from 0x1d7e57aa55817448
 import AllDay from 0xe4cf4bdc1751c65d
 
 access(all) fun main(address: Address): [UInt64] {
-    let account = getAccount(address)
-    
-    // Try the standard AllDay collection path
-    if let collectionRef = account.capabilities.borrow<&{NonFungibleToken.CollectionPublic}>(
-        /public/AllDayNFTCollection
-    ) {
-        return collectionRef.getIDs()
-    }
-    
-    return []
+  let account = getAccount(address)
+
+  // Try the standard AllDay collection path
+  if let collectionRef = account.capabilities.borrow <& { NonFungibleToken.CollectionPublic } > (
+    /public/AllDayNFTCollection
+  ) {
+    return collectionRef.getIDs()
+  }
+
+  return []
 }
 `;
 
@@ -1802,7 +1804,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
 
     // Flow REST API expects arguments in a specific format
     // The address needs to be in the correct format
-    const flowAddressWithPrefix = `0x${flowAddress}`;
+    const flowAddressWithPrefix = `0x${flowAddress} `;
 
     // Flow REST API v1 scripts endpoint expects arguments as an array
     // Each argument is a JSON-CDC encoded value
@@ -1812,7 +1814,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
       value: flowAddressWithPrefix
     };
 
-    const scriptResponse = await fetch(`${FLOW_REST_API}/v1/scripts`, {
+    const scriptResponse = await fetch(`${FLOW_REST_API} /v1/scripts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1826,7 +1828,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
 
     if (!scriptResponse.ok) {
       const errorText = await scriptResponse.text().catch(() => '');
-      throw new Error(`Flow API error: ${scriptResponse.status} ${scriptResponse.statusText} - ${errorText.substring(0, 200)}`);
+      throw new Error(`Flow API error: ${scriptResponse.status} ${scriptResponse.statusText} - ${errorText.substring(0, 200)} `);
     }
 
     const scriptData = await scriptResponse.json();
@@ -1846,7 +1848,7 @@ async function fetchWalletNFTsViaFlowAPI(walletAddress) {
 
     return [];
   } catch (err) {
-    console.warn(`[LiveWallet] Flow REST API script execution failed for ${walletAddress.substring(0, 10)}...:`, err.message);
+    console.warn(`[LiveWallet] Flow REST API script execution failed for ${walletAddress.substring(0, 10)}...: `, err.message);
     return null;
   }
 }
@@ -1872,7 +1874,7 @@ async function fetchLiveWalletNFTs(walletAddress) {
       return nftIds;
     }
   } catch (err) {
-    console.warn(`[LiveWallet] Flow REST API failed:`, err.message);
+    console.warn(`[LiveWallet] Flow REST API failed: `, err.message);
   }
 
   // Final fallback: query recent Deposit events for this wallet (last 7 days)
@@ -1885,7 +1887,7 @@ async function fetchLiveWalletNFTs(walletAddress) {
       return recentNfts;
     }
   } catch (err) {
-    console.warn(`[LiveWallet] Event-based fetch failed:`, err.message);
+    console.warn(`[LiveWallet] Event - based fetch failed: `, err.message);
   }
 
   // All methods failed - return null to use database
@@ -1907,7 +1909,7 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
 
     // Query Deposit events where this wallet is the recipient
     const depositRes = await fetch(
-      `${FLOW_REST_API}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${latestHeight}`,
+      `${FLOW_REST_API} /v1/events ? type = A.e4cf4bdc1751c65d.AllDay.Deposit & start_height=${startHeight}& end_height=${latestHeight} `,
       { signal: AbortSignal.timeout(10000) }
     );
 
@@ -1947,7 +1949,7 @@ async function fetchRecentWalletNFTsViaEvents(walletAddress) {
 
     return Array.from(nftIds);
   } catch (err) {
-    console.warn(`[LiveWallet] Event-based fetch error:`, err.message);
+    console.warn(`[LiveWallet] Event - based fetch error: `, err.message);
     return null;
   }
 }
@@ -1991,14 +1993,12 @@ app.get("/api/wallet-summary", async (req, res) => {
         if (lockedIds.length === 0) {
           // Get locked NFT IDs from database (synced from Snowflake)
           const lockedResult = await pgQuery(
-            `SELECT nft_id FROM holdings WHERE wallet_address = $1 AND is_locked = true
-             UNION
-             SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1 AND is_locked = true`,
+            `SELECT nft_id FROM holdings WHERE wallet_address = $1 AND is_locked = true`,
             [wallet]
           );
           lockedIds = lockedResult.rows.map(r => r.nft_id);
           if (lockedIds.length > 0) {
-            console.log(`[Wallet Summary] Got ${lockedIds.length} locked NFTs from database (fallback)`);
+            console.log(`[Wallet Summary] Got ${lockedIds.length} locked NFTs from database(fallback)`);
           }
         }
 
@@ -2031,15 +2031,15 @@ app.get("/api/wallet-summary", async (req, res) => {
         req.lockedNftIds = lockedSet;
 
         dataSource = 'blockchain';
-        console.log(`[Wallet Summary] Got ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${allNftIds.length} total NFTs (deduplicated)`);
+        console.log(`[Wallet Summary] Got ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${allNftIds.length} total NFTs(deduplicated)`);
       } catch (blockchainErr) {
-        console.warn(`[Wallet Summary] Flow blockchain query failed, falling back to database:`, blockchainErr.message);
+        console.warn(`[Wallet Summary] Flow blockchain query failed, falling back to database: `, blockchainErr.message);
         // Try fallback to FindLab API
         try {
           liveNftIds = await fetchLiveWalletNFTs(wallet);
           if (liveNftIds !== null) {
             dataSource = 'blockchain';
-            console.log(`[Wallet Summary] Got ${liveNftIds.length} NFTs from FindLab API (fallback)`);
+            console.log(`[Wallet Summary] Got ${liveNftIds.length} NFTs from FindLab API(fallback)`);
           }
         } catch (fallbackErr) {
           console.warn(`[Wallet Summary] All blockchain queries failed, using database`);
@@ -2054,7 +2054,7 @@ app.get("/api/wallet-summary", async (req, res) => {
       FROM wallet_profiles
       WHERE wallet_address = $1
       LIMIT 1;
-      `,
+`,
       [wallet]
     );
     const profileRow = profileResult.rows[0] || null;
@@ -2064,43 +2064,37 @@ app.get("/api/wallet-summary", async (req, res) => {
 
     if (liveNftIds !== null && liveNftIds.length > 0) {
       // ALWAYS use blockchain NFT IDs as source of truth for which NFTs exist
-      // Join with wallet_holdings only for locked status
-      const nftIdPlaceholders = liveNftIds.map((_, idx) => `$${idx + 2}`).join(', ');
       statsResult = await pgQuery(
         `
-        SELECT
+SELECT
           $1 AS wallet_address,
 
-          COUNT(*)::int AS moments_total,
-          -- Use new holdings table first (from Snowflake sync), fallback to old wallet_holdings
-          COUNT(*) FILTER (WHERE COALESCE(hn.is_locked, h.is_locked, false))::int AS locked_count,
-          COUNT(*) FILTER (WHERE NOT COALESCE(hn.is_locked, h.is_locked, false))::int AS unlocked_count,
+  COUNT(*)::int AS moments_total,
+COUNT(*) FILTER(WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+  COUNT(*) FILTER(WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
 
-          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
-          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
-          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
-          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
-          COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
+    COUNT(*) FILTER(WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int     AS common_count,
+      COUNT(*) FILTER(WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int   AS uncommon_count,
+        COUNT(*) FILTER(WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int       AS rare_count,
+          COUNT(*) FILTER(WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int  AS legendary_count,
+            COUNT(*) FILTER(WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int   AS ultimate_count,
 
-          COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
-          COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
-          COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
+              COALESCE(SUM(COALESCE(eps.lowest_ask_usd, 0)), 0)::numeric AS floor_value,
+                COALESCE(SUM(COALESCE(eps.avg_sale_usd, 0)), 0)::numeric AS asp_value,
+                  COUNT(*) FILTER(WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int AS priced_moments
 
-        FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
-        LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id::text
-        LEFT JOIN wallet_holdings h 
-          ON h.nft_id = nft_ids.nft_id::text 
+FROM(SELECT unnest(ARRAY[${nftIdPlaceholders}]:: text[]) AS nft_id) nft_ids
+        LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id:: text
+        LEFT JOIN holdings h 
+          ON h.nft_id = nft_ids.nft_id:: text 
           AND LOWER(h.wallet_address) = LOWER($1)
-        LEFT JOIN holdings hn
-          ON hn.nft_id = nft_ids.nft_id::text
-          AND LOWER(hn.wallet_address) = LOWER($1)
         LEFT JOIN public.edition_price_scrape eps
           ON eps.edition_id = m.edition_id;
-        `,
+`,
         [wallet, ...liveNftIds]
       );
 
-      console.log(`[Wallet Summary] Using blockchain data: ${statsResult.rows[0]?.moments_total || 0} total, ${statsResult.rows[0]?.locked_count || 0} locked (from db join)`);
+      console.log(`[Wallet Summary] Using blockchain data: ${statsResult.rows[0]?.moments_total || 0} total, ${statsResult.rows[0]?.locked_count || 0} locked(from db join)`);
 
       // Override locked/unlocked counts with blockchain data (more accurate)
       if (req.lockedNftIds && req.lockedNftIds.size > 0) {
@@ -2121,53 +2115,53 @@ app.get("/api/wallet-summary", async (req, res) => {
         }]
       };
     } else {
-      // Fall back to database snapshot
+      // Fall back to database snapshot - USING LIVE HOLDINGS TABLE
       statsResult = await pgQuery(
         `
-      SELECT
-        h.wallet_address,
+SELECT
+h.wallet_address,
 
-        COUNT(*)::int AS moments_total,
-        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false))::int AS locked_count,
-        COUNT(*) FILTER (WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
+  COUNT(*)::int AS moments_total,
+    COUNT(*) FILTER(WHERE COALESCE(h.is_locked, false))::int AS locked_count,
+      COUNT(*) FILTER(WHERE NOT COALESCE(h.is_locked, false))::int AS unlocked_count,
 
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
-        COUNT(*) FILTER (WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
+        COUNT(*) FILTER(WHERE UPPER(m.tier) = 'COMMON')::int     AS common_count,
+          COUNT(*) FILTER(WHERE UPPER(m.tier) = 'UNCOMMON')::int   AS uncommon_count,
+            COUNT(*) FILTER(WHERE UPPER(m.tier) = 'RARE')::int       AS rare_count,
+              COUNT(*) FILTER(WHERE UPPER(m.tier) = 'LEGENDARY')::int  AS legendary_count,
+                COUNT(*) FILTER(WHERE UPPER(m.tier) = 'ULTIMATE')::int   AS ultimate_count,
 
-        COALESCE(
-          SUM(
-            CASE
+                  COALESCE(
+                    SUM(
+                      CASE
               WHEN eps.lowest_ask_usd IS NOT NULL THEN eps.lowest_ask_usd
               ELSE 0
             END
-          ),
-          0
-        )::numeric AS floor_value,
+                    ),
+                    0
+                  )::numeric AS floor_value,
 
-        COALESCE(
-          SUM(
-            CASE
+                    COALESCE(
+                      SUM(
+                        CASE
               WHEN eps.avg_sale_usd IS NOT NULL THEN eps.avg_sale_usd
               ELSE 0
             END
-          ),
-          0
-        )::numeric AS asp_value,
+                      ),
+                      0
+                    )::numeric AS asp_value,
 
-        COUNT(*) FILTER (WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL)::int
+                      COUNT(*) FILTER(WHERE eps.lowest_ask_usd IS NOT NULL OR eps.avg_sale_usd IS NOT NULL):: int
           AS priced_moments
 
-      FROM wallet_holdings h
+      FROM holdings h
       LEFT JOIN nft_core_metadata_v2 m
         ON m.nft_id = h.nft_id
       LEFT JOIN public.edition_price_scrape eps
         ON eps.edition_id = m.edition_id
       WHERE h.wallet_address = $1
       GROUP BY h.wallet_address;
-      `,
+`,
         [wallet]
       );
     }
@@ -2175,12 +2169,12 @@ app.get("/api/wallet-summary", async (req, res) => {
     // 3) Holdings + price freshness metadata
     const holdingsMetaResult = await pgQuery(
       `
-      SELECT
-        MAX(last_event_ts)  AS last_event_ts,
-        MAX(last_synced_at) AS last_synced_at
-      FROM wallet_holdings
+SELECT
+MAX(acquired_at)  AS last_event_ts,
+  MAX(last_synced_at) AS last_synced_at
+      FROM holdings
       WHERE wallet_address = $1;
-      `,
+`,
       [wallet]
     );
     const holdingsMetaRow = holdingsMetaResult.rows[0] || null;
@@ -2189,7 +2183,7 @@ app.get("/api/wallet-summary", async (req, res) => {
       `
       SELECT MAX(scraped_at) AS last_scraped_at
       FROM public.edition_price_scrape;
-      `
+`
     );
     const pricesMetaRow = pricesMetaResult.rows[0] || null;
 
@@ -2259,14 +2253,14 @@ app.get("/api/prices", async (req, res) => {
 
     const result = await pgQuery(
       `
-      SELECT
-        edition_id,
-        lowest_ask_usd,
-        avg_sale_usd,
-        top_sale_usd
+SELECT
+edition_id,
+  lowest_ask_usd,
+  avg_sale_usd,
+  top_sale_usd
       FROM public.edition_price_scrape
-      WHERE edition_id = ANY($1::text[])
-      `,
+      WHERE edition_id = ANY($1:: text[])
+  `,
       [unique]
     );
 
@@ -2327,9 +2321,9 @@ app.get("/api/query", async (req, res) => {
         const unlockedIds = await flowService.getWalletNFTIds(wallet);
 
         // Get LOCKED NFT IDs from database
-        // NOTE: Only use wallet_holdings - the 'holdings' table has stale/corrupted data
+        // NOTE: Use holdings table as it is the live one
         const lockedResult = await pgQuery(
-          `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1 AND is_locked = true`,
+          `SELECT nft_id FROM holdings WHERE wallet_address = $1 AND is_locked = true`,
           [wallet]
         );
         const lockedIds = lockedResult.rows.map(r => r.nft_id);
@@ -2344,7 +2338,7 @@ app.get("/api/query", async (req, res) => {
         const allNftIdsSet = new Set([...unlockedStrings, ...lockedStrings]);
         const nftIds = Array.from(allNftIdsSet);
 
-        console.log(`[Wallet Query] Found ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${nftIds.length} total NFTs (deduplicated)`);
+        console.log(`[Wallet Query] Found ${unlockedIds.length} unlocked + ${lockedIds.length} locked = ${nftIds.length} total NFTs(deduplicated)`);
 
         if (nftIds.length === 0) {
           return res.json({
@@ -2359,47 +2353,47 @@ app.get("/api/query", async (req, res) => {
 
         // Get metadata from database - start from blockchain NFT IDs, then join to metadata
         // This ensures we get ALL NFTs from blockchain, even if metadata doesn't exist yet
-        // Also join with wallet_holdings to preserve locked status
-        const nftIdPlaceholders = nftIds.map((_, idx) => `$${idx + 1}`).join(', ');
+        // Also join with holdings to preserve locked status
+        const nftIdPlaceholders = nftIds.map((_, idx) => `$${idx + 1} `).join(', ');
         const result = await pgQuery(
           `
-          SELECT
+SELECT
             $${nftIds.length + 1}::text AS wallet_address,
-            COALESCE(h.is_locked, false) AS is_locked,
-            COALESCE(h.last_event_ts, NOW()) AS last_event_ts,
-            nft_ids.nft_id,
-            m.edition_id,
-            m.play_id,
-            m.series_id,
-            m.set_id,
-            m.tier,
-            m.serial_number,
-            m.max_mint_size,
-            m.first_name,
-            m.last_name,
-            COALESCE(
-              NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
-              m.team_name,
-              m.set_name,
-              '(unknown)'
-            ) AS player_name,
-            m.team_name,
-            m.position,
-            m.jersey_number,
-            m.series_name,
-            m.set_name
-          FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+  COALESCE(h.is_locked, false) AS is_locked,
+    COALESCE(h.acquired_at, NOW()) AS last_event_ts,
+      nft_ids.nft_id,
+      m.edition_id,
+      m.play_id,
+      m.series_id,
+      m.set_id,
+      m.tier,
+      m.serial_number,
+      m.max_mint_size,
+      m.first_name,
+      m.last_name,
+      COALESCE(
+        NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
+        m.team_name,
+        m.set_name,
+        '(unknown)'
+      ) AS player_name,
+        m.team_name,
+        m.position,
+        m.jersey_number,
+        m.series_name,
+        m.set_name
+FROM(SELECT unnest(ARRAY[${nftIdPlaceholders}]:: text[]) AS nft_id) nft_ids
           LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
-          LEFT JOIN wallet_holdings h 
+          LEFT JOIN holdings h 
             ON h.nft_id = nft_ids.nft_id 
-            AND h.wallet_address = $${nftIds.length + 1}::text
+            AND h.wallet_address = $${nftIds.length + 1}:: text
           ORDER BY COALESCE(m.last_name, '') NULLS LAST, COALESCE(m.first_name, '') NULLS LAST, nft_ids.nft_id;
-          `,
+`,
           [...nftIds.map(id => id.toString()), wallet]
         );
 
         const queryTime = Date.now() - startTime;
-        console.log(`[Wallet Query] ✅ Completed in ${queryTime}ms - Found ${result.rowCount} moments`);
+        console.log(`[Wallet Query] ✅ Completed in ${queryTime} ms - Found ${result.rowCount} moments`);
 
         // Post-process to ensure is_locked is set correctly from our lockedSet
         const rows = result.rows.map(row => ({
@@ -2416,7 +2410,7 @@ app.get("/api/query", async (req, res) => {
           queryTime: queryTime
         });
       } catch (blockchainErr) {
-        console.error(`[Wallet Query] Blockchain query failed, falling back to database:`, blockchainErr.message);
+        console.error(`[Wallet Query] Blockchain query failed, falling back to database: `, blockchainErr.message);
         // Fall through to database query
       }
     }
@@ -2429,7 +2423,7 @@ app.get("/api/query", async (req, res) => {
       // Check if wallet has any holdings in database
       const countResult = await pgQuery(
         `SELECT COUNT(*) as count 
-         FROM wallet_holdings 
+         FROM holdings 
          WHERE wallet_address = $1`,
         [wallet]
       );
@@ -2443,16 +2437,17 @@ app.get("/api/query", async (req, res) => {
       }
     }
 
-    // Auto-refresh from FindLab API if needed
+    // Auto-refresh from Flow blockchain if needed (PHASE 1 FIX: Use reliable Flow service)
     if (shouldRefresh) {
       try {
-        console.log(`[Wallet Query] Auto-refreshing wallet ${wallet.substring(0, 8)}... (stale data or forced)`);
-        const nftIds = await getWalletNFTsFindLab(wallet, 'A.e4cf4bdc1751c65d.AllDay');
+        console.log(`[Wallet Query] REFRESHING from Flow blockchain for ${wallet.substring(0, 8)}...`);
+        const flowService = await import("./services/flow-blockchain.js");
+        const nftIds = await flowService.getWalletNFTIds(wallet);
 
         if (nftIds && nftIds.length >= 0) {
           // Get current holdings from database
           const currentResult = await pgQuery(
-            `SELECT nft_id FROM wallet_holdings WHERE wallet_address = $1`,
+            `SELECT nft_id FROM holdings WHERE wallet_address = $1`,
             [wallet]
           );
           const currentNftIds = new Set(currentResult.rows.map(r => r.nft_id));
@@ -2474,35 +2469,36 @@ app.get("/api/query", async (req, res) => {
             const params = toAdd.flatMap(nftId => [wallet, nftId.toString(), false, now]);
 
             await pgQuery(
-              `INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+              `INSERT INTO holdings(wallet_address, nft_id, is_locked, acquired_at)
                VALUES ${values}
-               ON CONFLICT (wallet_address, nft_id) 
-               DO UPDATE SET 
-                 is_locked = FALSE,
-                 last_event_ts = EXCLUDED.last_event_ts,
-                 last_synced_at = NOW()`,
+               ON CONFLICT(wallet_address, nft_id) 
+               DO UPDATE SET
+is_locked = COALESCE(holdings.is_locked, FALSE),
+  acquired_at = COALESCE(holdings.acquired_at, EXCLUDED.acquired_at)`,
               params
             );
           }
 
-          // Remove NFTs that are no longer in the wallet
+          // Remove NFTs that are no longer in the wallet (BUT NEVER DELETE LOCKED ONES!)
           if (toRemove.length > 0) {
             await pgQuery(
-              `DELETE FROM wallet_holdings 
-               WHERE wallet_address = $1 AND nft_id = ANY($2::text[])`,
+              `DELETE FROM holdings 
+               WHERE wallet_address = $1 
+                 AND nft_id = ANY($2:: text[])
+                 AND is_locked IS NOT TRUE`,
               [wallet, toRemove]
             );
           }
 
           if (toAdd.length > 0 || toRemove.length > 0) {
-            console.log(`[Wallet Query] ✅ Refreshed wallet ${wallet.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length}`);
+            console.log(`[Wallet Query] ✅ Refreshed wallet ${wallet.substring(0, 8)}... - Added: ${toAdd.length}, Removed: ${toRemove.length} `);
           }
 
           // NEW: Fetch missing metadata for NFTs we just added
           if (nftIds.length > 0) {
             const nftIdStrings = nftIds.map(id => id.toString());
             const metadataCheck = await pgQuery(
-              `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1::text[])`,
+              `SELECT nft_id FROM nft_core_metadata_v2 WHERE nft_id = ANY($1:: text[])`,
               [nftIdStrings]
             );
             const existingMetadata = new Set(metadataCheck.rows.map(r => r.nft_id));
@@ -2521,7 +2517,7 @@ app.get("/api/query", async (req, res) => {
         }
       } catch (refreshErr) {
         // Don't fail the request if refresh fails - just log and continue with database data
-        console.warn(`[Wallet Query] Auto-refresh failed for ${wallet}:`, refreshErr.message);
+        console.warn(`[Wallet Query]Auto - refresh failed for ${wallet}: `, refreshErr.message);
       }
     }
 
@@ -2530,38 +2526,36 @@ app.get("/api/query", async (req, res) => {
     // JOIN with holdings table to get proper acquired_at date (not last_event_ts which updates on sync)
     const result = await pgQuery(
       `
-      SELECT
-        h.wallet_address,
-        h.is_locked,
-        h.last_event_ts,
-        COALESCE(hn.acquired_at, h.last_event_ts) AS acquired_at,
-        h.nft_id,
-        m.edition_id,
-        m.play_id,
-        m.series_id,
-        m.set_id,
-        m.tier,
-        m.serial_number,
-        m.max_mint_size,
-        m.first_name,
-        m.last_name,
-        COALESCE(
-          NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
-          m.team_name,
-          m.set_name,
-          '(unknown)'
-        ) AS player_name,
-        m.team_name,
-        m.position,
-        m.jersey_number,
-        m.series_name,
-        m.set_name
-      FROM wallet_holdings h
+SELECT
+h.wallet_address,
+  h.is_locked,
+  h.acquired_at,
+    h.nft_id,
+    m.edition_id,
+    m.play_id,
+    m.series_id,
+    m.set_id,
+    m.tier,
+    m.serial_number,
+    m.max_mint_size,
+    m.first_name,
+    m.last_name,
+    COALESCE(
+      NULLIF(TRIM(m.first_name || ' ' || m.last_name), ''),
+      m.team_name,
+      m.set_name,
+      '(unknown)'
+    ) AS player_name,
+      m.team_name,
+      m.position,
+      m.jersey_number,
+      m.series_name,
+      m.set_name
+      FROM holdings h
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
-      LEFT JOIN holdings hn ON hn.wallet_address = h.wallet_address AND hn.nft_id = h.nft_id
       WHERE h.wallet_address = $1
-      ORDER BY COALESCE(hn.acquired_at, h.last_event_ts) DESC;
-      `,
+      ORDER BY COALESCE(h.acquired_at, NOW()) DESC;
+`,
       [wallet]
     );
 
@@ -2610,7 +2604,7 @@ app.get("/api/query-blockchain", async (req, res) => {
         try {
           const syncService = await import("./scripts/sync_wallets_from_blockchain.js");
           syncService.syncWallet(wallet).catch(err => {
-            console.warn(`[Blockchain Query] Background sync failed:`, err.message);
+            console.warn(`[Blockchain Query] Background sync failed: `, err.message);
           });
         } catch (syncErr) {
           // Continue even if sync fails
@@ -2618,7 +2612,7 @@ app.get("/api/query-blockchain", async (req, res) => {
       } else {
         // Empty wallet - remove old holdings
         try {
-          await pgQuery(`DELETE FROM wallet_holdings WHERE wallet_address = $1`, [wallet]);
+          await pgQuery(`DELETE FROM holdings WHERE wallet_address = $1`, [wallet]);
         } catch (e) {
           // Ignore
         }
@@ -2640,41 +2634,40 @@ app.get("/api/query-blockchain", async (req, res) => {
 
       // Get metadata from database - start from blockchain NFT IDs, then join to metadata
       // This ensures we get ALL NFTs from blockchain, even if metadata doesn't exist yet
-      // Also join with wallet_holdings to preserve locked status
       const nftIdPlaceholders = nftIds.map((_, idx) => `$${idx + 1}`).join(', ');
       const result = await pgQuery(
         `
-        SELECT
+SELECT
           $${nftIds.length + 1}::text AS wallet_address,
-          COALESCE(h.is_locked, false) AS is_locked,
-          COALESCE(h.last_event_ts, NOW()) AS last_event_ts,
-          nft_ids.nft_id,
-          m.edition_id,
-          m.play_id,
-          m.series_id,
-          m.set_id,
-          m.tier,
-          m.serial_number,
-          m.max_mint_size,
-          m.first_name,
-          m.last_name,
-          m.team_name,
-          m.position,
-          m.jersey_number,
-          m.series_name,
-          m.set_name
-        FROM (SELECT unnest(ARRAY[${nftIdPlaceholders}]::text[]) AS nft_id) nft_ids
+  COALESCE(h.is_locked, false) AS is_locked,
+    COALESCE(h.acquired_at, NOW()) AS last_event_ts,
+      nft_ids.nft_id,
+      m.edition_id,
+      m.play_id,
+      m.series_id,
+      m.set_id,
+      m.tier,
+      m.serial_number,
+      m.max_mint_size,
+      m.first_name,
+      m.last_name,
+      m.team_name,
+      m.position,
+      m.jersey_number,
+      m.series_name,
+      m.set_name
+FROM(SELECT unnest(ARRAY[${nftIdPlaceholders}]:: text[]) AS nft_id) nft_ids
         LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = nft_ids.nft_id
-        LEFT JOIN wallet_holdings h 
+        LEFT JOIN holdings h 
           ON h.nft_id = nft_ids.nft_id 
-          AND h.wallet_address = $${nftIds.length + 1}::text
+          AND h.wallet_address = $${nftIds.length + 1}:: text
         ORDER BY COALESCE(m.last_name, '') NULLS LAST, COALESCE(m.first_name, '') NULLS LAST, nft_ids.nft_id;
-        `,
+`,
         [...nftIds.map(id => id.toString()), wallet]
       );
 
       const queryTime = Date.now() - startTime;
-      console.log(`[Blockchain Query] ✅ Completed in ${queryTime}ms - Found ${result.rowCount} moments with metadata`);
+      console.log(`[Blockchain Query] ✅ Completed in ${queryTime} ms - Found ${result.rowCount} moments with metadata`);
 
       return res.json({
         ok: true,
@@ -2687,7 +2680,7 @@ app.get("/api/query-blockchain", async (req, res) => {
         metadataMatched: result.rowCount
       });
     } catch (blockchainErr) {
-      console.error(`[Blockchain Query] Error:`, blockchainErr);
+      console.error(`[Blockchain Query]Error: `, blockchainErr);
       return res.status(500).json({
         ok: false,
         error: blockchainErr.message || String(blockchainErr),
@@ -2716,25 +2709,25 @@ app.get("/api/profiles", async (req, res) => {
     // Search by both display name and wallet address
     const sql = `
       SELECT
-        s.display_name,
+      s.display_name,
         s.wallet_address,
         COALESCE(COUNT(s.nft_id), 0) AS total_moments,
-        COALESCE(COUNT(*) FILTER (WHERE s.is_locked = FALSE), 0) AS unlocked_moments,
-        COALESCE(COUNT(*) FILTER (WHERE s.is_locked = TRUE), 0) AS locked_moments,
-        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'common'), 0)    AS tier_common,
-        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'uncommon'), 0)  AS tier_uncommon,
-        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'rare'), 0)      AS tier_rare,
-        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'legendary'), 0) AS tier_legendary,
-        COALESCE(COUNT(*) FILTER (WHERE s.tier_norm = 'ultimate'), 0)  AS tier_ultimate
-      FROM (
+          COALESCE(COUNT(*) FILTER(WHERE s.is_locked = FALSE), 0) AS unlocked_moments,
+            COALESCE(COUNT(*) FILTER(WHERE s.is_locked = TRUE), 0) AS locked_moments,
+              COALESCE(COUNT(*) FILTER(WHERE s.tier_norm = 'common'), 0)    AS tier_common,
+                COALESCE(COUNT(*) FILTER(WHERE s.tier_norm = 'uncommon'), 0)  AS tier_uncommon,
+                  COALESCE(COUNT(*) FILTER(WHERE s.tier_norm = 'rare'), 0)      AS tier_rare,
+                    COALESCE(COUNT(*) FILTER(WHERE s.tier_norm = 'legendary'), 0) AS tier_legendary,
+                      COALESCE(COUNT(*) FILTER(WHERE s.tier_norm = 'ultimate'), 0)  AS tier_ultimate
+      FROM(
         SELECT
           wp.display_name,
-          wp.wallet_address,
-          wh.nft_id,
-          wh.is_locked,
-          LOWER(ncm.tier) AS tier_norm
+        wp.wallet_address,
+        wh.nft_id,
+        wh.is_locked,
+        LOWER(ncm.tier) AS tier_norm
         FROM public.wallet_profiles AS wp
-        LEFT JOIN public.wallet_holdings AS wh
+        LEFT JOIN public.holdings AS wh
           ON wh.wallet_address = wp.wallet_address
         LEFT JOIN public.nft_core_metadata_v2 AS ncm
           ON ncm.nft_id = wh.nft_id
@@ -2743,13 +2736,13 @@ app.get("/api/profiles", async (req, res) => {
           OR LOWER(wp.wallet_address) LIKE LOWER($1 || '%')
       ) AS s
       GROUP BY
-        s.display_name,
+      s.display_name,
         s.wallet_address
       ORDER BY
         total_moments DESC,
         s.display_name ASC
       LIMIT 50;
-    `;
+      `;
 
     const { rows } = await pool.query(sql, [query]);
 
@@ -2776,7 +2769,7 @@ app.get("/api/top-wallets", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        wallet_address,
+      wallet_address,
         display_name,
         total_moments,
         unlocked_moments,
@@ -2788,10 +2781,10 @@ app.get("/api/top-wallets", async (req, res) => {
         tier_ultimate,
         updated_at
       FROM top_wallets_snapshot
-      WHERE wallet_address NOT IN (
-        '0xe4cf4bdc1751c65d', -- AllDay contract
-        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
-      )
+      WHERE wallet_address NOT IN(
+          '0xe4cf4bdc1751c65d', --AllDay contract
+        '0xb6f2481eba4df97b'  -- huge custodial / system wallet
+        )
       ORDER BY total_moments DESC, display_name ASC
       LIMIT $1;
       `,
@@ -2830,7 +2823,7 @@ app.get("/api/top-wallets-by-team", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        wallet_address,
+      wallet_address,
         display_name,
         total_moments,
         unlocked_moments,
@@ -2880,7 +2873,7 @@ app.get("/api/top-wallets-by-tier", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        wallet_address,
+      wallet_address,
         display_name,
         total_moments,
         unlocked_moments,
@@ -2930,7 +2923,7 @@ app.get("/api/top-wallets-by-value", async (req, res) => {
     const { rows } = await pool.query(
       `
       SELECT
-        wallet_address,
+      wallet_address,
         display_name,
         total_moments,
         unlocked_moments,
@@ -2996,7 +2989,7 @@ app.get("/api/teams", async (req, res) => {
         FROM explorer_filters_snapshot
         WHERE id = 1
         LIMIT 1;
-        `
+      `
       );
 
       if (snapshotRes.rows.length > 0 && snapshotRes.rows[0].teams) {
@@ -3021,7 +3014,7 @@ app.get("/api/teams", async (req, res) => {
         WHERE team_name IS NOT NULL AND team_name != ''
         ORDER BY team_name ASC
         LIMIT 100;
-        `
+      `
       );
       teams = rows.map(r => r.team_name);
     }
@@ -3067,7 +3060,7 @@ app.get("/api/query-paged", async (req, res) => {
     const result = await pgQuery(
       `
       SELECT
-        h.wallet_address,
+      h.wallet_address,
         h.is_locked,
         h.last_event_ts,
         m.nft_id,
@@ -3085,11 +3078,11 @@ app.get("/api/query-paged", async (req, res) => {
         m.jersey_number,
         m.series_name,
         m.set_name,
-        COUNT(*) OVER ()::int AS total_count
-      FROM wallet_holdings h
+        COUNT(*) OVER()::int AS total_count
+      FROM holdings h
       JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       WHERE h.wallet_address = $1
-      ORDER BY h.last_event_ts DESC
+      ORDER BY COALESCE(h.acquired_at, NOW()) DESC
       LIMIT $2 OFFSET $3;
       `,
       [wallet, pageSize, offset]
@@ -3177,16 +3170,16 @@ app.post("/api/login-dapper", async (req, res) => {
     }
 
     // Use a synthetic email so we can reuse the existing users table
-    const syntheticEmail = `dapper:${wallet_address}`;
+    const syntheticEmail = `dapper:${wallet_address} `;
 
     const upsertSql = `
-      INSERT INTO public.users (email, password_hash, default_wallet_address)
-      VALUES ($1, NULL, $2)
-      ON CONFLICT (email)
+      INSERT INTO public.users(email, password_hash, default_wallet_address)
+      VALUES($1, NULL, $2)
+      ON CONFLICT(email)
       DO UPDATE SET
-        default_wallet_address = EXCLUDED.default_wallet_address
+      default_wallet_address = EXCLUDED.default_wallet_address
       RETURNING id, email, default_wallet_address;
-    `;
+      `;
 
     const { rows } = await pool.query(upsertSql, [syntheticEmail, wallet_address]);
     const user = rows[0];
@@ -3244,7 +3237,7 @@ app.post("/api/login-flow", async (req, res) => {
     const flowAddressPattern = /^0x[0-9a-f]{8,16}$/i;
     if (!flowAddressPattern.test(wallet_address)) {
       console.error("[Flow Login] Invalid address format:", wallet_address);
-      return res.status(400).json({ ok: false, error: `Invalid Flow wallet address format: ${wallet_address}` });
+      return res.status(400).json({ ok: false, error: `Invalid Flow wallet address format: ${wallet_address} ` });
     }
 
     // Normalize to 16 characters (pad with zeros if needed)
@@ -3255,7 +3248,7 @@ app.post("/api/login-flow", async (req, res) => {
     // For now, we'll trust the wallet address from FCL
 
     // Use synthetic email format: flow:wallet_address
-    const syntheticEmail = `flow:${normalizedAddress}`;
+    const syntheticEmail = `flow:${normalizedAddress} `;
 
     console.log("[Flow Login] Creating/updating user:", syntheticEmail);
 
@@ -3274,7 +3267,7 @@ app.post("/api/login-flow", async (req, res) => {
         await pool.query(`
           ALTER TABLE public.users 
           ALTER COLUMN password_hash DROP NOT NULL;
-        `);
+      `);
         console.log("[Flow Login] Made password_hash nullable (migration applied)");
       }
     } catch (alterErr) {
@@ -3286,20 +3279,20 @@ app.post("/api/login-flow", async (req, res) => {
     // Update display_name if dapper_username is provided
     const upsertSql = dapper_username
       ? `
-        INSERT INTO public.users (email, password_hash, default_wallet_address, display_name)
-        VALUES ($1, NULL, $2, $3)
-        ON CONFLICT (email)
+        INSERT INTO public.users(email, password_hash, default_wallet_address, display_name)
+      VALUES($1, NULL, $2, $3)
+        ON CONFLICT(email)
         DO UPDATE SET
-          default_wallet_address = EXCLUDED.default_wallet_address,
-          display_name = COALESCE(EXCLUDED.display_name, users.display_name)
+      default_wallet_address = EXCLUDED.default_wallet_address,
+        display_name = COALESCE(EXCLUDED.display_name, users.display_name)
         RETURNING id, email, default_wallet_address, display_name;
       `
       : `
-        INSERT INTO public.users (email, password_hash, default_wallet_address)
-        VALUES ($1, NULL, $2)
-        ON CONFLICT (email)
+        INSERT INTO public.users(email, password_hash, default_wallet_address)
+      VALUES($1, NULL, $2)
+        ON CONFLICT(email)
         DO UPDATE SET
-          default_wallet_address = EXCLUDED.default_wallet_address
+      default_wallet_address = EXCLUDED.default_wallet_address
         RETURNING id, email, default_wallet_address, display_name;
       `;
 
@@ -3396,18 +3389,18 @@ app.get("/api/flow-events", async (req, res) => {
         if (start_height !== null) urlParams.set("start_height", start_height.toString());
         if (end_height !== null) urlParams.set("end_height", end_height.toString());
 
-        const url = `${FLOW_ACCESS_NODE}/v1/events?${urlParams.toString()}`;
-        console.log(`Fetching ${eventType} from blocks ${start_height}-${end_height}`);
+        const url = `${FLOW_ACCESS_NODE} /v1/events ? ${urlParams.toString()} `;
+        console.log(`Fetching ${eventType} from blocks ${start_height} -${end_height} `);
 
         const flowRes = await fetch(url);
         const responseText = await flowRes.text();
 
         if (!flowRes.ok) {
           if (flowRes.status === 500) {
-            console.warn(`Flow API 500 error for ${eventType} (blocks ${start_height}-${end_height})`);
+            console.warn(`Flow API 500 error for ${eventType}(blocks ${start_height} - ${end_height})`);
             continue; // Skip this event type
           } else {
-            console.error(`Flow API error for ${eventType}:`, flowRes.status);
+            console.error(`Flow API error for ${eventType}: `, flowRes.status);
             continue;
           }
         }
@@ -3425,7 +3418,7 @@ app.get("/api/flow-events", async (req, res) => {
           console.log(`Got ${data.results.length} ${eventType} events`);
         }
       } catch (err) {
-        console.error(`Error fetching ${eventType}:`, err.message);
+        console.error(`Error fetching ${eventType}: `, err.message);
         continue;
       }
     }
@@ -3473,7 +3466,7 @@ app.get("/api/flow-events", async (req, res) => {
       };
     });
 
-    console.log(`Fetched ${events.length} events from blocks ${start_height} to ${end_height}`);
+    console.log(`Fetched ${events.length} events from blocks ${start_height} to ${end_height} `);
 
     // Debug: log raw events if we got any
     if (data.results && data.results.length > 0) {
@@ -3526,33 +3519,33 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
     // Note: Snowflake returns fields in uppercase, so we need to handle both cases
     const sql = `
       SELECT
-        EVENT_DATA:id::STRING AS nft_id,
-        LOWER(EVENT_DATA:to::STRING) AS to_addr,
-        LOWER(EVENT_DATA:from::STRING) AS from_addr,
-        EVENT_TYPE AS event_type,
-        BLOCK_TIMESTAMP AS block_timestamp,
-        BLOCK_HEIGHT AS block_height,
-        TX_ID AS tx_id,
-        EVENT_INDEX AS event_index
+      EVENT_DATA: id::STRING AS nft_id,
+        LOWER(EVENT_DATA: to:: STRING) AS to_addr,
+          LOWER(EVENT_DATA: from:: STRING) AS from_addr,
+            EVENT_TYPE AS event_type,
+              BLOCK_TIMESTAMP AS block_timestamp,
+                BLOCK_HEIGHT AS block_height,
+                  TX_ID AS tx_id,
+                    EVENT_INDEX AS event_index
       FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
       WHERE EVENT_CONTRACT = 'A.e4cf4bdc1751c65d.AllDay'
-        AND EVENT_TYPE IN ('Deposit', 'Withdraw', 'MomentNFTMinted', 'MomentNFTBurned')
+        AND EVENT_TYPE IN('Deposit', 'Withdraw', 'MomentNFTMinted', 'MomentNFTBurned')
         AND TX_SUCCEEDED = TRUE
         AND BLOCK_TIMESTAMP >= '${cutoffStr}'
       ORDER BY BLOCK_TIMESTAMP DESC, BLOCK_HEIGHT DESC, EVENT_INDEX DESC
       LIMIT ${limitNum}
-    `;
+      `;
 
-    console.log(`Querying Snowflake for events in last ${hoursAgo} hours (since ${cutoffStr})`);
-    console.log(`Current time: ${new Date().toISOString()}`);
+    console.log(`Querying Snowflake for events in last ${hoursAgo} hours(since ${cutoffStr})`);
+    console.log(`Current time: ${new Date().toISOString()} `);
 
     const result = await executeSql(sql);
     console.log(`Snowflake returned ${result ? result.length : 0} events`);
 
     if (result && result.length > 0) {
-      console.log(`Sample event:`, JSON.stringify(result[0]).substring(0, 300));
-      console.log(`Most recent event timestamp: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP}`);
-      console.log(`Most recent event block: ${result[0].block_height || result[0].BLOCK_HEIGHT}`);
+      console.log(`Sample event: `, JSON.stringify(result[0]).substring(0, 300));
+      console.log(`Most recent event timestamp: ${result[0].block_timestamp || result[0].BLOCK_TIMESTAMP} `);
+      console.log(`Most recent event block: ${result[0].block_height || result[0].BLOCK_HEIGHT} `);
     } else {
       console.log("No events found. This could mean:");
       console.log("1. No events occurred in the last", hoursAgo, "hours");
@@ -3598,7 +3591,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
     const eventMap = new Map();
 
     for (const event of rawEvents) {
-      const key = `${event.txId}-${event.nftId}`;
+      const key = `${event.txId} -${event.nftId} `;
 
       if (!eventMap.has(key)) {
         eventMap.set(key, {
@@ -3675,7 +3668,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           );
           enriched.sellerName = sellerResult.rows[0]?.display_name || null;
         } catch (err) {
-          console.error(`Error fetching seller name for ${event.from}:`, err.message);
+          console.error(`Error fetching seller name for ${event.from}: `, err.message);
         }
       }
 
@@ -3687,7 +3680,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           );
           enriched.buyerName = buyerResult.rows[0]?.display_name || null;
         } catch (err) {
-          console.error(`Error fetching buyer name for ${event.to}:`, err.message);
+          console.error(`Error fetching buyer name for ${event.to}: `, err.message);
         }
       }
 
@@ -3695,14 +3688,14 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       if (event.nftId) {
         try {
           const momentResult = await pgQuery(
-            `SELECT 
-              first_name, 
-              last_name, 
-              team_name, 
-              position,
-              tier,
-              set_name,
-              series_name
+            `SELECT
+      first_name,
+        last_name,
+        team_name,
+        position,
+        tier,
+        set_name,
+        series_name
             FROM nft_core_metadata_v2 
             WHERE nft_id = $1 LIMIT 1`,
             [event.nftId]
@@ -3711,7 +3704,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
           if (moment) {
             enriched.moment = {
               playerName: moment.first_name && moment.last_name
-                ? `${moment.first_name} ${moment.last_name}`
+                ? `${moment.first_name} ${moment.last_name} `
                 : null,
               teamName: moment.team_name,
               position: moment.position,
@@ -3721,7 +3714,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
             };
           }
         } catch (err) {
-          console.error(`Error fetching moment details for ${event.nftId}:`, err.message);
+          console.error(`Error fetching moment details for ${event.nftId}: `, err.message);
         }
       }
 
@@ -3747,7 +3740,7 @@ app.get("/api/recent-events-snowflake", async (req, res) => {
       newestEventTime: newestEventTime,
       dataAgeHours: dataAgeHours,
       note: dataAgeHours !== null
-        ? `Snowflake data is ${dataAgeHours} hours old (newest event: ${newestEventTime})`
+        ? `Snowflake data is ${dataAgeHours} hours old(newest event: ${newestEventTime})`
         : "No events found in the specified time window"
     });
   } catch (err) {
@@ -3822,11 +3815,11 @@ app.get("/api/lightnode-events", async (req, res) => {
 
     // Query both Deposit and Withdraw events
     // The light node proxies these requests to the upstream access node
-    console.log(`Querying light node for events in blocks ${startHeight}-${endHeight}`);
+    console.log(`Querying light node for events in blocks ${startHeight} -${endHeight} `);
 
     const [depositRes, withdrawRes] = await Promise.all([
-      fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Deposit&start_height=${startHeight}&end_height=${endHeight}`),
-      fetch(`${FLOW_LIGHT_NODE_URL}/v1/events?type=A.e4cf4bdc1751c65d.AllDay.Withdraw&start_height=${startHeight}&end_height=${endHeight}`)
+      fetch(`${FLOW_LIGHT_NODE_URL} /v1/events ? type = A.e4cf4bdc1751c65d.AllDay.Deposit & start_height=${startHeight}& end_height=${endHeight} `),
+      fetch(`${FLOW_LIGHT_NODE_URL} /v1/events ? type = A.e4cf4bdc1751c65d.AllDay.Withdraw & start_height=${startHeight}& end_height=${endHeight} `)
     ]);
 
     const depositData = depositRes.ok ? await depositRes.json() : [];
@@ -3930,7 +3923,7 @@ app.get("/api/lightnode-events", async (req, res) => {
     // Group events by txId+nftId to combine Withdraw/Deposit pairs into "Sold"
     const eventMap = new Map();
     for (const event of parsedEvents) {
-      const key = `${event.txId}-${event.nftId}`;
+      const key = `${event.txId} -${event.nftId} `;
       if (!eventMap.has(key)) {
         eventMap.set(key, { withdraw: null, deposit: null, ...event });
       }
@@ -3991,7 +3984,7 @@ app.get("/api/lightnode-events", async (req, res) => {
           const moment = result.rows[0];
           if (moment) {
             enriched.moment = {
-              playerName: moment.first_name && moment.last_name ? `${moment.first_name} ${moment.last_name}` : null,
+              playerName: moment.first_name && moment.last_name ? `${moment.first_name} ${moment.last_name} ` : null,
               teamName: moment.team_name,
               position: moment.position,
               tier: moment.tier,
@@ -4040,7 +4033,7 @@ app.get("/api/live-events", async (req, res) => {
     // Group Withdraw/Deposit pairs into "Sold" events (same logic as Snowflake)
     const eventMap = new Map();
     for (const event of events) {
-      const key = `${event.txId}-${event.nftId}`;
+      const key = `${event.txId} -${event.nftId} `;
       if (!eventMap.has(key)) {
         eventMap.set(key, {
           withdraw: null,
@@ -4141,7 +4134,7 @@ app.get("/api/live-status", (req, res) => {
 app.get("/api/flow-latest-block", async (req, res) => {
   try {
     const FLOW_ACCESS_NODE = "https://rest-mainnet.onflow.org";
-    const url = `${FLOW_ACCESS_NODE}/v1/blocks?height=final`;
+    const url = `${FLOW_ACCESS_NODE} /v1/blocks ? height = final`;
 
     console.log("Fetching latest block from:", url);
 
@@ -4150,7 +4143,7 @@ app.get("/api/flow-latest-block", async (req, res) => {
 
     if (!flowRes.ok) {
       console.error("Flow API error:", flowRes.status, responseText.substring(0, 500));
-      throw new Error(`Flow API error: ${flowRes.status} - ${responseText.substring(0, 200)}`);
+      throw new Error(`Flow API error: ${flowRes.status} - ${responseText.substring(0, 200)} `);
     }
 
     let data;
@@ -4287,33 +4280,33 @@ app.get("/api/sniper-listings", async (req, res) => {
     // Filter for nftType containing AllDay contract
     // Also get ListingCompleted to filter out sold listings
     const eventsSql = `
-      WITH listings AS (
-        SELECT
-          EVENT_DATA:nftID::STRING AS nft_id,
-          EVENT_DATA:listingResourceID::STRING AS listing_id,
-          TRY_TO_DOUBLE(EVENT_DATA:price::STRING) AS listing_price,
-          LOWER(EVENT_DATA:storefrontAddress::STRING) AS seller_addr,
+      WITH listings AS(
+          SELECT
+          EVENT_DATA: nftID:: STRING AS nft_id,
+          EVENT_DATA: listingResourceID:: STRING AS listing_id,
+          TRY_TO_DOUBLE(EVENT_DATA: price:: STRING) AS listing_price,
+          LOWER(EVENT_DATA: storefrontAddress:: STRING) AS seller_addr,
           BLOCK_TIMESTAMP AS block_timestamp,
           BLOCK_HEIGHT AS block_height,
           TX_ID AS tx_id
         FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
         WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
           AND EVENT_TYPE = 'ListingAvailable'
-          AND EVENT_DATA:nftType:typeID::STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
+          AND EVENT_DATA: nftType: typeID:: STRING = 'A.e4cf4bdc1751c65d.AllDay.NFT'
           AND TX_SUCCEEDED = TRUE
           AND BLOCK_TIMESTAMP >= '${cutoffStr}'
-      ),
-      completed AS (
-        SELECT DISTINCT
-          EVENT_DATA:listingResourceID::STRING AS listing_id
+        ),
+        completed AS(
+          SELECT DISTINCT
+          EVENT_DATA: listingResourceID:: STRING AS listing_id
         FROM FLOW_ONCHAIN_CORE_DATA.CORE.FACT_EVENTS
         WHERE EVENT_CONTRACT = 'A.4eb8a10cb9f87357.NFTStorefront'
           AND EVENT_TYPE = 'ListingCompleted'
           AND TX_SUCCEEDED = TRUE
           AND BLOCK_TIMESTAMP >= '${cutoffStr}'
-      )
-      SELECT 
-        l.nft_id,
+        )
+      SELECT
+      l.nft_id,
         l.listing_id,
         l.listing_price,
         l.seller_addr,
@@ -4323,10 +4316,10 @@ app.get("/api/sniper-listings", async (req, res) => {
         CASE WHEN c.listing_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_sold
       FROM listings l
       LEFT JOIN completed c ON l.listing_id = c.listing_id
-      WHERE c.listing_id IS NULL  -- Only show unsold listings
+      WHERE c.listing_id IS NULL-- Only show unsold listings
       ORDER BY l.block_timestamp DESC
       LIMIT ${limitNum}
-    `;
+      `;
 
     sniperLog(`[Sniper] Querying active listings from last ${hoursAgo} hours...`);
 
@@ -4351,10 +4344,10 @@ app.get("/api/sniper-listings", async (req, res) => {
     if (nftIds.length > 0) {
       try {
         const metaResult = await pgQuery(
-          `SELECT nft_id, edition_id, serial_number, first_name, last_name, 
-                  team_name, position, tier, set_name, series_name
+          `SELECT nft_id, edition_id, serial_number, first_name, last_name,
+  team_name, position, tier, set_name, series_name
            FROM nft_core_metadata_v2 
-           WHERE nft_id = ANY($1::text[])`,
+           WHERE nft_id = ANY($1:: text[])`,
           [nftIds]
         );
         for (const row of metaResult.rows) {
@@ -4372,7 +4365,7 @@ app.get("/api/sniper-listings", async (req, res) => {
     const editionList = [...editionIds];
 
     if (editionList.length > 0) {
-      sniperLog(`[Sniper] Scraping real-time prices for ${editionList.length} editions...`);
+      sniperLog(`[Sniper] Scraping real - time prices for ${editionList.length} editions...`);
 
       // Scrape in parallel batches of 5 to avoid overwhelming the server
       const BATCH_SIZE = 5;
@@ -4392,7 +4385,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         }
       }
 
-      sniperLog(`[Sniper] Got real-time prices for ${Object.keys(scrapedData).length} editions`);
+      sniperLog(`[Sniper] Got real - time prices for ${Object.keys(scrapedData).length} editions`);
     }
 
     // Get average sale prices from our database to compare with scraped low asks
@@ -4402,7 +4395,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         const priceResult = await pgQuery(
           `SELECT edition_id, avg_sale_usd 
            FROM public.edition_price_scrape 
-           WHERE edition_id = ANY($1::text[])`,
+           WHERE edition_id = ANY($1:: text[])`,
           [editionList]
         );
         for (const row of priceResult.rows) {
@@ -4431,7 +4424,7 @@ app.get("/api/sniper-listings", async (req, res) => {
     if (sellerAddrs.length > 0) {
       try {
         const nameResult = await pgQuery(
-          `SELECT wallet_address, display_name FROM wallet_profiles WHERE wallet_address = ANY($1::text[])`,
+          `SELECT wallet_address, display_name FROM wallet_profiles WHERE wallet_address = ANY($1:: text[])`,
           [sellerAddrs]
         );
         for (const row of nameResult.rows) {
@@ -4487,7 +4480,7 @@ app.get("/api/sniper-listings", async (req, res) => {
         dealPercent,                          // % below floor (positive = deal!)
 
         playerName: moment.first_name && moment.last_name
-          ? `${moment.first_name} ${moment.last_name}`
+          ? `${moment.first_name} ${moment.last_name} `
           : null,
         teamName: moment.team_name,
         tier: moment.tier,

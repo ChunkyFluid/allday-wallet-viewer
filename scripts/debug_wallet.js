@@ -9,12 +9,12 @@ const wallet = process.argv[2] || '0x07943321994c72c6';
 async function debugWallet() {
     console.log(`\n=== Debugging wallet: ${wallet} ===\n`);
 
-    // 1. Check wallet_holdings
+    // 1. Check holdings
     const holdings = await pgQuery(
-        `SELECT nft_id, is_locked, last_event_ts FROM wallet_holdings WHERE wallet_address = $1`,
+        `SELECT nft_id, is_locked, acquired_at FROM holdings WHERE wallet_address = $1`,
         [wallet.toLowerCase()]
     );
-    console.log(`1. wallet_holdings: ${holdings.rows.length} rows`);
+    console.log(`1. holdings: ${holdings.rows.length} rows`);
     if (holdings.rows.length > 0) {
         console.log('   NFT IDs:', holdings.rows.map(r => r.nft_id).join(', '));
     }

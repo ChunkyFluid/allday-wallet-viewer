@@ -29,13 +29,12 @@ async function upload() {
     console.log('      This replaces steps 2 & 3 - much faster!');
 
     // Single query that does BOTH reset AND set in one shot
-    await pgQuery('UPDATE wallet_holdings SET is_locked = (nft_id = ANY($1))', [nftIds]);
     await pgQuery('UPDATE holdings SET is_locked = (nft_id = ANY($1))', [nftIds]);
 
     console.log('      ✅ Updated all rows\n');
 
     console.log('[4/4] Verification...');
-    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM wallet_holdings');
+    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM holdings');
     console.log(`      ✅ ${parseInt(check.rows[0].locked).toLocaleString()} locked NFTs\n`);
 
     console.log('=== COMPLETE ===\n');

@@ -336,14 +336,14 @@ export async function markListingAsSold(nftId, buyerAddr = null) {
 
     if (sellerAddr && buyerAddr && nftId) {
         try {
-            sniperLog(`[Sniper] 💼 Updating wallet holdings: ${sellerAddr} → ${buyerAddr} (NFT ${nftId})`);
-            await pgQuery(`DELETE FROM wallet_holdings WHERE wallet_address = $1 AND nft_id = $2`, [sellerAddr.toLowerCase(), nftId]);
+            sniperLog(`[Sniper] 💼 Updating holdings: ${sellerAddr} → ${buyerAddr} (NFT ${nftId})`);
+            await pgQuery(`DELETE FROM holdings WHERE wallet_address = $1 AND nft_id = $2`, [sellerAddr.toLowerCase(), nftId]);
             await pgQuery(`
-        INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts, last_synced_at)
+        INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
         VALUES ($1, $2, FALSE, NOW(), NOW())
-        ON CONFLICT (wallet_address, nft_id) DO UPDATE SET last_event_ts = NOW(), last_synced_at = NOW()
+        ON CONFLICT (wallet_address, nft_id) DO UPDATE SET last_synced_at = NOW()
       `, [buyerAddr.toLowerCase(), nftId]);
-        } catch (err) { sniperError(`[Sniper] ⚠️ Error updating wallet_holdings:`, err.message); }
+        } catch (err) { sniperError(`[Sniper] ⚠️ Error updating holdings:`, err.message); }
     }
 
     for (const listing of sniperListings) {

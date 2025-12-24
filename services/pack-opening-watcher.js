@@ -50,21 +50,13 @@ async function handleDepositEvent(event) {
             console.log(`\n📬 [Transfer] NFT ${nftId}: ${fromAddress} → ${toWallet}`);
         }
 
-        // 1. Add to wallet_holdings
+        // 1. Add to holdings (with acquired_at preserved and last_synced_at updated)
         await pgQuery(`
-      INSERT INTO wallet_holdings (wallet_address, nft_id, is_locked, last_event_ts)
-      VALUES ($1, $2, false, NOW())
+      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
+      VALUES ($1, $2, false, NOW(), NOW())
       ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
         is_locked = false,
-        last_event_ts = NOW()
-    `, [toWallet, nftId]);
-
-        // 2. Add to holdings (with acquired_at preserved)
-        await pgQuery(`
-      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
-      VALUES ($1, $2, false, NOW())
-      ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
-        is_locked = false
+        last_synced_at = NOW()
     `, [toWallet, nftId]);
 
         // 3. Check if metadata exists

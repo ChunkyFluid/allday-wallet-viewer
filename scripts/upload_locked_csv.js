@@ -28,7 +28,6 @@ async function upload() {
         console.log('      ⏭️  SKIPPED (--skip-reset flag)\n');
     } else {
         console.log('[2/4] Resetting all locked status to false...');
-        await pgQuery('UPDATE wallet_holdings SET is_locked = false');
         await pgQuery('UPDATE holdings SET is_locked = false');
         console.log('      ✅ Reset complete\n');
     }
@@ -41,7 +40,6 @@ async function upload() {
         const batch = records.slice(i, i + BATCH_SIZE);
         const nftIds = batch.map(r => r.NFT_ID || r.nft_id || r.id);
 
-        await pgQuery('UPDATE wallet_holdings SET is_locked = true WHERE nft_id = ANY($1)', [nftIds]);
         await pgQuery('UPDATE holdings SET is_locked = true WHERE nft_id = ANY($1)', [nftIds]);
 
         updated += batch.length;
@@ -52,7 +50,7 @@ async function upload() {
     console.log('      ✅ Complete\n');
 
     console.log('[4/4] Verification...');
-    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM wallet_holdings');
+    const check = await pgQuery('SELECT COUNT(*) FILTER (WHERE is_locked) as locked FROM holdings');
     console.log(`      ✅ Database has ${parseInt(check.rows[0].locked).toLocaleString()} locked NFTs\n`);
 
     console.log('=== UPLOAD COMPLETE ===\n');
