@@ -175,7 +175,7 @@ async function syncWallet(walletAddress) {
 
       const wasLockedInDb = currentResult.rows.find(r => r.nft_id === id)?.is_locked === true;
       if (wasLockedInDb) {
-        console.log(`[Sync] ⚠️ Preserving locked NFT ${id} - not in new sync but keeping in DB`);
+        // console.log(`[Sync] ⚠️ Preserving locked NFT ${id} - not in new sync but keeping in DB`);
         return false;
       }
 
