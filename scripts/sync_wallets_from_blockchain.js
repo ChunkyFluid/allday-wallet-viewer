@@ -288,11 +288,11 @@ async function syncRecentWallets() {
     console.log("[Sync] Starting sync of recently queried wallets...");
 
     const recentWalletsResult = await pgQuery(
-      `SELECT DISTINCT wallet_address
+      `SELECT wallet_address, MAX(acquired_at) as max_acquired
        FROM holdings 
        WHERE acquired_at > NOW() - INTERVAL '24 hours'
        GROUP BY wallet_address
-       ORDER BY MAX(acquired_at) DESC
+       ORDER BY max_acquired DESC
        LIMIT 1000`
     );
 
@@ -345,12 +345,12 @@ async function syncStaleWallets() {
     console.log("[Sync] Starting sync of stale wallets...");
 
     const staleWalletsResult = await pgQuery(
-      `SELECT DISTINCT wallet_address, MIN(last_synced_at) as last_synced_at
+      `SELECT wallet_address, MIN(last_synced_at) as min_synced
        FROM holdings 
-       WHERE last_synced_at < NOW() - INTERVAL '1 hour'
-          OR last_synced_at IS NULL
        GROUP BY wallet_address
-       ORDER BY MIN(last_synced_at) NULLS FIRST
+       HAVING MIN(last_synced_at) < NOW() - INTERVAL '1 hour'
+          OR MIN(last_synced_at) IS NULL
+       ORDER BY min_synced NULLS FIRST
        LIMIT 500`
     );
 

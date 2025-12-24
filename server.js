@@ -331,6 +331,7 @@ let flowWsConnection = null;
 let flowWsConnected = false;
 let flowWsReconnectTimer = null;
 let lastFlowEventTime = null;
+let flowWsHeartbeatTimer = null;
 
 // Event types we care about - expanded to include metadata events for self-managed data
 const ALLDAY_EVENT_TYPES = eventProcessor.ALLDAY_EVENT_TYPES;
@@ -370,6 +371,26 @@ function connectToFlowWebSocket() {
       console.log("Sending subscription:", JSON.stringify(subscribeMsg));
       flowWsConnection.send(JSON.stringify(subscribeMsg));
       console.log(`Subscribed to AllDay events: ${ALLDAY_EVENT_TYPES.join(', ')}`);
+
+      // Start heartbeat/watchdog
+      if (flowWsHeartbeatTimer) clearInterval(flowWsHeartbeatTimer);
+      flowWsHeartbeatTimer = setInterval(() => {
+        const now = new Date();
+        const secondsSinceLastEvent = lastFlowEventTime ? (now - lastFlowEventTime) / 1000 : 3600;
+
+        // On Flow mainnet, there are usually multiple events per minute. 
+        // If we haven't seen an event in 3 minutes, something might be wrong.
+        if (secondsSinceLastEvent > 180) {
+          console.warn(`[Flow WS] Watchdog: No events for ${Math.round(secondsSinceLastEvent)}s. Force reconnecting...`);
+          flowWsConnection.terminate();
+          flowWsConnected = false;
+        } else {
+          // Send a ping to keep connection alive
+          if (flowWsConnection.readyState === WebSocket.OPEN) {
+            flowWsConnection.ping();
+          }
+        }
+      }, 30000); // Check every 30 seconds
     });
 
     flowWsConnection.on("message", async (data) => {
@@ -414,6 +435,10 @@ function connectToFlowWebSocket() {
     flowWsConnection.on("close", (code, reason) => {
       console.log(`Flow WebSocket closed: ${code} - ${reason}`);
       flowWsConnected = false;
+      if (flowWsHeartbeatTimer) {
+        clearInterval(flowWsHeartbeatTimer);
+        flowWsHeartbeatTimer = null;
+      }
 
       // Reconnect after 5 seconds
       if (!flowWsReconnectTimer) {
@@ -586,24 +611,25 @@ async function updateWalletHoldingOnDeposit(walletAddress, nftId, timestamp, blo
     const ts = timestamp ? new Date(timestamp) : new Date();
 
     // 1. Remove from ANY other wallet (Transfer logic)
-    // This is safer than deleting on Withdraw because it preserves locked NFTs during the lock process.
-    await pgQuery(
+    // This is critical for "instant" removal when an NFT moves to a contract or another user.
+    const deleteResult = await pgQuery(
       `DELETE FROM holdings WHERE nft_id = $1 AND wallet_address != $2`,
       [nftId.toString(), walletAddr]
     );
 
+    if (deleteResult.rowCount > 0) {
+      console.log(`[Wallet Sync] 🗑️  Removed NFT ${nftId} from previous owners`);
+    }
+
     // 2. Upsert: add NFT to new wallet holdings
     await pgQuery(
-      `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
+       VALUES ($1, $2, $3, $4, NOW())
        ON CONFLICT (wallet_address, nft_id) 
        DO UPDATE SET 
          is_locked = FALSE,
-         acquired_at = CASE 
-           WHEN holdings.acquired_at IS NULL OR holdings.acquired_at < EXCLUDED.acquired_at 
-           THEN EXCLUDED.acquired_at 
-           ELSE holdings.acquired_at 
-         END`,
+         acquired_at = COALESCE(holdings.acquired_at, EXCLUDED.acquired_at),
+         last_synced_at = NOW()`,
       [walletAddr, nftId.toString(), false, ts]
     );
 

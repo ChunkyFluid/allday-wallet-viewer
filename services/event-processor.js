@@ -289,19 +289,24 @@ export async function handleDeposit(event, payload) {
 
     try {
         // 1. Remove from ANY other wallet (Transfer logic)
-        // This is safer than deleting on Withdraw because it preserves locked NFTs during the lock process.
-        await pgQuery(
+        // This is critical for "instant" removal when an NFT moves to a contract (like GiftPack) or another user.
+        const deleteResult = await pgQuery(
             `DELETE FROM holdings WHERE nft_id = $1 AND wallet_address != $2`,
             [nftId, toAddr]
         );
 
+        if (deleteResult.rowCount > 0) {
+            console.log(`[Event] 🗑️  Removed NFT ${nftId} from previous owner(s)`);
+        }
+
         // 2. Add to NEW owner
         await pgQuery(`
-      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
-      VALUES ($1, $2, FALSE, $3)
+      INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at, last_synced_at)
+      VALUES ($1, $2, FALSE, $3, NOW())
       ON CONFLICT (wallet_address, nft_id) DO UPDATE SET
         is_locked = FALSE,
-        acquired_at = COALESCE(holdings.acquired_at, EXCLUDED.acquired_at)
+        acquired_at = COALESCE(holdings.acquired_at, EXCLUDED.acquired_at),
+        last_synced_at = NOW()
     `, [toAddr, nftId, acquiredAt]);
 
         console.log(`[Event] ✅ Transferred NFT ${nftId} → ${toAddr.substring(0, 10)}...`);
