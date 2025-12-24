@@ -4,7 +4,7 @@ const PAGE_SIZE = 200;
 
 let allMoments = [];
 let filteredMoments = [];
-let currentSortKey = "last_event_ts";
+let currentSortKey = "acquired_at";
 let currentSortDir = "desc";
 let currentPage = 1;
 
@@ -433,7 +433,7 @@ function applySort() {
             vb = !!vb;
             if (va === vb) return 0;
             return dir === "asc" ? (va ? 1 : -1) : va ? -1 : 1;
-        } else if (key === "last_event_ts") {
+        } else if (key === "acquired_at" || key === "last_event_ts") {
             va = new Date(va).getTime() || 0;
             vb = new Date(vb).getTime() || 0;
         } else {
@@ -566,8 +566,8 @@ function renderPage(page) {
         const seriesAbbrev = abbreviateSeries(r.series_name);
         const setAbbrev = abbreviateSet(r.set_name);
 
-        // Compact date format (just date, no time)
-        const eventDate = r.last_event_ts ? formatDate(r.last_event_ts).split(',')[0] : "";
+        // Compact date format (just date, no time) - use acquired_at for proper acquisition date
+        const eventDate = r.acquired_at ? formatDate(r.acquired_at).split(',')[0] : "";
 
         // Get duplicate count for this edition
         const duplicateCount = r.edition_id ? editionCounts[r.edition_id] : 1;

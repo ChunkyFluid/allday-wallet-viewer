@@ -1,0 +1,45 @@
+Fetching NFTLocker contract code...
+Contract Code found!
+access(all) contract NFTLocker {
+    access(all) event Withdraw(id: UInt64, from: Address?)
+    access(all) event Deposit(id: UInt64, to: Address?)
+    access(all) event NFTLocked(
+    access(all) event NFTUnlocked(
+    access(all) event ReceiverAdded(name: String, eligibleNFTTypes: {Type: Bool})
+    access(all) event ReceiverRemoved(name: String, eligibleNFTTypes: {Type: Bool})
+    access(all) let CollectionStoragePath:  StoragePath
+    access(all) let CollectionPublicPath:   PublicPath
+    access(all) var totalLockedTokens:      UInt64
+    access(all) entitlement Operate
+    access(all) struct LockedData {
+        access(all) let id: UInt64
+        access(all) let owner: Address
+        access(all) let lockedAt: UInt64
+        access(all) let lockedUntil: UInt64
+        access(all) let duration: UInt64
+        access(all) let nftType: Type
+        access(all) let extension: {String: AnyStruct}
+    access(all) view fun getNFTLockerDetails(id: UInt64, nftType: Type): NFTLocker.LockedData? {
+    access(all) view fun canUnlockToken(id: UInt64, nftType: Type): Bool {
+    access(all) view fun GetAdminStoragePath(): StoragePath {
+    access(all) view fun getReceiverCollectorStoragePath(): StoragePath {
+    access(all) view fun borrowAdminReceiverCollectorPublic(): &ReceiverCollector? {
+    access(all) struct interface IAuthorizedDepositHandler {
+        access(all) fun deposit(nft: @{NonFungibleToken.NFT}, ownerAddress: Address, passThruParams: {String: AnyStruct})
+    access(all) struct Receiver {
+        access(all) var authorizedDepositHandler: {IAuthorizedDepositHandler}
+        access(all) let eligibleNFTTypes: {Type: Bool}
+        access(all) let metadata: {String: AnyStruct}
+    access(all) resource ReceiverCollector  {
+        access(all) view fun getReceiver(name: String): Receiver? {
+        access(all) view fun getReceiverNamesByNFTType(nftType: Type): {String: Bool}? {
+    access(all) resource Admin {
+        access(all) fun expireLock(id: UInt64, nftType: Type) {
+        access(all) fun createReceiverCollector(): @ReceiverCollector {
+    access(all) resource interface LockedCollection {
+        access(all) view fun getIDs(nftType: Type): [UInt64]?
+    access(all) resource interface LockProvider: LockedCollection {}
+    access(all) resource Collection: LockedCollection, LockProvider {
+        access(all) var lockedNFTs: @{Type: {UInt64: {NonFungibleToken.NFT}}}
+        access(all) view fun getIDs(nftType: Type): [UInt64]? {
+    access(all) fun createEmptyCollection(): @Collection {

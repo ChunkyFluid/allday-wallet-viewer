@@ -58,6 +58,10 @@ async function syncLeaderboards() {
       FROM wallet_holdings h
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
+      WHERE h.wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d', -- AllDay contract
+        '0xb6f2481eba4df97b'  -- huge custodial/system wallet
+      )
       GROUP BY h.wallet_address, p.display_name
       HAVING COUNT(*) > 0
     `);
@@ -106,6 +110,10 @@ async function syncLeaderboards() {
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       WHERE m.team_name IS NOT NULL AND m.team_name != ''
+        AND h.wallet_address NOT IN (
+          '0xe4cf4bdc1751c65d',
+          '0xb6f2481eba4df97b'
+        )
       GROUP BY h.wallet_address, m.team_name, p.display_name
       HAVING COUNT(*) > 0
     `);
@@ -122,6 +130,8 @@ async function syncLeaderboards() {
         tier TEXT,
         display_name TEXT,
         total_moments INTEGER DEFAULT 0,
+        unlocked_moments INTEGER DEFAULT 0,
+        locked_moments INTEGER DEFAULT 0,
         tier_common INTEGER DEFAULT 0,
         tier_uncommon INTEGER DEFAULT 0,
         tier_rare INTEGER DEFAULT 0,
@@ -137,24 +147,88 @@ async function syncLeaderboards() {
     await pgQuery(`
       INSERT INTO top_wallets_by_tier_snapshot (
         wallet_address, tier, display_name, total_moments,
+        unlocked_moments, locked_moments,
         tier_common, tier_uncommon, tier_rare, tier_legendary, tier_ultimate, updated_at
       )
       SELECT 
-        h.wallet_address,
-        LOWER(COALESCE(m.tier, 'unknown')) as tier,
-        COALESCE(p.display_name, h.wallet_address) as display_name,
-        COUNT(*)::int as total_moments,
-        COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int as tier_common,
-        COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int as tier_uncommon,
-        COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int as tier_rare,
-        COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'LEGENDARY')::int as tier_legendary,
-        COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'ULTIMATE')::int as tier_ultimate,
+        wallet_address,
+        'common' as tier,
+        display_name,
+        tier_common as total_moments, -- Sort by this tier's count
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
         NOW()
-      FROM wallet_holdings h
-      LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
-      LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
-      GROUP BY h.wallet_address, LOWER(COALESCE(m.tier, 'unknown')), p.display_name
-      HAVING COUNT(*) > 0
+      FROM top_wallets_snapshot
+      WHERE tier_common > 0
+      UNION ALL
+      SELECT 
+        wallet_address,
+        'uncommon',
+        display_name,
+        tier_uncommon,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        NOW()
+      FROM top_wallets_snapshot
+      WHERE tier_uncommon > 0
+      UNION ALL
+      SELECT 
+        wallet_address,
+        'rare',
+        display_name,
+        tier_rare,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        NOW()
+      FROM top_wallets_snapshot
+      WHERE tier_rare > 0
+      UNION ALL
+      SELECT 
+        wallet_address,
+        'legendary',
+        display_name,
+        tier_legendary,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        NOW()
+      FROM top_wallets_snapshot
+      WHERE tier_legendary > 0
+      UNION ALL
+      SELECT 
+        wallet_address,
+        'ultimate',
+        display_name,
+        tier_ultimate,
+        unlocked_moments,
+        locked_moments,
+        tier_common,
+        tier_uncommon,
+        tier_rare,
+        tier_legendary,
+        tier_ultimate,
+        NOW()
+      FROM top_wallets_snapshot
+      WHERE tier_ultimate > 0
     `);
 
     const byTierCount = await pgQuery(`SELECT COUNT(*)::int as cnt FROM top_wallets_by_tier_snapshot`);
@@ -168,6 +242,8 @@ async function syncLeaderboards() {
         wallet_address TEXT PRIMARY KEY,
         display_name TEXT,
         total_moments INTEGER DEFAULT 0,
+        unlocked_moments INTEGER DEFAULT 0,
+        locked_moments INTEGER DEFAULT 0,
         tier_common INTEGER DEFAULT 0,
         tier_uncommon INTEGER DEFAULT 0,
         tier_rare INTEGER DEFAULT 0,
@@ -183,7 +259,7 @@ async function syncLeaderboards() {
 
     await pgQuery(`
       INSERT INTO top_wallets_by_value_snapshot (
-        wallet_address, display_name, total_moments,
+        wallet_address, display_name, total_moments, unlocked_moments, locked_moments,
         tier_common, tier_uncommon, tier_rare, tier_legendary, tier_ultimate,
         floor_value, asp_value, updated_at
       )
@@ -191,6 +267,8 @@ async function syncLeaderboards() {
         h.wallet_address,
         COALESCE(p.display_name, h.wallet_address) as display_name,
         COUNT(*)::int as total_moments,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false) = false)::int as unlocked_moments,
+        COUNT(*) FILTER (WHERE COALESCE(h.is_locked, false) = true)::int as locked_moments,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'COMMON')::int as tier_common,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'UNCOMMON')::int as tier_uncommon,
         COUNT(*) FILTER (WHERE UPPER(COALESCE(m.tier, '')) = 'RARE')::int as tier_rare,
@@ -203,6 +281,10 @@ async function syncLeaderboards() {
       LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
       LEFT JOIN wallet_profiles p ON p.wallet_address = h.wallet_address
       LEFT JOIN edition_price_scrape eps ON eps.edition_id = m.edition_id
+      WHERE h.wallet_address NOT IN (
+        '0xe4cf4bdc1751c65d',
+        '0xb6f2481eba4df97b'
+      )
       GROUP BY h.wallet_address, p.display_name
       HAVING COUNT(*) > 0
     `);

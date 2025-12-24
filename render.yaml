@@ -1,0 +1,76 @@
+services:
+  # Web Service (your main app)
+  - type: web
+    name: allday-wallet-viewer
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PGHOST
+        sync: false
+      - key: PGPORT
+        value: 5432
+      - key: PGDATABASE
+        sync: false
+      - key: PGUSER
+        sync: false
+      - key: PGPASSWORD
+        sync: false
+      - key: PGSSLMODE
+        value: require
+      - key: SNOWFLAKE_ACCOUNT
+        sync: false
+      - key: SNOWFLAKE_USERNAME
+        sync: false
+      - key: SNOWFLAKE_PASSWORD
+        sync: false
+      - key: SNOWFLAKE_WAREHOUSE
+        value: COMPUTE_WH
+      - key: SNOWFLAKE_DATABASE
+        value: ALLDAY_VIEWER
+      - key: SNOWFLAKE_SCHEMA
+        value: ALLDAY
+      - key: SNOWFLAKE_ROLE
+        value: ACCOUNTADMIN
+      - key: FLOW_ACCESS_NODE
+        value: https://rest-mainnet.onflow.org
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: PORT
+        value: 3000
+
+  # Background Worker (sync service)
+  - type: worker
+    name: allday-sync-worker
+    env: node
+    buildCommand: npm install
+    startCommand: node services/background-sync.js
+    envVars:
+      - key: PGHOST
+        sync: false
+      - key: PGPORT
+        value: 5432
+      - key: PGDATABASE
+        sync: false
+      - key: PGUSER
+        sync: false
+      - key: PGPASSWORD
+        sync: false
+      - key: PGSSLMODE
+        value: require
+      - key: SNOWFLAKE_ACCOUNT
+        sync: false
+      - key: SNOWFLAKE_USERNAME
+        sync: false
+      - key: SNOWFLAKE_PASSWORD
+        sync: false
+      - key: SNOWFLAKE_WAREHOUSE
+        value: COMPUTE_WH
+      - key: SNOWFLAKE_DATABASE
+        value: ALLDAY_VIEWER
+      - key: SNOWFLAKE_SCHEMA
+        value: ALLDAY
+      - key: SNOWFLAKE_ROLE
+        value: ACCOUNTADMIN
+      - key: FLOW_ACCESS_NODE
+        value: https://rest-mainnet.onflow.org

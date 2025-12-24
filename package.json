@@ -1,41 +1,24 @@
 {
   "name": "allday-wallet-viewer",
   "version": "1.0.0",
-  "type": "module",
+  "description": "NFL All Day Wallet Viewer",
   "main": "server.js",
+  "type": "module",
   "scripts": {
-    "start": "node --max-old-space-size=400 --expose-gc server.js",
-    "dev": "node server.js",
-    "build:fcl": "npx esbuild src/fcl-bundle.js --bundle --format=iife --global-name=fcl --outfile=public/js/fcl-bundle.js --platform=browser",
-    "prestart": "npm run build:fcl"
-  },
-  "dependencies": {
-    "@onflow/fcl": "^1.20.6",
-    "@onflow/types": "^1.5.0",
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "csv-parse": "^6.1.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-session": "^1.18.2",
-    "node-fetch": "^2.7.0",
-    "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
-    "pg": "^8.16.3",
-    "playwright": "^1.49.0",
-    "snowflake-sdk": "^1.11.3",
-    "ws": "^8.18.3"
-  },
-  "description": "A full‑stack app for exploring NFL ALL DAY wallets, moments, and collections.",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ChunkyFluid/allday-wallet-viewer.git"
+    "start": "node server.js",
+    "sync": "node services/background-sync.js",
+    "dev": "node server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/ChunkyFluid/allday-wallet-viewer/issues"
-  },
-  "homepage": "https://github.com/ChunkyFluid/allday-wallet-viewer#readme"
+  "dependencies": {
+    "@onflow/fcl": "^1.12.2",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "pg": "^8.13.1",
+    "snowflake-sdk": "^1.14.0"
+  }
 }

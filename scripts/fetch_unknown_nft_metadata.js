@@ -15,11 +15,11 @@ async function findUnknownNFTs(limit = 100) {
   const result = await pgQuery(`
     SELECT DISTINCT h.nft_id, h.wallet_address
     FROM wallet_holdings h
-    LEFT JOIN nft_core_metadata m ON m.nft_id = h.nft_id
+    LEFT JOIN nft_core_metadata_v2 m ON m.nft_id = h.nft_id
     WHERE m.nft_id IS NULL
     LIMIT $1
   `, [limit]);
-  
+
   return result.rows;
 }
 
@@ -30,12 +30,12 @@ async function fetchAndStoreNFTMetadata(nftId, walletAddress) {
   try {
     // Get metadata from blockchain
     const metadata = await flowService.getNFTFullDetails(walletAddress, parseInt(nftId));
-    
+
     if (!metadata) {
       console.log(`[Metadata] No metadata found for NFT ${nftId}`);
       return false;
     }
-    
+
     // Map blockchain metadata to our schema
     // Note: On-chain metadata may not have all fields (like first_name, last_name separately)
     const nftData = {
@@ -56,10 +56,10 @@ async function fetchAndStoreNFTMetadata(nftId, walletAddress) {
       series_name: null,
       set_name: null
     };
-    
+
     // Insert into database
     await pgQuery(`
-      INSERT INTO nft_core_metadata (
+      INSERT INTO nft_core_metadata_v2 (
         nft_id, edition_id, play_id, series_id, set_id, tier,
         serial_number, max_mint_size, first_name, last_name,
         team_name, position, jersey_number, series_name, set_name
@@ -72,13 +72,13 @@ async function fetchAndStoreNFTMetadata(nftId, walletAddress) {
         tier = EXCLUDED.tier,
         serial_number = EXCLUDED.serial_number,
         max_mint_size = EXCLUDED.max_mint_size,
-        first_name = COALESCE(EXCLUDED.first_name, nft_core_metadata.first_name),
-        last_name = COALESCE(EXCLUDED.last_name, nft_core_metadata.last_name),
-        team_name = COALESCE(EXCLUDED.team_name, nft_core_metadata.team_name),
-        position = COALESCE(EXCLUDED.position, nft_core_metadata.position),
-        jersey_number = COALESCE(EXCLUDED.jersey_number, nft_core_metadata.jersey_number),
-        series_name = COALESCE(EXCLUDED.series_name, nft_core_metadata.series_name),
-        set_name = COALESCE(EXCLUDED.set_name, nft_core_metadata.set_name)
+        first_name = COALESCE(EXCLUDED.first_name, nft_core_metadata_v2.first_name),
+        last_name = COALESCE(EXCLUDED.last_name, nft_core_metadata_v2.last_name),
+        team_name = COALESCE(EXCLUDED.team_name, nft_core_metadata_v2.team_name),
+        position = COALESCE(EXCLUDED.position, nft_core_metadata_v2.position),
+        jersey_number = COALESCE(EXCLUDED.jersey_number, nft_core_metadata_v2.jersey_number),
+        series_name = COALESCE(EXCLUDED.series_name, nft_core_metadata_v2.series_name),
+        set_name = COALESCE(EXCLUDED.set_name, nft_core_metadata_v2.set_name)
     `, [
       nftData.nft_id,
       nftData.edition_id,
@@ -96,7 +96,7 @@ async function fetchAndStoreNFTMetadata(nftId, walletAddress) {
       nftData.series_name,
       nftData.set_name
     ]);
-    
+
     console.log(`[Metadata] ✅ Stored metadata for NFT ${nftId}: ${nftData.tier || 'unknown tier'} - ${nftData.last_name || 'unknown'}`);
     return true;
   } catch (err) {
@@ -112,19 +112,19 @@ async function processUnknownNFTs() {
   console.log("═══════════════════════════════════════════════════════════");
   console.log("  FETCH UNKNOWN NFT METADATA (from blockchain)");
   console.log("═══════════════════════════════════════════════════════════\n");
-  
+
   const unknownNFTs = await findUnknownNFTs(500);
-  
+
   if (unknownNFTs.length === 0) {
     console.log("[Metadata] ✅ All NFTs have metadata!");
     return { processed: 0, success: 0, failed: 0 };
   }
-  
+
   console.log(`[Metadata] Found ${unknownNFTs.length} NFTs without metadata\n`);
-  
+
   let success = 0;
   let failed = 0;
-  
+
   for (const { nft_id, wallet_address } of unknownNFTs) {
     const result = await fetchAndStoreNFTMetadata(nft_id, wallet_address);
     if (result) {
@@ -132,11 +132,11 @@ async function processUnknownNFTs() {
     } else {
       failed++;
     }
-    
+
     // Small delay to avoid rate limiting
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  
+
   console.log(`\n[Metadata] ✅ Complete: ${success} success, ${failed} failed`);
   return { processed: unknownNFTs.length, success, failed };
 }

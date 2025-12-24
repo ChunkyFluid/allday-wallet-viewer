@@ -89,14 +89,14 @@ async function syncWallet() {
     }
 
     // Also upsert holdings table (never delete!)
-    console.log('\n5. Upserting holdings table (preserving existing locked status)...');
+    console.log('\n5. Upserting holdings table (preserving existing locked status AND acquired_at)...');
 
     if (allNftIds.length > 0) {
         const BATCH_SIZE = 500;
         for (let i = 0; i < allNftIds.length; i += BATCH_SIZE) {
             const batch = allNftIds.slice(i, i + BATCH_SIZE);
             const batchValues = batch.map((_, idx) =>
-                `($1, $${idx * 2 + 2}, $${idx * 2 + 3}, NOW())`
+                `($1, $${idx * 2 + 2}, $${idx * 2 + 3}, COALESCE((SELECT acquired_at FROM holdings WHERE wallet_address = $1 AND nft_id = $${idx * 2 + 2}), NOW()))`
             ).join(', ');
 
             const batchParams = [WALLET];
@@ -108,11 +108,12 @@ async function syncWallet() {
                 `INSERT INTO holdings (wallet_address, nft_id, is_locked, acquired_at)
          VALUES ${batchValues}
          ON CONFLICT (wallet_address, nft_id) DO UPDATE SET 
-           is_locked = EXCLUDED.is_locked`,
+           is_locked = EXCLUDED.is_locked
+           -- ✅ FIX: acquired_at is NEVER updated, preserving original timestamp`,
                 batchParams
             );
         }
-        console.log(`   ✅ Upserted ${allNftIds.length} NFTs into holdings`);
+        console.log(`   ✅ Upserted ${allNftIds.length} NFTs into holdings (acquired_at preserved)`);
     }
 
     // Verify
