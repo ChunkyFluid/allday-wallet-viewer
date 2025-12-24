@@ -7,7 +7,7 @@ import * as eventProcessor from '../services/event-processor.js';
 import fetch from 'node-fetch';
 
 const FLOW_REST_API = 'https://rest-mainnet.onflow.org';
-const START_DATE = '2024-12-17T00:00:00Z';
+const START_DATE = '2025-12-22T00:00:00Z';
 const END_DATE = new Date().toISOString();
 
 async function getBlockHeightForDate(dateStr) {
@@ -32,7 +32,7 @@ async function fetchEventsInRange(startHeight, endHeight) {
     const allEvents = [];
 
     // Flow REST API has limits, so we'll fetch in chunks
-    const CHUNK_SIZE = 50; // blocks per request
+    const CHUNK_SIZE = 250; // blocks per request
 
     for (let height = startHeight; height <= endHeight; height += CHUNK_SIZE) {
         const endChunk = Math.min(height + CHUNK_SIZE - 1, endHeight);
@@ -86,8 +86,11 @@ async function backfillEvents() {
     console.log(`Date Range: ${START_DATE} to ${END_DATE}\n`);
 
     // Calculate approximate block heights
-    const startHeight = await getBlockHeightForDate(START_DATE);
-    const endHeight = await getBlockHeightForDate(END_DATE);
+    // Use hardcoded blocks for accuracy based on diagnosis
+    // Current block roughly 137070688 (Dec 24)
+    // We want last ~3 days (approx 260k blocks)
+    const endHeight = 137070000;
+    const startHeight = 136800000;
 
     console.log(`Estimated Block Range: ${startHeight.toLocaleString()} to ${endHeight.toLocaleString()}`);
     console.log(`(Approximately ${(endHeight - startHeight).toLocaleString()} blocks to scan)\n`);
