@@ -11,7 +11,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Pool } from "pg"; // (still imported; fine even if unused)
 import session from "express-session";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import WebSocket from "ws";
 import * as eventProcessor from "./services/event-processor.js";
 import { syncLeaderboards } from "./scripts/sync_leaderboards.js";
