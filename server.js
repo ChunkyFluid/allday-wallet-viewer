@@ -68,25 +68,52 @@ initVisitCounterTable();
 
 // ------------------ Snowflake connection ------------------
 
-const connection = snowflake.createConnection({
-  account: process.env.SNOWFLAKE_ACCOUNT,
-  username: process.env.SNOWFLAKE_USERNAME,
-  password: process.env.SNOWFLAKE_PASSWORD,
-  warehouse: process.env.SNOWFLAKE_WAREHOUSE,
-  database: process.env.SNOWFLAKE_DATABASE,
-  schema: process.env.SNOWFLAKE_SCHEMA,
-  role: process.env.SNOWFLAKE_ROLE
-});
-
+let connection = null;
 let snowflakeConnected = false;
+
+function createSnowflakeConnection() {
+  return snowflake.createConnection({
+    account: process.env.SNOWFLAKE_ACCOUNT,
+    username: process.env.SNOWFLAKE_USERNAME,
+    password: process.env.SNOWFLAKE_PASSWORD,
+    warehouse: process.env.SNOWFLAKE_WAREHOUSE,
+    database: process.env.SNOWFLAKE_DATABASE,
+    schema: process.env.SNOWFLAKE_SCHEMA,
+    role: process.env.SNOWFLAKE_ROLE
+  });
+}
+
+// Initial creation
+connection = createSnowflakeConnection();
 
 function ensureSnowflakeConnected() {
   return new Promise((resolve, reject) => {
-    if (snowflakeConnected) return resolve();
+    // If we think we're connected, verify it hasn't been terminated
+    if (snowflakeConnected && connection && connection.isUp()) {
+      return resolve();
+    }
+
+    // If connection object exists but is down/terminated, destroy it and recreate
+    if (connection && !connection.isUp()) {
+      console.log("Snowflake connection appears down, recreating...");
+      snowflakeConnected = false;
+      try {
+        // Create new connection instance
+        connection = createSnowflakeConnection();
+      } catch (err) {
+        return reject(new Error("Failed to recreate Snowflake connection: " + err.message));
+      }
+    }
+
+    // If connection is null (shouldn't happen with logic above but safe check)
+    if (!connection) {
+      connection = createSnowflakeConnection();
+    }
 
     connection.connect((err, conn) => {
       if (err) {
         console.error("Snowflake connect error:", err);
+        snowflakeConnected = false;
         return reject(err);
       }
       console.log("Snowflake connected as", conn.getId());
